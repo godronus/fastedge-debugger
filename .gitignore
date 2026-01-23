@@ -1,0 +1,23 @@
+/tests/jest-results.json
+
+node_modules/
+.DS_Store
+bin/
+dist/
+lib/
+integration-tests/test-files/output.wasm
+integration-tests/test-application/test-app.wasm
+# *.o
+# *.d
+/rusturl/
+# compiler_flags
+
+/runtime/fastedge/build-*
+/runtime/fastedge/deps/
+*.a
+yarn-error.log
+
+.vscode/
+
+# Using pnpm
+package-lock.json
