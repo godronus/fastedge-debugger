@@ -90,6 +90,11 @@ export class ProxyWasmRunner {
     }
 
     this.logs = [];
+
+    // Set log level if specified (default to Info=2 if not specified)
+    const logLevel = call.logLevel !== undefined ? call.logLevel : 2;
+    this.hostFunctions.setLogLevel(logLevel);
+
     const requestHeaders = HeaderManager.normalize(call.request.headers ?? {});
     const responseHeaders = HeaderManager.normalize(
       call.response.headers ?? {},
@@ -168,9 +173,14 @@ export class ProxyWasmRunner {
     );
     const returnCode = this.callIfExported(exportName, ...args);
 
+    // Filter logs based on log level
+    const filteredLogs = this.logs.filter((log) =>
+      this.hostFunctions.shouldLog(log.level),
+    );
+
     return {
       returnCode,
-      logs: this.logs,
+      logs: filteredLogs,
       request: {
         headers: { ...this.hostFunctions.getRequestHeaders() },
         body: this.hostFunctions.getRequestBody(),

@@ -68,6 +68,20 @@
 
       <section class="card">
         <h2>Hooks</h2>
+        <div style="margin-bottom: 1rem">
+          <label for="logLevel">Log Level Filter:</label>
+          <select id="logLevel">
+            <option value="0">Trace (show all)</option>
+            <option value="1">Debug</option>
+            <option value="2" selected>Info</option>
+            <option value="3">Warn</option>
+            <option value="4">Error</option>
+            <option value="5">Critical</option>
+          </select>
+          <small style="color: #888; display: block; margin-top: 0.25rem">
+            Only logs at or above this level will be shown
+          </small>
+        </div>
         <div class="hook-buttons">
           <button id="runAllBtn" class="primary">▶ Run All Hooks</button>
           <button data-hook="onRequestHeaders">onRequestHeaders</button>

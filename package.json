@@ -3,16 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm run build:backend && pnpm run build:frontend",
+    "build:backend": "tsc -p server/tsconfig.json",
+    "build:frontend": "cd frontend && pnpm exec vite build",
     "start": "node dist/server.js",
-    "dev": "node --watch dist/server.js"
+    "dev": "pnpm run dev:backend & pnpm run dev:frontend",
+    "dev:backend": "tsc -p server/tsconfig.json && node --watch dist/server.js",
+    "dev:frontend": "cd frontend && pnpm exec vite"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.24",
-    "typescript": "^5.4.5"
+    "@types/react": "^19.2.9",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "typescript": "^5.4.5",
+    "vite": "^7.3.1"
   }
 }

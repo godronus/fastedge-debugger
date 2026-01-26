@@ -6,6 +6,16 @@ import { PropertyResolver } from "./PropertyResolver";
 
 const textEncoder = new TextEncoder();
 
+// Log levels from G-Core SDK
+export enum LogLevel {
+  Trace = 0,
+  Debug = 1,
+  Info = 2,
+  Warn = 3,
+  Error = 4,
+  Critical = 5,
+}
+
 export class HostFunctions {
   private memory: MemoryManager;
   private propertyResolver: PropertyResolver;
@@ -19,6 +29,7 @@ export class HostFunctions {
   private currentContextId = 1;
   private lastHostCall: string | null = null;
   private debug = false;
+  private currentLogLevel: number = LogLevel.Trace; // Default to show all logs
 
   constructor(
     memory: MemoryManager,
@@ -55,6 +66,18 @@ export class HostFunctions {
     this.currentContextId = contextId;
   }
 
+  getCurrentLogLevel(): number {
+    return this.currentLogLevel;
+  }
+
+  setLogLevel(level: number): void {
+    this.currentLogLevel = level;
+  }
+
+  shouldLog(level: number): boolean {
+    return level >= this.currentLogLevel;
+  }
+
   getRequestHeaders(): HeaderMap {
     return this.requestHeaders;
   }
@@ -76,7 +99,25 @@ export class HostFunctions {
       proxy_log: (level: number, ptr: number, len: number) => {
         this.setLastHostCall(`proxy_log level=${level} len=${len}`);
         const message = this.memory.readString(ptr, len);
-        this.logs.push({ level, message });
+        // Only log if level meets or exceeds current log level
+        if (level >= this.currentLogLevel) {
+          this.logs.push({ level, message });
+        }
+        return ProxyStatus.Ok;
+      },
+
+      proxy_get_log_level: (levelPtr: number) => {
+        this.setLastHostCall(`proxy_get_log_level`);
+        if (levelPtr) {
+          this.memory.writeU32(levelPtr, this.currentLogLevel);
+        }
+        return ProxyStatus.Ok;
+      },
+
+      proxy_set_log_level: (level: number) => {
+        this.setLastHostCall(`proxy_set_log_level level=${level}`);
+        this.currentLogLevel = level;
+        this.logDebug(`Log level set to ${level}`);
         return ProxyStatus.Ok;
       },
 

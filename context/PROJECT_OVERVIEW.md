@@ -12,8 +12,8 @@ Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run 
 ## Production Context
 
 - **Production Environment**: nginx + custom wasmtime host
-- **SDK**: Kong's proxy-wasm AssemblyScript SDK (https://github.com/Kong/proxy-wasm-assemblyscript-sdk)
-- **ABI**: Standard proxy-wasm ABI with specific format requirements for the Kong SDK
+- **SDK**: G-Core's proxy-wasm AssemblyScript SDK (https://github.com/G-Core/proxy-wasm-sdk-as)
+- **ABI**: Standard proxy-wasm ABI with specific format requirements for the G-Core SDK
 - **CDN Use Case**: Binaries run on FastEdge CDN for request/response manipulation
 
 ## Architecture
@@ -21,15 +21,16 @@ Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run 
 ### Tech Stack
 
 - **Backend**: Node.js + Express + TypeScript
-- **Frontend**: Vanilla HTML/CSS/JavaScript
+- **Frontend**: React 19 + Vite + TypeScript
 - **WASM Runtime**: Node's WebAssembly API with WASI preview1
-- **Port**: 5180 (configurable via PORT env var)
+- **Port**: 5179 (configurable via PORT env var)
 
 ### Project Structure
 
 ```
-src/
+server/                       # Backend code (formerly src/)
   server.ts                   # Express server with /api/load and /api/call endpoints
+  tsconfig.json              # Extends base tsconfig.json
   runner/
     ProxyWasmRunner.ts        # Main orchestrator (340 lines)
     HostFunctions.ts          # Proxy-wasm host function implementations (413 lines)
@@ -37,13 +38,47 @@ src/
     MemoryManager.ts          # WASM memory operations (165 lines)
     PropertyResolver.ts       # Property path resolution (160 lines)
     types.ts                  # Shared TypeScript types (60 lines)
-public/
-  index.html                  # Test UI
-  app.js                      # Frontend logic
-  styles.css                  # Dark theme styling
-context/
-  basic-wasm-code.md          # Simple test binary source
-  print-wasm-code.md          # Complex test binary with header parsing
+
+frontend/                     # React + Vite frontend
+  src/
+    components/               # React components
+      WasmLoader.tsx         # File upload component
+      HeadersEditor.tsx      # Headers input component
+      RequestForm.tsx        # Request configuration
+      ResponseForm.tsx       # Response configuration
+      PropertiesEditor.tsx   # JSON properties editor
+      HooksPanel.tsx         # Hook execution controls
+      OutputDisplay.tsx      # Results viewer
+    hooks/
+      useWasm.ts            #React UI (base64 upload)
+- [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
+- [x] Capture logs from `proxy_log` and `fd_write` (stdout) with log level filtering
+- [x] Log level filtering: Trace(0), Debug(1), Info(2), Warn(3), Error(4), Critical(5)
+- [x] Header serialization in G-Core SDK format
+- [x] Property resolution (request.method, request.path, request.url, request.host, response.code, etc.)
+- [x] Request metadata (headers, body, trailers)
+- [x] Response metadata (headers, body, trailers)
+- [x] "Run All Hooks" button for full request flow simulation
+- [x] React-based frontend with component architecture
+- [x] TypeScript type safety throughout (frontend + backend)
+- [x] Vite build system for fast development
+- [x] SPA routing with Express fallback
+
+### ⚠️ Known Issues
+
+- `proxy_on_vm_start` and `proxy_on_configure` fail with "Unexpected 'null'" errors
+  - Non-blocking: hooks still execute successfully
+  - Likely missing host functions the SDK tries to call during initialization
+  - Error handling catches these, execution continues
+
+### 🚧 Not Yet Implemented
+
+- Response body manipulation by WASM
+- HTTP callouts (proxy_http_call)
+- Shared data/queue operations
+- Metrics support
+- Full property path coverage (only common paths implemented)
+- Request/response trailers hooks (not supported by runner
 ```
 
 ## Current Status
@@ -70,7 +105,7 @@ context/
 ### 🚧 Not Yet Implemented
 
 - Response body manipulation by WASM
-- HTTP callouts (proxy_http_call)
+- HTTP callouts (proxy_http_call)erver/runner/HeaderManager.ts](../server
 - Shared data/queue operations
 - Metrics support
 - Full property path coverage (only common paths implemented)
@@ -79,7 +114,7 @@ context/
 
 ### Header Serialization Format
 
-**This was the major breakthrough.** The Kong AssemblyScript SDK expects a specific binary format:
+**This was the major breakthrough.** The G-Core AssemblyScript SDK expects a specific binary format:
 
 ```
 [num_pairs: u32]                          # Header pair count
@@ -100,35 +135,51 @@ context/
 04 00 00 00 0b 00 00 00                  # "host" = 4 bytes, "example.com" = 11 bytes
 0e 00 00 00 07 00 00 00                  # "x-custom-relay" = 14 bytes, "Fifteen" = 7 bytes
 68 6f 73 74 00                            # "host\0"
-65 78 61 6d 70 6c 65 2e 63 6f 6d 00     # "example.com\0"
-78 2d 63 75 73 74 6f 6d 2d 72 65 6c 61 79 00  # "x-custom-relay\0"
-46 69 66 74 65 65 6e 00                  # "Fifteen\0"
+pnpm install
+pnpm run build          # Builds both backend and frontend
+pnpm start              # Starts server on port 5179
 ```
 
-See `HeaderManager.serialize()` in [src/runner/HeaderManager.ts](../src/runner/HeaderManager.ts)
+Or run in development mode:
 
-### Key SDK Functions Flow
+```bash
+pnpm run dev:backend    # Runs backend with watch mode
+pnpm run dev:frontend   # Runs Vite dev server on port 5173 (with proxy to backend)
+```
 
-1. **Hook Invocation**: Host calls WASM export `proxy_on_request_headers(context_id, header_count, end_of_stream)`
-2. **SDK Internal**: WASM calls host import `proxy_get_header_map_pairs(map_type, ptr_ptr, len_ptr)`
-3. **Host Response**: Host writes serialized header data to WASM memory, returns pointer
-4. **SDK Parsing**: `deserializeHeaders()` parses binary format into `Headers` array
-5. **User Code**: `collectHeaders()` converts to usable format with `.key` and `.value` properties
+### Build Commands
 
-### Property Resolution
+- `pnpm run build` - Build both backend and frontend
+- `pnpm run build:backend` - Build only backend (TypeScript → dist/)
+- `pnpm run build:frontend` - Build only frontend (React → dist-frontend/)
+- `pnpm run dev:backend` - Run backend in watch mode
+- `pnpm run dev:frontend` - Run Vite dev server with hot reload
 
-Standard properties implemented in `PropertyResolver.ts`:
+### Debug Mode
 
-- `request.method` → HTTP method (GET, POST, etc.)
-- `request.path` → URL path
-- `request.url` → Full URL (scheme://host/path)
-- `request.host` → Host header
-- `request.scheme` → "http" or "https"
-- `response.code` → Status code (200, 404, etc.)
-- `response.status` → Same as response.code
-- `response.code_details` → Status text ("OK", "Not Found")
+Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 
-Path separators supported: `\0` (null), `.` (dot), `/` (slash)
+- Host function calls
+- Memory operations
+- Header hex dumps
+- Trap information
+
+### Loading a Binary
+
+1. Open http://localhost:5179
+2. Click file input and select a .wasm file
+3. File is read in browser and sent as base64 to `/api/load`
+4. Wait for success message
+
+### Running Hooks
+
+1. Configure request headers, body, trailers (supports key:value format)
+2. Configure response headers, body, trailers
+3. Set properties (JSON format)
+4. Select log level (default: Info)
+5. Click "Run All Hooks" or individual hook buttons
+6. View output with logs and return codes
+   Path separators supported: `\0` (null), `.` (dot), `/` (slash)
 
 ## How to Use
 
@@ -159,10 +210,20 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 ### Running Hooks
 
 1. Configure request (method, path, headers, body)
-2. Configure response (status, headers, body)
-3. Set properties (JSON format)
-4. Click "Run All Hooks" or individual hook buttons
-5. View output in the Output section
+2. Configure response (status, headers, body)G-Core SDK format
+   - Tried: simple length-prefixed format ❌
+   - Tried: null-terminated strings only ❌
+   - Tried: count prefix without null terminators ❌
+   - **Success**: Count + size array + null-terminated data ✅
+3. **Frontend Migration**: Vanilla JS → React + Vite + TypeScript
+   - Component-based architecture for better maintainability
+   - Type-safe API layer
+   - Modern development workflow with hot reload
+4. **Project Structure Reorganization**:
+   - `src/` → `server/` for clarity
+   - Separate `frontend/` directory
+   - Base `tsconfig.json` extended by both backend and frontend
+   - Separate build outputs: `dist/` (backend), `dist-frontend/` (frontend)
 
 ### Example Request
 
@@ -180,11 +241,12 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 
 1. **Initial**: Monolithic 942-line ProxyWasmRunner.ts
 2. **Refactoring**: Split into 6 modular files for maintainability
-3. **Header Format Discovery**: Multiple iterations to match Kong SDK format
-   - Tried: simple length-prefixed format ❌
-   - Tried: null-terminated strings only ❌
-   - Tried: count prefix without null terminators ❌
-   - **Success**: Count + size array + null-terminated data ✅
+   3.Node.js version warning (Vite requires 20.19+ or 22.12+)
+
+- No automated Tried: simple length-prefixed format ❌
+  - Tried: null-terminated strings only ❌
+  - Tried: count prefix without null terminators ❌
+  - **Success**: Count + size array + null-terminated data ✅
 
 ### Test Binaries
 
@@ -201,7 +263,10 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 ### Strengths
 
 - Clean modular separation of concerns
-- Comprehensive error handling
+- Comprehensive error handling as JSON
+
+5. Automated testing suite
+
 - Debug logging throughout
 - Type safety with TypeScript
 - Memory management abstraction
@@ -248,8 +313,8 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 **Hook returns unexpected value**
 
 - Check logs for "debug: host_call ..." to see what WASM requested
-- Verify property values are set correctly
-- Check if WASM is calling unimplemented host functions
+- Verify property value6, 2026
+  Status: React frontend complete, log filtering working, core features stable
 
 **WASM initialization fails**
 
@@ -265,14 +330,14 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 
 ## References
 
-- [Kong Proxy-WASM AssemblyScript SDK](https://github.com/Kong/proxy-wasm-assemblyscript-sdk)
+- [G-Core Proxy-WASM AssemblyScript SDK](https://github.com/G-Core/proxy-wasm-sdk-as)
 - [Proxy-WASM Spec](https://github.com/proxy-wasm/spec)
 - [WebAssembly JavaScript API](https://developer.mozilla.org/en-US/docs/WebAssembly)
 - [WASI Preview1](https://github.com/WebAssembly/WASI/blob/main/legacy/preview1/docs.md)
 
 ## Contact & Context
 
-This test runner was built for FastEdge CDN binary development. The code runs in production on nginx with a custom wasmtime host, so exact format compatibility with the Kong SDK is critical.
+This test runner was built for FastEdge CDN binary development. The code runs in production on nginx with a custom wasmtime host, so exact format compatibility with the G-Core SDK is critical.
 
 Last Updated: January 23, 2026
 Status: Header serialization working, core features complete, ready for testing

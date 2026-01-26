@@ -125,7 +125,29 @@ export class MemoryManager {
     }
     if (output && this.logCallback) {
       const message = output.replace(/\n$/, "");
-      this.logCallback(1, `stdout(fd=${fd}): ${message}`);
+      // Try to parse log level from WASI output
+      // Format: "[LEVEL] message" or just "message"
+      let level = 1; // Default to debug/info
+      let cleanMessage = message;
+
+      const levelMatch = message.match(
+        /^\[(TRACE|DEBUG|INFO|WARN|ERROR|CRITICAL)\]\s*(.*)$/,
+      );
+      if (levelMatch) {
+        const levelName = levelMatch[1];
+        cleanMessage = levelMatch[2];
+        const levelMap: Record<string, number> = {
+          TRACE: 0,
+          DEBUG: 1,
+          INFO: 2,
+          WARN: 3,
+          ERROR: 4,
+          CRITICAL: 5,
+        };
+        level = levelMap[levelName] ?? 1;
+      }
+
+      this.logCallback(level, `stdout(fd=${fd}): ${cleanMessage}`);
     }
     if (nwritten) {
       this.writeU32(nwritten, total);

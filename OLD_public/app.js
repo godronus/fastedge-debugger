@@ -11,6 +11,7 @@ const resStatusText = document.getElementById("resStatusText");
 const resHeaders = document.getElementById("resHeaders");
 const resBody = document.getElementById("resBody");
 const properties = document.getElementById("properties");
+const logLevel = document.getElementById("logLevel");
 const output = document.getElementById("output");
 
 loadBtn.addEventListener("click", async () => {
@@ -67,6 +68,7 @@ document.getElementById("runAllBtn").addEventListener("click", async () => {
         body: resBody.value,
       },
       properties: parseJson(properties.value),
+      logLevel: parseInt(logLevel.value, 10),
     };
 
     output.textContent += `\n═══ ${hook} ═══\n`;
@@ -90,7 +92,14 @@ document.getElementById("runAllBtn").addEventListener("click", async () => {
       if (result.result.logs && result.result.logs.length > 0) {
         output.textContent += "Logs:\n";
         for (const log of result.result.logs) {
-          const levels = ["trace", "debug", "info", "warn", "error"];
+          const levels = [
+            "trace",
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "critical",
+          ];
           const levelName = levels[log.level] || `level${log.level}`;
           output.textContent += `  [${levelName}] ${log.message}\n`;
         }
@@ -130,6 +139,7 @@ for (const button of document.querySelectorAll("[data-hook]")) {
         body: resBody.value,
       },
       properties: parseJson(properties.value),
+      logLevel: parseInt(logLevel.value, 10),
     };
 
     output.textContent = "Running hook...";

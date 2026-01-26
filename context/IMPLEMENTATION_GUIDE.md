@@ -5,22 +5,27 @@
 ### Request Flow
 
 ```
-UI (browser)
-  ↓ POST /api/load with base64 WASM
+React UI (browser)
+  ↓ User selects .wasm file
+  ↓ File.arrayBuffer() → btoa() → base64
+  ↓ POST /api/load with {wasmBase64: "..."}
 Server (Express)
-  ↓ Buffer.from(base64)
+  ↓ Buffer.from(wasmBase64, 'base64')
 ProxyWasmRunner.load()
   ↓ WebAssembly.compile()
   ↓ WebAssembly.instantiate(imports)
   ↓ instance._start()
 Ready for hook calls
 
-UI (browser)
-  ↓ POST /api/call with {hook, request, response, properties}
+React UI (browser)
+  ↓ User clicks "Run All Hooks" or individual hook
+  ↓ API: callHook(hook, {request_headers, request_body, ...})
+  ↓ Transform to backend format: {hook, request: {headers, body}, response: {...}}
+  ↓ POST /api/call with JSON payload
 Server (Express)
   ↓ JSON.parse()
 ProxyWasmRunner.callHook()
-  ↓ Setup: normalize headers, resolve properties
+  ↓ Setup: normalize headers, resolve properties, set log level
   ↓ Initialize: proxy_on_vm_start, proxy_on_configure, proxy_on_context_create
   ↓ Hook: proxy_on_request_headers(context_id, header_count, end_of_stream)
 WASM Execution
@@ -36,13 +41,17 @@ WASM Execution (continued)
   ↓ SDK: deserializeHeaders(buffer)
   ↓ SDK: collectHeaders() creates Header objects
   ↓ User code: iterate headers, process
+  ↓ User code: Log.info("message") → proxy_log(level, msg_ptr, msg_len)
   ↓ Return FilterHeadersStatusValues.Continue
 ProxyWasmRunner.callHook() (completed)
+  ↓ Filter logs by log level
   ↓ Collect logs, modified headers/body
-  ↓ Return {returnCode, logs, request, response, properties}
-Server → UI
+  ↓ Return {returnCode, logs: [{level, message}, ...], request, response}
+Server → React UI
   ↓ res.json({ok: true, result: {...}})
-UI displays results
+  ↓ Transform: logs array → logs.map(log => log.message).join("\n")
+React UI displays results
+  ↓ OutputDisplay component renders logs and return code
 ```
 
 ### Memory Management
@@ -127,7 +136,7 @@ When WASM wants a result:
 ### Header Serialization Details
 
 **Why the specific format?**
-The Kong SDK's `deserializeHeaders()` function expects:
+The G-Core SDK's `deserializeHeaders()` function expects:
 
 1. First u32 tells it how many pairs to expect
 2. Size array lets it pre-calculate offsets
@@ -491,6 +500,8 @@ If you need a different header format:
 1. Modify `HeaderManager.serialize()`
 2. Ensure it matches your SDK's `deserializeHeaders()`
 3. Test with real binaries
+
+**Note**: The G-Core SDK uses the same format as the previous Kong SDK, so no changes are needed for G-Core binaries.
 
 ### Additional Hooks
 
