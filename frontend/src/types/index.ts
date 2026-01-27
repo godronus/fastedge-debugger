@@ -19,3 +19,12 @@ export interface WasmState {
   wasmPath: string | null;
   wasmBuffer: ArrayBuffer | null;
 }
+
+export interface FinalResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+  contentType: string;
+  isBase64?: boolean;
+}

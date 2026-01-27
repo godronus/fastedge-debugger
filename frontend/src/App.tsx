@@ -3,9 +3,9 @@ import { useWasm } from "./hooks/useWasm";
 import { WasmLoader } from "./components/WasmLoader";
 import { RequestBar } from "./components/RequestBar";
 import { RequestTabs } from "./components/RequestTabs";
-import { TriggerPanel } from "./components/TriggerPanel";
-import { ResponseTabs } from "./components/ResponseTabs";
-import { HookResult } from "./types";
+import { HookStagesPanel } from "./components/HookStagesPanel";
+import { ResponseViewer } from "./components/ResponseViewer";
+import { HookResult, FinalResponse } from "./types";
 import "./App.css";
 
 function App() {
@@ -33,8 +33,11 @@ function App() {
     "my.custom.property": "test-value",
   });
 
-  const [logLevel, setLogLevel] = useState(2);
+  const [logLevel, setLogLevel] = useState(0); // Trace
   const [results, setResults] = useState<Record<string, HookResult>>({});
+  const [finalResponse, setFinalResponse] = useState<FinalResponse | null>(
+    null,
+  );
 
   const handleResult = (hook: string, result: HookResult) => {
     setResults((prev) => ({ ...prev, [hook]: result }));
@@ -63,8 +66,41 @@ function App() {
       <RequestBar
         method={method}
         url={url}
+        wasmLoaded={wasmState.wasmPath !== null}
         onMethodChange={setMethod}
         onUrlChange={setUrl}
+        onSend={async () => {
+          try {
+            const { sendFullFlow } = await import("./api");
+            const { hookResults, finalResponse: response } = await sendFullFlow(
+              url,
+              method,
+              {
+                ...hookCall,
+                logLevel,
+              },
+            );
+            // Update hook results and final response
+            setResults(hookResults);
+            setFinalResponse(response);
+          } catch (err) {
+            // Show error in all hooks
+            const errorMsg =
+              err instanceof Error ? err.message : "Unknown error";
+            const errorResult = {
+              logs: "",
+              returnValue: undefined,
+              error: errorMsg,
+            };
+            setResults({
+              onRequestHeaders: errorResult,
+              onRequestBody: errorResult,
+              onResponseHeaders: errorResult,
+              onResponseBody: errorResult,
+            });
+            setFinalResponse(null);
+          }
+        }}
       />
 
       <RequestTabs
@@ -76,15 +112,14 @@ function App() {
         onPropertiesChange={setProperties}
       />
 
-      <TriggerPanel
-        wasmLoaded={wasmState.wasmPath !== null}
+      <HookStagesPanel
+        results={results}
         hookCall={hookCall}
         logLevel={logLevel}
         onLogLevelChange={setLogLevel}
-        onResult={handleResult}
       />
 
-      <ResponseTabs results={results} />
+      <ResponseViewer response={finalResponse} />
     </div>
   );
 }

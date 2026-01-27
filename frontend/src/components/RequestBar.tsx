@@ -3,8 +3,10 @@ import { ChangeEvent } from "react";
 interface RequestBarProps {
   method: string;
   url: string;
+  wasmLoaded: boolean;
   onMethodChange: (method: string) => void;
   onUrlChange: (url: string) => void;
+  onSend: () => void;
 }
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
@@ -12,8 +14,10 @@ const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 export function RequestBar({
   method,
   url,
+  wasmLoaded,
   onMethodChange,
   onUrlChange,
+  onSend,
 }: RequestBarProps) {
   const handleMethodChange = (e: ChangeEvent<HTMLSelectElement>) => {
     onMethodChange(e.target.value);
@@ -38,6 +42,9 @@ export function RequestBar({
         onChange={handleUrlChange}
         placeholder="Enter request URL (e.g., https://example.com/api/endpoint)"
       />
+      <button onClick={onSend} disabled={!wasmLoaded} className="send-button">
+        Send
+      </button>
     </div>
   );
 }

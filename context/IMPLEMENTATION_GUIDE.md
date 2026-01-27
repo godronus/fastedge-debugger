@@ -2,7 +2,7 @@
 
 ## How the Runner Works
 
-### Request Flow
+### Full Flow with HTTP Fetch
 
 ```
 React UI (browser)
@@ -15,43 +15,67 @@ ProxyWasmRunner.load()
   ↓ WebAssembly.compile()
   ↓ WebAssembly.instantiate(imports)
   ↓ instance._start()
-Ready for hook calls
+Ready for requests
 
 React UI (browser)
-  ↓ User clicks "Run All Hooks" or individual hook
-  ↓ API: callHook(hook, {request_headers, request_body, ...})
-  ↓ Transform to backend format: {hook, request: {headers, body}, response: {...}}
-  ↓ POST /api/call with JSON payload
-Server (Express)
-  ↓ JSON.parse()
-ProxyWasmRunner.callHook()
+  ↓ User clicks "Send" button
+  ↓ API: sendFullFlow(url, method, {request_headers, request_body, properties, logLevel})
+  ↓ POST /api/send with {url, request: {headers, body, method}, properties, logLevel}
+Server (Express) → ProxyWasmRunner.callFullFlow()
+  
+  ↓ PHASE 1: Request Hooks
+  ↓ Run onRequestHeaders hook
+  ↓   → WASM can modify headers via proxy_set_header_map_pairs
+  ↓ Run onRequestBody hook  
+  ↓   → WASM can modify body and headers
+  ↓ Capture modified headers and body
+  
+  ↓ PHASE 2: Real HTTP Fetch
+  ↓ Detect binary content types (images, PDFs, etc.)
+  ↓ Preserve host header as x-forwarded-host
+  ↓ fetch(targetUrl, {method, headers: modifiedHeaders, body: modifiedBody})
+  ↓ Read response:
+  ↓   → Binary: Convert to base64, set isBase64 flag
+  ↓   → Text: Read as string
+  ↓ Extract response headers, status, contentType
+  
+  ↓ PHASE 3: Response Hooks
+  ↓ Run onResponseHeaders with real response headers
+  ↓   → WASM can inspect/modify response headers
+  ↓ Run onResponseBody with real response body
+  ↓   → WASM can inspect/modify response body
+  ↓ Capture final headers and body after WASM processing
+  
+  ↓ Return FullFlowResult:
+  ↓   hookResults: {onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody}
+  ↓   finalResponse: {status, headers, body, contentType, isBase64}
+
+Server → React UI
+  ↓ res.json({ok: true, hookResults: {...}, finalResponse: {...}})
+  ↓ Frontend receives both hook logs and final response
+  
+React UI displays:
+  ↓ HookStagesPanel shows logs/inputs for each hook
+  ↓ ResponseViewer shows final response:
+  ↓   → Body tab: Formatted JSON/HTML/XML
+  ↓   → Preview tab: Rendered HTML or displayed image
+  ↓   → Headers tab: Final response headers
+```
+
+### Individual Hook Execution (Manual Testing)
+
+```
+React UI
+  ↓ User clicks individual hook button (e.g., "onRequestHeaders")
+  ↓ API: callHook("onRequestHeaders", {request_headers, ...})
+  ↓ POST /api/call with {hook, request, response, properties, logLevel}
+Server (Express) → ProxyWasmRunner.callHook()
   ↓ Setup: normalize headers, resolve properties, set log level
   ↓ Initialize: proxy_on_vm_start, proxy_on_configure, proxy_on_context_create
-  ↓ Hook: proxy_on_request_headers(context_id, header_count, end_of_stream)
-WASM Execution
-  ↓ User code: onRequestHeaders()
-  ↓ SDK: stream_context.headers.request.get_headers()
-  ↓ SDK internal: proxy_get_header_map_pairs(0, ptr_ptr, len_ptr)
-Host Function
-  ↓ HostFunctions.proxy_get_header_map_pairs()
-  ↓ HeaderManager.serialize(headers)
-  ↓ MemoryManager.writeToWasm(bytes)
-  ↓ Return pointer to WASM
-WASM Execution (continued)
-  ↓ SDK: deserializeHeaders(buffer)
-  ↓ SDK: collectHeaders() creates Header objects
-  ↓ User code: iterate headers, process
-  ↓ User code: Log.info("message") → proxy_log(level, msg_ptr, msg_len)
-  ↓ Return FilterHeadersStatusValues.Continue
-ProxyWasmRunner.callHook() (completed)
-  ↓ Filter logs by log level
-  ↓ Collect logs, modified headers/body
-  ↓ Return {returnCode, logs: [{level, message}, ...], request, response}
-Server → React UI
-  ↓ res.json({ok: true, result: {...}})
-  ↓ Transform: logs array → logs.map(log => log.message).join("\n")
-React UI displays results
-  ↓ OutputDisplay component renders logs and return code
+  ↓ Execute single hook: proxy_on_request_headers(context_id, header_count, end_of_stream)
+  ↓ Return {returnCode, logs, request, response, properties}
+React UI
+  ↓ Display in HookStagesPanel for that specific hook
 ```
 
 ### Memory Management
@@ -254,6 +278,63 @@ fd_write: (fd: number, iovs: number, iovsLen: number, nwritten: number) => {
 ```
 
 Each iovec points to a buffer in WASM memory. We read all of them and concatenate.
+
+## Binary Content Handling
+
+### Detection
+
+Binary content is detected by content-type:
+
+```typescript
+const isBinary =
+  contentType.startsWith("image/") ||
+  contentType.startsWith("video/") ||
+  contentType.startsWith("audio/") ||
+  contentType.includes("application/octet-stream") ||
+  contentType.includes("application/pdf") ||
+  contentType.includes("application/zip");
+```
+
+### Backend Processing
+
+Binary responses are converted to base64:
+
+```typescript
+if (isBinary) {
+  const arrayBuffer = await response.arrayBuffer();
+  responseBody = Buffer.from(arrayBuffer).toString("base64");
+  isBase64 = true;
+} else {
+  responseBody = await response.text();
+}
+```
+
+### Frontend Display
+
+**Images:**
+```typescript
+<img src={`data:${contentType};base64,${body}`} />
+```
+
+**HTML:**
+```typescript
+<iframe srcDoc={body} sandbox="allow-same-origin" />
+```
+
+**Non-displayable binary:**
+Show message, hide Body tab, only show Headers tab.
+
+### Tab Visibility Logic
+
+- **Body tab**: Hidden for binary content (images, PDFs, etc.)
+- **Preview tab**: Shown only for HTML and images
+- **Headers tab**: Always shown
+
+### Auto Tab Selection
+
+- HTML/Images → Preview tab
+- Binary non-image → Headers tab  
+- Text (JSON, XML, plain) → Body tab
 
 ## Module Dependencies
 
@@ -527,4 +608,4 @@ To load properties from external sources:
 2. Call during initialization in ProxyWasmRunner
 3. Cache results for performance
 
-Last Updated: January 23, 2026
+Last Updated: January 27, 2026

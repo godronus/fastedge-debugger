@@ -1,5 +1,5 @@
 import { WASI } from "node:wasi";
-import type { HookCall, HookResult, HeaderMap } from "./types";
+import type { HookCall, HookResult, HeaderMap, FullFlowResult } from "./types";
 import { MemoryManager } from "./MemoryManager";
 import { HeaderManager } from "./HeaderManager";
 import { PropertyResolver } from "./PropertyResolver";
@@ -82,6 +82,163 @@ export class ProxyWasmRunner {
     }
 
     this.initialized = false;
+  }
+
+  async callFullFlow(
+    call: HookCall,
+    targetUrl: string,
+  ): Promise<FullFlowResult> {
+    if (!this.instance) {
+      throw new Error("WASM module not loaded");
+    }
+
+    const results: Record<string, HookResult> = {};
+
+    // Phase 1: Run request hooks
+    results.onRequestHeaders = await this.callHook({
+      ...call,
+      hook: "onRequestHeaders",
+    });
+    results.onRequestBody = await this.callHook({
+      ...call,
+      hook: "onRequestBody",
+    });
+
+    // Get modified request data from hooks
+    const modifiedRequestHeaders = results.onRequestBody.request.headers;
+    const modifiedRequestBody = results.onRequestBody.request.body;
+    const requestMethod = call.request.method ?? "GET";
+
+    // Phase 2: Perform actual HTTP fetch
+    try {
+      this.logDebug(`Fetching ${requestMethod} ${targetUrl}`);
+
+      // Preserve the host header as x-forwarded-host since fetch() will override it
+      const fetchHeaders: Record<string, string> = {
+        ...modifiedRequestHeaders,
+      };
+
+      // If there's a host header, also add it as x-forwarded-host
+      const hostHeader = Object.entries(modifiedRequestHeaders).find(
+        ([key]) => key.toLowerCase() === "host",
+      );
+
+      if (hostHeader) {
+        fetchHeaders["x-forwarded-host"] = hostHeader[1];
+        this.logDebug(`Adding x-forwarded-host: ${hostHeader[1]}`);
+      }
+
+      const fetchOptions: RequestInit = {
+        method: requestMethod,
+        headers: fetchHeaders,
+      };
+
+      // Add body for methods that support it
+      if (
+        ["POST", "PUT", "PATCH"].includes(requestMethod.toUpperCase()) &&
+        modifiedRequestBody
+      ) {
+        fetchOptions.body = modifiedRequestBody;
+      }
+
+      const response = await fetch(targetUrl, fetchOptions);
+
+      // Extract response headers
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+
+      const contentType = response.headers.get("content-type") || "text/plain";
+      const responseStatus = response.status;
+      const responseStatusText = response.statusText;
+
+      // Check if response is binary (image, video, audio, etc.)
+      const isBinary =
+        contentType.startsWith("image/") ||
+        contentType.startsWith("video/") ||
+        contentType.startsWith("audio/") ||
+        contentType.includes("application/octet-stream") ||
+        contentType.includes("application/pdf") ||
+        contentType.includes("application/zip");
+
+      let responseBody: string;
+      let isBase64 = false;
+
+      if (isBinary) {
+        // For binary content, convert to base64
+        const arrayBuffer = await response.arrayBuffer();
+        responseBody = Buffer.from(arrayBuffer).toString("base64");
+        isBase64 = true;
+        this.logDebug(
+          `Binary response converted to base64 (${arrayBuffer.byteLength} bytes)`,
+        );
+      } else {
+        // For text content, just get as text
+        responseBody = await response.text();
+      }
+
+      this.logDebug(`Fetch completed: ${responseStatus} ${responseStatusText}`);
+
+      // Phase 3: Run response hooks with real response data
+      const responseCall = {
+        ...call,
+        response: {
+          headers: responseHeaders,
+          body: responseBody,
+          status: responseStatus,
+          statusText: responseStatusText,
+        },
+      };
+
+      results.onResponseHeaders = await this.callHook({
+        ...responseCall,
+        hook: "onResponseHeaders",
+      });
+      results.onResponseBody = await this.callHook({
+        ...responseCall,
+        hook: "onResponseBody",
+      });
+
+      // Get final response after WASM modifications
+      const finalHeaders = results.onResponseBody.response.headers;
+      const finalBody = results.onResponseBody.response.body;
+
+      return {
+        hookResults: results,
+        finalResponse: {
+          status: responseStatus,
+          statusText: responseStatusText,
+          headers: finalHeaders,
+          body: finalBody,
+          contentType,
+          isBase64,
+        },
+      };
+    } catch (error) {
+      this.logDebug(`Fetch error: ${String(error)}`);
+      // Return error in response hooks
+      const errorResult: HookResult = {
+        returnCode: null,
+        logs: [{ level: 4, message: `Fetch error: ${String(error)}` }],
+        request: results.onRequestBody.request,
+        response: { headers: {}, body: "" },
+        properties: call.properties,
+      };
+      results.onResponseHeaders = errorResult;
+      results.onResponseBody = errorResult;
+
+      return {
+        hookResults: results,
+        finalResponse: {
+          status: 0,
+          statusText: "Fetch Error",
+          headers: {},
+          body: `Error: ${String(error)}`,
+          contentType: "text/plain",
+        },
+      };
+    }
   }
 
   async callHook(call: HookCall): Promise<HookResult> {

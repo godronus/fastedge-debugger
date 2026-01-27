@@ -70,15 +70,18 @@ frontend/                     # React + Vite frontend
   - Non-blocking: hooks still execute successfully
   - Likely missing host functions the SDK tries to call during initialization
   - Error handling catches these, execution continues
+- Native `fetch()` overrides `Host` header based on target URL
+  - Workaround: Original host is preserved as `X-Forwarded-Host`
+  - This is standard proxy behavior
 
 ### 🚧 Not Yet Implemented
 
-- Response body manipulation by WASM
+- Response body manipulation by WASM (hooks run but modifications not yet applied)
 - HTTP callouts (proxy_http_call)
 - Shared data/queue operations
 - Metrics support
 - Full property path coverage (only common paths implemented)
-- Request/response trailers hooks (not supported by runner
+- Request/response trailers hooks
 ```
 
 ## Current Status
@@ -241,12 +244,25 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 
 1. **Initial**: Monolithic 942-line ProxyWasmRunner.ts
 2. **Refactoring**: Split into 6 modular files for maintainability
-   3.Node.js version warning (Vite requires 20.19+ or 22.12+)
-
-- No automated Tried: simple length-prefixed format ❌
-  - Tried: null-terminated strings only ❌
-  - Tried: count prefix without null terminators ❌
-  - **Success**: Count + size array + null-terminated data ✅
+3. **Header Format Discovery**: Critical breakthrough in G-Core SDK format
+   - Tried: simple length-prefixed format ❌
+   - Tried: null-terminated strings only ❌
+   - Tried: count prefix without null terminators ❌
+   - **Success**: Count + size array + null-terminated data ✅
+4. **Frontend Migration**: Vanilla JS → React 19 + Vite + TypeScript
+   - Component-based architecture for better maintainability
+   - Type-safe API layer
+   - Modern development workflow with hot reload
+5. **UI Redesign** (January 2026):
+   - Moved "Send" button to request bar (Postman-like)
+   - Tabbed hook stages panel with Logs/Inputs views
+   - Response viewer with Body/Preview/Headers
+   - Smart tab visibility based on content type
+6. **HTTP Integration**: Added actual fetching between hooks
+   - Request hooks modify headers/body
+   - Real HTTP request with modifications
+   - Response hooks process real server response
+   - Binary content handling with base64 encoding
 
 ### Test Binaries
 
@@ -339,5 +355,5 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 
 This test runner was built for FastEdge CDN binary development. The code runs in production on nginx with a custom wasmtime host, so exact format compatibility with the G-Core SDK is critical.
 
-Last Updated: January 23, 2026
-Status: Header serialization working, core features complete, ready for testing
+Last Updated: January 27, 2026
+Status: Full flow with HTTP fetching working, response viewer complete, production-ready for local testing

@@ -47,10 +47,6 @@ export function TriggerPanel({
 
   return (
     <div className="trigger-panel">
-      <button onClick={handleRunAll} disabled={!wasmLoaded}>
-        Run All Hooks
-      </button>
-
       <div className="hooks-grid">
         {HOOKS.map((hook) => (
           <button

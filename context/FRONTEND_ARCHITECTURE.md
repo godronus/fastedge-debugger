@@ -50,26 +50,46 @@ Manages global state and orchestrates all components:
 ```typescript
 const App = () => {
   const { wasmState, loading, error, loadWasm } = useWasm();
-  const [requestConfig, setRequestConfig] = useState<RequestConfig>(...);
-  const [responseConfig, setResponseConfig] = useState<ResponseConfig>(...);
+  const [method, setMethod] = useState("GET");
+  const [url, setUrl] = useState("https://example.com/api/endpoint");
+  const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>(...);
+  const [requestBody, setRequestBody] = useState(...);
   const [properties, setProperties] = useState<Record<string, string>>(...);
-  const [logLevel, setLogLevel] = useState(2);
+  const [logLevel, setLogLevel] = useState(0); // Trace
   const [results, setResults] = useState<Record<string, HookResult>>({});
+  const [finalResponse, setFinalResponse] = useState<FinalResponse | null>(null);
 
   return (
     <div className="container">
       <WasmLoader onFileLoad={loadWasm} loading={loading} />
-      <RequestForm value={requestConfig} onChange={setRequestConfig} />
-      <ResponseForm value={responseConfig} onChange={setResponseConfig} />
-      <PropertiesEditor value={properties} onChange={setProperties} />
-      <HooksPanel
+      <RequestBar
+        method={method}
+        url={url}
         wasmLoaded={wasmState.wasmPath !== null}
+        onMethodChange={setMethod}
+        onUrlChange={setUrl}
+        onSend={async () => {
+          // Calls sendFullFlow API - executes all hooks + real HTTP fetch
+          const { hookResults, finalResponse } = await sendFullFlow(url, method, hookCall);
+          setResults(hookResults);
+          setFinalResponse(finalResponse);
+        }}
+      />
+      <RequestTabs
+        headers={requestHeaders}
+        body={requestBody}
+        properties={properties}
+        onHeadersChange={setRequestHeaders}
+        onBodyChange={setRequestBody}
+        onPropertiesChange={setProperties}
+      />
+      <HookStagesPanel
+        results={results}
         hookCall={hookCall}
         logLevel={logLevel}
         onLogLevelChange={setLogLevel}
-        onResult={handleResult}
       />
-      <OutputDisplay results={results} />
+      <ResponseViewer response={finalResponse} />
     </div>
   );
 };
@@ -128,14 +148,44 @@ Execute hooks:
   - onResponseHeaders
   - onResponseBody
 
-### OutputDisplay.tsx
+### HookStagesPanel.tsx (Replaces TriggerPanel + OutputDisplay)
 
-Display results:
+Tabbed interface for viewing hook execution:
 
-- Per-hook output sections
-- Error messages (red text)
-- Return codes
-- Formatted logs (pre tag)
+- **Main tabs**: One for each hook (onRequestHeaders, onRequestBody, etc.)
+- **Sub-tabs**: Logs and Inputs
+- **Logs view**: Shows output, return codes, errors for that hook
+- **Inputs view**: Shows data available to that hook (headers, body, properties)
+- **Log level selector**: Filter logs by severity
+- Individual hook buttons still available for manual testing
+
+### ResponseViewer.tsx
+
+Displays final HTTP response after all WASM processing:
+
+- **Body tab**: Formatted text display
+  - JSON: Pretty-printed with 2-space indent
+  - HTML: Formatted with proper indentation
+  - XML: Formatted with proper indentation
+  - Plain text: As-is
+  - Hidden for binary content
+- **Preview tab**: Visual rendering
+  - HTML: Rendered in sandboxed iframe
+  - Images: Displayed with proper base64 decoding
+  - Other: "Preview not available" message
+  - Hidden for non-visual content (JSON, plain text, etc.)
+- **Headers tab**: Final response headers as key-value pairs
+- **Status display**: Color-coded HTTP status and content-type
+- **Smart defaults**: Auto-selects appropriate tab based on content type
+
+### RequestBar.tsx
+
+Top navigation bar:
+
+- HTTP method dropdown (GET, POST, PUT, etc.)
+- URL input field
+- **"Send" button**: Triggers full flow execution (all hooks + HTTP fetch)
+- Disabled when WASM not loaded
 
 ## State Management
 
@@ -179,38 +229,64 @@ return file.name;
 
 #### callHook(hook: string, params: HookCall): Promise<HookResult>
 
-```typescript
-// 1. Transform frontend format to backend format
-const payload = {
-  hook,
-  request: {
-    headers: params.request_headers || {},
-    body: params.request_body || "",
-    trailers: params.request_trailers || {},
-  },
-  response: {
-    headers: params.response_headers || {},
-    body: params.response_body || "",
-    trailers: params.response_trailers || {},
-  },
-  properties: params.properties || {},
-  logLevel: params.logLevel !== undefined ? params.logLevel : 2,
-};
+Calls a single hook individually (used for manual hook testing):
 
-// 2. POST to /api/call
+```typescript
+const payload = { hook, request, response, properties, logLevel };
 const response = await fetch("/api/call", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(payload),
 });
-
-// 3. Transform response
 const result = await response.json();
-const logs = result.result?.logs || [];
 return {
-  logs: logs.map((log: any) => log.message || String(log)).join("\n"),
-  returnValue: result.result?.returnCode,
+  logs: result.result.logs.map(log => log.message).join("\n"),
+  returnValue: result.result.returnCode,
   error: result.error,
+};
+```
+
+#### sendFullFlow(url: string, method: string, params: HookCall): Promise<FullFlowResult>
+
+Executes complete request flow with real HTTP fetch:
+
+```typescript
+// 1. Send full flow request
+const payload = {
+  url,
+  request: {
+    headers: params.request_headers || {},
+    body: params.request_body || "",
+    method: method || "GET",
+  },
+  response: { headers: {}, body: "" }, // Initial, will be replaced by real response
+  properties: params.properties || {},
+  logLevel: params.logLevel !== undefined ? params.logLevel : 0,
+};
+
+const response = await fetch("/api/send", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+});
+
+// 2. Parse response with hook results and final response
+const result = await response.json();
+return {
+  hookResults: {
+    onRequestHeaders: { logs, returnValue, error },
+    onRequestBody: { logs, returnValue, error },
+    onResponseHeaders: { logs, returnValue, error },
+    onResponseBody: { logs, returnValue, error },
+  },
+  finalResponse: {
+    status: 200,
+    statusText: "OK",
+    headers: { "content-type": "application/json" },
+    body: "...",
+    contentType: "application/json",
+    isBase64: false,
+  },
 };
 ```
 
@@ -452,4 +528,4 @@ pnpm start
 - Build output goes to parent directory for easier deployment
 - Backend serves both API and static frontend (single server deployment)
 
-Last Updated: January 26, 2026
+Last Updated: January 27, 2026

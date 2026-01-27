@@ -52,3 +52,15 @@ export type LogEntry = {
   level: number;
   message: string;
 };
+
+export type FullFlowResult = {
+  hookResults: Record<string, HookResult>;
+  finalResponse: {
+    status: number;
+    statusText: string;
+    headers: HeaderMap;
+    body: string;
+    contentType: string;
+    isBase64?: boolean;
+  };
+};

@@ -46,6 +46,31 @@ app.post("/api/call", async (req: Request, res: Response) => {
   }
 });
 
+app.post("/api/send", async (req: Request, res: Response) => {
+  const { url, request, response, properties, logLevel } = req.body ?? {};
+  if (!url || typeof url !== "string") {
+    res.status(400).json({ error: "Missing url" });
+    return;
+  }
+
+  try {
+    const fullFlowResult = await runner.callFullFlow(
+      {
+        hook: "", // Not used in fullFlow
+        request: request ?? { headers: {}, body: "", method: "GET" },
+        response: response ?? { headers: {}, body: "" },
+        properties: properties ?? {},
+        logLevel: logLevel !== undefined ? logLevel : 2,
+      },
+      url,
+    );
+
+    res.json({ ok: true, ...fullFlowResult });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: String(error) });
+  }
+});
+
 // SPA fallback - serve index.html for all non-API routes
 app.get("*", (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "..", "dist-frontend", "index.html"));
