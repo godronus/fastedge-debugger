@@ -19,11 +19,12 @@ frontend/
 │   ├── components/          # React components
 │   │   ├── WasmLoader.tsx   # File upload component
 │   │   ├── HeadersEditor.tsx # Key:value header input
-│   │   ├── RequestForm.tsx   # Request configuration
-│   │   ├── ResponseForm.tsx  # Response configuration
 │   │   ├── PropertiesEditor.tsx # JSON properties editor
-│   │   ├── HooksPanel.tsx    # Hook execution controls
-│   │   └── OutputDisplay.tsx # Results viewer
+│   │   ├── RequestBar.tsx   # Method + URL + Send button
+│   │   ├── RequestTabs.tsx  # Collapsible request config tabs
+│   │   ├── HookStagesPanel.tsx # Collapsible hook logs/inputs viewer
+│   │   ├── ResponseViewer.tsx # Collapsible response display
+│   │   └── CollapsiblePanel.tsx # Reusable collapsible wrapper
 │   ├── hooks/
 │   │   └── useWasm.ts       # WASM loading logic
 │   ├── api/
@@ -95,6 +96,50 @@ const App = () => {
 };
 ```
 
+### CollapsiblePanel.tsx (Reusable Component)
+
+Reusable wrapper for collapsible sections with consistent UI:
+
+```typescript
+interface CollapsiblePanelProps {
+  title: string;                  // Header text
+  children: React.ReactNode;      // Panel content
+  defaultExpanded?: boolean;      // Initial state (default: true)
+  headerExtra?: React.ReactNode;  // Optional extra content (e.g., badges)
+}
+
+export function CollapsiblePanel({
+  title,
+  children,
+  defaultExpanded = true,
+  headerExtra,
+}: CollapsiblePanelProps) {
+  const [isExpanded, setIsExpanded] = useState<boolean>(defaultExpanded);
+
+  return (
+    <div>
+      <div className="collapsible-header" onClick={() => setIsExpanded(!isExpanded)}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <h3>{title}</h3>
+          {headerExtra}
+        </div>
+        <span style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+      </div>
+      {isExpanded && children}
+    </div>
+  );
+}
+```
+
+**Used by**: RequestTabs, HookStagesPanel, ResponseViewer
+
+**Features**:
+
+- Consistent expand/collapse behavior across all panels
+- Rotating arrow indicator
+- Optional extra header content (used by ResponseViewer for status badges)
+- Configurable initial state
+
 ### WasmLoader.tsx
 
 Handles WASM file upload:
@@ -135,33 +180,30 @@ JSON editor for properties:
 - Real-time error display
 - Default properties pre-populated
 
-### HooksPanel.tsx
+### RequestTabs.tsx (Collapsible)
 
-Execute hooks:
+Configure request data with tabbed interface wrapped in CollapsiblePanel:
 
-- Log level selector (Trace to Critical)
-- "Run All Hooks" button
-- Individual hook buttons (grid layout)
-- Supported hooks:
-  - onRequestHeaders
-  - onRequestBody
-  - onResponseHeaders
-  - onResponseBody
+- **Tabs**: Headers, Body, Properties
+- **Headers tab**: HeadersEditor for key:value input
+- **Body tab**: Textarea for request body (JSON, XML, etc.)
+- **Properties tab**: PropertiesEditor for WASM properties
+- **Collapsible**: Uses CollapsiblePanel with title "Request", defaultExpanded={true}
 
-### HookStagesPanel.tsx (Replaces TriggerPanel + OutputDisplay)
+### HookStagesPanel.tsx (Collapsible)
 
-Tabbed interface for viewing hook execution:
+Tabbed interface for viewing hook execution, wrapped in CollapsiblePanel:
 
-- **Main tabs**: One for each hook (onRequestHeaders, onRequestBody, etc.)
+- **Main tabs**: One for each hook (onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody)
 - **Sub-tabs**: Logs and Inputs
 - **Logs view**: Shows output, return codes, errors for that hook
 - **Inputs view**: Shows data available to that hook (headers, body, properties)
 - **Log level selector**: Filter logs by severity
-- Individual hook buttons still available for manual testing
+- **Collapsible**: Uses CollapsiblePanel with title "Logging", defaultExpanded={false}
 
-### ResponseViewer.tsx
+### ResponseViewer.tsx (Collapsible)
 
-Displays final HTTP response after all WASM processing:
+Displays final HTTP response after all WASM processing, wrapped in CollapsiblePanel:
 
 - **Body tab**: Formatted text display
   - JSON: Pretty-printed with 2-space indent
@@ -175,17 +217,19 @@ Displays final HTTP response after all WASM processing:
   - Other: "Preview not available" message
   - Hidden for non-visual content (JSON, plain text, etc.)
 - **Headers tab**: Final response headers as key-value pairs
-- **Status display**: Color-coded HTTP status and content-type
+- **Status display**: Color-coded HTTP status and content-type in header
 - **Smart defaults**: Auto-selects appropriate tab based on content type
+- **Collapsible**: Uses CollapsiblePanel with title "Response", status/contentType in headerExtra, defaultExpanded={true}
 
 ### RequestBar.tsx
 
-Top navigation bar:
+Top navigation bar with integrated styling:
 
-- HTTP method dropdown (GET, POST, PUT, etc.)
-- URL input field
+- HTTP method dropdown (GET, POST) - integrated with URL input
+- URL input field - shares focus border with method selector
 - **"Send" button**: Triggers full flow execution (all hooks + HTTP fetch)
 - Disabled when WASM not loaded
+- Custom styling removes orange focus borders
 
 ## State Management
 
@@ -240,7 +284,7 @@ const response = await fetch("/api/call", {
 });
 const result = await response.json();
 return {
-  logs: result.result.logs.map(log => log.message).join("\n"),
+  logs: result.result.logs.map((log) => log.message).join("\n"),
   returnValue: result.result.returnCode,
   error: result.error,
 };
@@ -377,7 +421,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../dist-frontend", // Output to parent directory
+    outDir: "../dist/frontend", // Output to dist/frontend directory
   },
 });
 ```
@@ -395,8 +439,8 @@ In dev mode (`pnpm run dev:frontend`):
 
 In production (`pnpm run build:frontend`):
 
-- Builds to `../dist-frontend/`
-- Express serves static files from `dist-frontend/`
+- Builds to `../dist/frontend/`
+- Express serves static files from `dist/frontend/`
 - SPA fallback: all non-API routes serve `index.html`
 
 ## TypeScript Configuration
@@ -475,11 +519,11 @@ No CSS framework (Bootstrap, Tailwind, etc.) - kept minimal and custom.
 ```bash
 pnpm run build
 # Builds backend → dist/
-# Builds frontend → dist-frontend/
+# Builds frontend → dist/frontend/
 
 pnpm start
 # Serves on http://localhost:5179
-# Serves frontend from dist-frontend/
+# Serves frontend from dist/frontend/
 ```
 
 ## Key Differences from Old Vanilla JS Frontend

@@ -209,14 +209,27 @@ export class ProxyWasmRunner {
         ...responseCall,
         hook: "onResponseHeaders",
       });
+
+      // Pass modified headers from onResponseHeaders to onResponseBody
+      const headersAfterResponseHeaders =
+        results.onResponseHeaders.response.headers;
+      this.logDebug(
+        `Headers after onResponseHeaders: ${JSON.stringify(headersAfterResponseHeaders)}`,
+      );
+
       results.onResponseBody = await this.callHook({
         ...responseCall,
+        response: {
+          ...responseCall.response,
+          headers: headersAfterResponseHeaders,
+        },
         hook: "onResponseBody",
       });
 
       // Get final response after WASM modifications
       const finalHeaders = results.onResponseBody.response.headers;
       const finalBody = results.onResponseBody.response.body;
+      this.logDebug(`Final response body length: ${finalBody.length}`);
 
       return {
         hookResults: results,

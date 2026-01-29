@@ -394,14 +394,20 @@ export class HostFunctions {
   }
 
   private getHeaderMap(mapType: number): HeaderMap {
-    if (mapType === MapType.ResponseHeaders) {
+    if (
+      mapType === MapType.ResponseHeaders ||
+      mapType === MapType.ResponseTrailers
+    ) {
       return this.responseHeaders;
     }
     return this.requestHeaders;
   }
 
   private setHeaderMap(mapType: number, map: HeaderMap): void {
-    if (mapType === MapType.ResponseHeaders) {
+    if (
+      mapType === MapType.ResponseHeaders ||
+      mapType === MapType.ResponseTrailers
+    ) {
       this.responseHeaders = HeaderManager.normalize(map);
     } else {
       this.requestHeaders = HeaderManager.normalize(map);

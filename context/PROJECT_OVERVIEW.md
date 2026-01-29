@@ -44,11 +44,12 @@ frontend/                     # React + Vite frontend
     components/               # React components
       WasmLoader.tsx         # File upload component
       HeadersEditor.tsx      # Headers input component
-      RequestForm.tsx        # Request configuration
-      ResponseForm.tsx       # Response configuration
       PropertiesEditor.tsx   # JSON properties editor
-      HooksPanel.tsx         # Hook execution controls
-      OutputDisplay.tsx      # Results viewer
+      RequestBar.tsx         # Method selector, URL input, Send button
+      RequestTabs.tsx        # Request headers/body/properties tabs
+      HookStagesPanel.tsx    # Hook execution logs and inputs viewer
+      ResponseViewer.tsx     # Response display with Body/Preview/Headers tabs
+      CollapsiblePanel.tsx   # Reusable collapsible panel wrapper
     hooks/
       useWasm.ts            #React UI (base64 upload)
 - [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
@@ -76,12 +77,11 @@ frontend/                     # React + Vite frontend
 
 ### 🚧 Not Yet Implemented
 
-- Response body manipulation by WASM (hooks run but modifications not yet applied)
 - HTTP callouts (proxy_http_call)
 - Shared data/queue operations
 - Metrics support
 - Full property path coverage (only common paths implemented)
-- Request/response trailers hooks
+- Request/response trailers (map types implemented but not tested)
 ```
 
 ## Current Status
@@ -90,13 +90,20 @@ frontend/                     # React + Vite frontend
 
 - [x] Load WASM binaries via UI
 - [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
+- [x] Request header modifications flow through to HTTP fetch
+- [x] Response header modifications apply correctly (MapType bug fixed Jan 29, 2026)
+- [x] Request body modifications flow through to HTTP fetch
+- [x] Response body modifications work correctly
+- [x] Real HTTP requests with WASM-modified headers and body
 - [x] Capture logs from `proxy_log` and `fd_write` (stdout)
-- [x] Header serialization in Kong SDK format (critical fix completed)
+- [x] Log level filtering: Trace(0), Debug(1), Info(2), Warn(3), Error(4), Critical(5)
+- [x] Header serialization in G-Core SDK format
 - [x] Property resolution (request.method, request.path, request.url, request.host, response.code, etc.)
-- [x] Request metadata (method, path, scheme)
-- [x] Response metadata (status code, status text)
-- [x] "Run All Hooks" button for full request flow simulation
-- [x] Works with both basic-wasm-code and print-wasm-code test binaries
+- [x] Full request/response pipeline with hook chaining
+- [x] Postman-like UI with collapsible panels
+- [x] TypeScript type safety throughout (frontend + backend)
+- [x] Vite build system with fast HMR
+- [x] Works with change-header-code.wasm test binary
 
 ### ⚠️ Known Issues
 
@@ -107,11 +114,11 @@ frontend/                     # React + Vite frontend
 
 ### 🚧 Not Yet Implemented
 
-- Response body manipulation by WASM
-- HTTP callouts (proxy_http_call)erver/runner/HeaderManager.ts](../server
+- HTTP callouts (proxy_http_call)
 - Shared data/queue operations
 - Metrics support
 - Full property path coverage (only common paths implemented)
+- Request/response trailers (map types implemented but not tested)
 
 ## Critical Technical Details
 
@@ -154,7 +161,7 @@ pnpm run dev:frontend   # Runs Vite dev server on port 5173 (with proxy to backe
 
 - `pnpm run build` - Build both backend and frontend
 - `pnpm run build:backend` - Build only backend (TypeScript → dist/)
-- `pnpm run build:frontend` - Build only frontend (React → dist-frontend/)
+- `pnpm run build:frontend` - Build only frontend (React → dist/frontend/)
 - `pnpm run dev:backend` - Run backend in watch mode
 - `pnpm run dev:frontend` - Run Vite dev server with hot reload
 
@@ -226,7 +233,7 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
    - `src/` → `server/` for clarity
    - Separate `frontend/` directory
    - Base `tsconfig.json` extended by both backend and frontend
-   - Separate build outputs: `dist/` (backend), `dist-frontend/` (frontend)
+   - Build outputs: `dist/` (backend at root, frontend at dist/frontend/)
 
 ### Example Request
 
@@ -361,4 +368,4 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 This test runner was built for FastEdge CDN binary development. The code runs in production on nginx with a custom wasmtime host, so exact format compatibility with the G-Core SDK is critical.
 
 Last Updated: January 29, 2026
-Status: Request modification pipeline working, header injection verified, body modification supported, development workflow improved
+Status: Full request/response modification pipeline working, MapType bug fixed, response header modifications verified, UI refactored with reusable components

@@ -639,6 +639,74 @@ Would need:
 - Check which host function failed
 - Add missing host functions if needed
 
+### Response headers not modified by WASM
+
+- Fixed Jan 29, 2026: MapType enum had wrong values
+- Ensure MapType.ResponseHeaders = 2 (not 1)
+- Check debug logs for `proxy_add_header_map_value map=2`
+- Verify headers appear in `onResponseHeaders` hook results
+
+## Type System and Enums
+
+### MapType Enum (Fixed Jan 29, 2026)
+
+**Critical Bug Fix**: The MapType enum values must match the proxy-wasm specification exactly.
+
+```typescript
+export enum MapType {
+  RequestHeaders = 0,
+  RequestTrailers = 1,
+  ResponseHeaders = 2, // Was incorrectly 1 before fix
+  ResponseTrailers = 3, // Added in fix
+}
+```
+
+**Bug Impact**: Before the fix, when WASM called `proxy_add_header_map_value` with `mapType=2` (response headers), our code treated it as request headers because `ResponseHeaders = 1`. This caused all response header modifications to be lost.
+
+**Usage in Host Functions:**
+
+```typescript
+private getHeaderMap(mapType: number): HeaderMap {
+  if (mapType === MapType.ResponseHeaders || mapType === MapType.ResponseTrailers) {
+    return this.responseHeaders;
+  }
+  return this.requestHeaders;
+}
+
+private setHeaderMap(mapType: number, map: HeaderMap): void {
+  if (mapType === MapType.ResponseHeaders || mapType === MapType.ResponseTrailers) {
+    this.responseHeaders = HeaderManager.normalize(map);
+  } else {
+    this.requestHeaders = HeaderManager.normalize(map);
+  }
+}
+```
+
+### Other Enums
+
+**ProxyStatus:**
+
+```typescript
+export enum ProxyStatus {
+  Ok = 0,
+  NotFound = 1,
+  BadArgument = 2,
+  SerializationFailure = 7,
+  InternalFailure = 10,
+}
+```
+
+**BufferType:**
+
+```typescript
+export enum BufferType {
+  HttpRequestBody = 0,
+  HttpResponseBody = 1,
+  VmConfiguration = 2,
+  PluginConfiguration = 3,
+}
+```
+
 ## Hook State Chaining
 
 **Critical Implementation Detail (Fixed Jan 29, 2026)**

@@ -72,13 +72,69 @@ section {
   align-items: center;
 }
 
-.request-bar select {
-  width: 120px;
+.url-input-container {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  background: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.url-input-container:focus-within {
+  border-color: #ff6c37;
+  box-shadow: 0 0 0 1px #ff6c37;
+}
+
+.method-select {
+  padding: 8px 12px;
+  background: #2d2d2d;
+  color: #e0e0e0;
+  border: none;
+  border-right: 1px solid #3d3d3d;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  width: auto;
   flex-shrink: 0;
 }
 
-.request-bar input[type="text"] {
+.method-select:focus {
+  outline: none;
+  box-shadow: none;
+  border: none;
+  border-right: 1px solid #3d3d3d;
+  border-color: transparent;
+}
+
+.method-select:hover {
+  background: #3d3d3d;
+}
+
+.url-input {
   flex: 1;
+  padding: 8px 12px;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  border: none;
+  border-radius: 0;
+  font-size: 13px;
+  outline: none;
+}
+
+.url-input:focus {
+  outline: none;
+  box-shadow: none;
+  border: none;
+  border-color: transparent;
+}
+
+.url-input::placeholder {
+  color: #6d6d6d;
 }
 
 .request-bar .send-button {
@@ -278,11 +334,11 @@ pre {
 
 /* Hook Stages Panel */
 .hook-stages-panel {
-  flex: 1;
   display: flex;
   flex-direction: column;
   background: #252525;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .stages-header {
@@ -368,7 +424,7 @@ pre {
   background: #252525;
   display: flex;
   flex-direction: column;
-  max-height: 50vh;
+  flex: 1;
   min-height: 200px;
 }
 

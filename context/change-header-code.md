@@ -1,3 +1,7 @@
+This is the demo code I am loading as the wasm file to run tests on.
+
+```assemblyscript
+
 export * from "@gcoredev/proxy-wasm-sdk-as/assembly/proxy"; // this exports the required functions for the proxy to interact with us.
 import {
   BufferTypeValues,
@@ -31,14 +35,18 @@ class HttpHeaders extends Context {
   onRequestHeaders(a: u32, end_of_stream: bool): FilterHeadersStatusValues {
     log(
       LogLevelValues.debug,
-      'onRequestHeaders >> injecting header { "x-custom-me", "I am injected" }',
+      'onRequestHeaders >> injecting header { "x-custom-request", "I am injected from onRequestHeaders" }',
     );
 
     // Add custom header to the request
-    stream_context.headers.request.add("x-custom-me", "I am injected");
+    stream_context.headers.request.add(
+      "x-custom-request",
+      "I am injected from onRequestHeaders",
+    );
 
-    // Check if we need to modify the body (x-inject-body header exists and content-type is JSON)
-    const injectHeader = stream_context.headers.request.get("x-inject-body");
+    // Check if we need to modify the request body (x-inject-req-body header exists and content-type is JSON)
+    const injectHeader =
+      stream_context.headers.request.get("x-inject-req-body");
     const contentType = stream_context.headers.request.get("content-type");
     const isJsonContent =
       contentType !== null && contentType.includes("application/json");
@@ -66,8 +74,9 @@ class HttpHeaders extends Context {
       return FilterDataStatusValues.StopIterationAndBuffer;
     }
 
-    // Check for x-inject-body header directly (each hook runs in its own sandbox)
-    const injectHeader = stream_context.headers.request.get("x-inject-body");
+    // Check for x-inject-req-body header directly (each hook runs in its own sandbox)
+    const injectHeader =
+      stream_context.headers.request.get("x-inject-req-body");
 
     // Check if Content-Type is application/json
     const contentType = stream_context.headers.request.get("content-type");
@@ -99,13 +108,13 @@ class HttpHeaders extends Context {
           modifiedBody = modifiedBody.slice(0, -1);
           // Check if we need a comma (if JSON object is not empty)
           if (modifiedBody.trimEnd().endsWith("{")) {
-            modifiedBody += `"x-inject-body":"${injectHeader}"}`;
+            modifiedBody += `"x-inject-req-body":"${injectHeader}"}`;
           } else {
-            modifiedBody += `,"x-inject-body":"${injectHeader}"}`;
+            modifiedBody += `,"x-inject-req-body":"${injectHeader}"}`;
           }
         } else {
           // Fallback: just append to the body
-          modifiedBody = bodyString + `{"x-inject-body":"${injectHeader}"}`;
+          modifiedBody = bodyString + `{"x-inject-req-body":"${injectHeader}"}`;
         }
 
         log(
@@ -123,7 +132,7 @@ class HttpHeaders extends Context {
 
         log(
           LogLevelValues.debug,
-          "onRequestBody >> Injected x-inject-body into request body",
+          "onRequestBody >> Injected x-inject-req-body into request body",
         );
       }
     }
@@ -132,7 +141,33 @@ class HttpHeaders extends Context {
   }
 
   onResponseHeaders(a: u32, end_of_stream: bool): FilterHeadersStatusValues {
-    log(LogLevelValues.debug, "onResponseHeaders >>");
+    log(
+      LogLevelValues.debug,
+      'onResponseHeaders >> injecting header { "x-custom-response", "I am injected from onResponseHeaders" }',
+    );
+
+    // Add custom header to the response
+    stream_context.headers.response.add(
+      "x-custom-response",
+      "I am injected from onResponseHeaders",
+    );
+
+    // Check if we need to modify the response body (x-inject-res-body header exists and content-type is JSON)
+    const injectHeader =
+      stream_context.headers.response.get("x-inject-res-body");
+    const contentType = stream_context.headers.response.get("content-type");
+    const isJsonContent =
+      contentType !== null && contentType.includes("application/json");
+
+    if (injectHeader !== null && isJsonContent) {
+      // Remove content-length header as we will modify the body
+      stream_context.headers.response.remove("content-length");
+      log(
+        LogLevelValues.debug,
+        "onResponseHeaders >> Removed content-length for body modification",
+      );
+    }
+
     return FilterHeadersStatusValues.Continue;
   }
 
@@ -141,6 +176,75 @@ class HttpHeaders extends Context {
     end_of_stream: bool,
   ): FilterDataStatusValues {
     log(LogLevelValues.debug, "onResponseBody >>" + end_of_stream.toString());
+
+    if (!end_of_stream) {
+      // Wait until the complete body is buffered
+      return FilterDataStatusValues.StopIterationAndBuffer;
+    }
+
+    // Check for x-inject-res-body header directly (each hook runs in its own sandbox)
+    const injectHeader =
+      stream_context.headers.response.get("x-inject-res-body");
+
+    // Check if Content-Type is application/json
+    const contentType = stream_context.headers.response.get("content-type");
+    const isJsonContent =
+      contentType !== null && contentType.includes("application/json");
+
+    // If we have a header to inject and content is JSON, modify the body
+    if (injectHeader !== null && isJsonContent) {
+      // Retrieve the body from the HttpResponseBody buffer
+      const bodyBytes = get_buffer_bytes(
+        BufferTypeValues.HttpResponseBody,
+        0,
+        <u32>body_buffer_length,
+      );
+
+      if (bodyBytes.byteLength > 0) {
+        const bodyString = String.UTF8.decode(bodyBytes);
+        log(
+          LogLevelValues.debug,
+          "onResponseBody >> Original body: " + bodyString,
+        );
+
+        // Manually inject the field into the JSON string
+        // Since AssemblyScript doesn't have JSON.parse, we'll do string manipulation
+        let modifiedBody = bodyString.trimEnd();
+
+        // Remove trailing } if it exists and add our field
+        if (modifiedBody.endsWith("}")) {
+          modifiedBody = modifiedBody.slice(0, -1);
+          // Check if we need a comma (if JSON object is not empty)
+          if (modifiedBody.trimEnd().endsWith("{")) {
+            modifiedBody += `"x-inject-res-body":"${injectHeader}"}`;
+          } else {
+            modifiedBody += `,"x-inject-res-body":"${injectHeader}"}`;
+          }
+        } else {
+          // Fallback: just append to the body
+          modifiedBody = bodyString + `{"x-inject-res-body":"${injectHeader}"}`;
+        }
+
+        log(
+          LogLevelValues.debug,
+          "onResponseBody >> Modified body: " + modifiedBody,
+        );
+
+        // Set the modified body
+        set_buffer_bytes(
+          BufferTypeValues.HttpResponseBody,
+          0,
+          <u32>body_buffer_length,
+          String.UTF8.encode(modifiedBody),
+        );
+
+        log(
+          LogLevelValues.debug,
+          "onResponseBody >> Injected x-inject-res-body into response body",
+        );
+      }
+    }
+
     return FilterDataStatusValues.Continue;
   }
 
@@ -155,3 +259,6 @@ class HttpHeaders extends Context {
 registerRootContext((context_id: u32) => {
   return new HttpHeadersRoot(context_id);
 }, "httpheaders");
+
+
+```

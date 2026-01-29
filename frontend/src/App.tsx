@@ -11,13 +11,14 @@ import "./App.css";
 function App() {
   const { wasmState, loading, error, loadWasm } = useWasm();
 
-  const [method, setMethod] = useState("GET");
+  const [method, setMethod] = useState("POST");
   const [url, setUrl] = useState("http://localhost:8181");
 
   const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>({
     host: "example.com",
     "content-type": "application/json",
-    "x-inject-body": "injected value from onRequestBody",
+    "x-inject-req-body": "Injected WASM value onRequestBody",
+    "x-inject-res-body": "Injected WASM value onResponseBody",
   });
 
   const [requestBody, setRequestBody] = useState('{"message": "Hello"}');

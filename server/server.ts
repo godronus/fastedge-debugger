@@ -6,7 +6,7 @@ const app = express();
 const runner = new ProxyWasmRunner();
 
 app.use(express.json({ limit: "20mb" }));
-app.use(express.static(path.join(__dirname, "..", "dist-frontend")));
+app.use(express.static(path.join(__dirname, "frontend")));
 
 app.post("/api/load", async (req: Request, res: Response) => {
   const { wasmBase64 } = req.body ?? {};
@@ -73,7 +73,7 @@ app.post("/api/send", async (req: Request, res: Response) => {
 
 // SPA fallback - serve index.html for all non-API routes
 app.get("*", (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, "..", "dist-frontend", "index.html"));
+  res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
 
 const port = process.env.PORT ? Number(process.env.PORT) : 5179;

@@ -45,7 +45,9 @@ export enum BufferType {
 
 export enum MapType {
   RequestHeaders = 0,
-  ResponseHeaders = 1,
+  RequestTrailers = 1,
+  ResponseHeaders = 2,
+  ResponseTrailers = 3,
 }
 
 export type LogEntry = {

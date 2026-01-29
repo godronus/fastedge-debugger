@@ -1,5 +1,83 @@
 # Proxy-WASM Runner - Changelog
 
+## January 29, 2026 - Critical MapType Bug Fix
+
+### Overview
+
+Fixed a critical bug where response header modifications by WASM were not being applied due to incorrect MapType enum values.
+
+### 🐛 Bug Fixed
+
+#### MapType Enum Correction
+
+**Problem**: The MapType enum had incorrect values that didn't match the proxy-wasm specification:
+
+```typescript
+// WRONG (before)
+export enum MapType {
+  RequestHeaders = 0,
+  ResponseHeaders = 1, // Should be 2!
+}
+```
+
+**Impact**: When WASM called `proxy_add_header_map_value` with `mapType=2` to modify response headers, our code was treating it as request headers. This caused all response header modifications to be lost.
+
+**Solution**: Corrected the enum to match the proxy-wasm spec:
+
+```typescript
+// CORRECT (after)
+export enum MapType {
+  RequestHeaders = 0,
+  RequestTrailers = 1,
+  ResponseHeaders = 2,
+  ResponseTrailers = 3,
+}
+```
+
+**Result**: Response header modifications (e.g., `x-custom-response`) now properly appear in the final HTTP response.
+
+### Files Modified
+
+- `/server/runner/types.ts` - Fixed MapType enum values
+- `/server/runner/HostFunctions.ts` - Updated getHeaderMap() and setHeaderMap() to handle all four map types
+
+## January 29, 2026 - UI Component Refactoring
+
+### Overview
+
+Refactored collapsible panel logic from three separate components into a single reusable CollapsiblePanel component, eliminating code duplication and improving maintainability.
+
+### 🎯 Key Achievements
+
+#### 1. CollapsiblePanel Component
+
+- **Created reusable component** - Extracted collapsible header logic into standalone component
+- **Props interface**:
+  - `title: string` - Header text
+  - `children: ReactNode` - Panel content
+  - `defaultExpanded?: boolean` - Initial expanded state (default: true)
+  - `headerExtra?: ReactNode` - Optional extra content in header (e.g., status badges)
+- **Features**:
+  - Rotating arrow indicator (▼)
+  - Click-to-toggle header
+  - Smooth expand/collapse
+  - Consistent styling across all panels
+
+#### 2. Panel Refactoring
+
+- **RequestTabs.tsx** - Wrapped tabs and content in CollapsiblePanel with title "Request"
+- **HookStagesPanel.tsx** - Wrapped stages in CollapsiblePanel with title "Logging", defaultExpanded={false}
+- **ResponseViewer.tsx** - Wrapped response content in CollapsiblePanel with title "Response", status/contentType in headerExtra
+- **Code reduction**: Eliminated ~60 lines of duplicated collapsible logic across three files
+- **Consistency**: All panels now have identical expand/collapse behavior
+
+#### 3. Benefits
+
+- **DRY principle**: Single source of truth for collapsible behavior
+- **Easier maintenance**: Changes to collapsible logic only need to be made in one place
+- **Consistency**: All panels look and behave identically
+- **Extensibility**: Easy to add new collapsible panels in the future
+
 ## January 27, 2026 - Major UI/UX Improvements
 
 ### Overview
@@ -384,7 +462,7 @@ Comprehensive test for request modification capabilities:
 
 - Injects custom header: `x-custom-me: I am injected`
 - Conditionally modifies request body when:
-  - `x-inject-body` header is present
+  - `x-inject-req-body` header is present
   - `content-type` is `application/json`
   - Request has a body
 - Removes `content-length` header when body will be modified
@@ -450,7 +528,7 @@ Enable with: `PROXY_RUNNER_DEBUG=1 pnpm start`
 **Test Case 2: Body Modification** (in progress)
 
 - Method: POST
-- Headers: `content-type: application/json`, `x-inject-body: value`
+- Headers: `content-type: application/json`, `x-inject-req-body: value`
 - Body: `{"message": "Hello"}`
 - Expected: Body modified to include injected field
 
