@@ -274,6 +274,11 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
   - Tests: Header serialization, property resolution, SDK integration
   - Status: Works with correct header format
 
+- **change-header-code.md**: Request modification binary (Added Jan 29, 2026)
+  - Tests: Header injection, body modification, set_buffer_bytes
+  - Features: Injects `x-custom-me` header, conditionally modifies JSON body
+  - Status: Header injection verified working, body modification in testing
+
 ## Code Quality Notes
 
 ### Strengths
@@ -355,5 +360,5 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 
 This test runner was built for FastEdge CDN binary development. The code runs in production on nginx with a custom wasmtime host, so exact format compatibility with the G-Core SDK is critical.
 
-Last Updated: January 27, 2026
-Status: Full flow with HTTP fetching working, response viewer complete, production-ready for local testing
+Last Updated: January 29, 2026
+Status: Request modification pipeline working, header injection verified, body modification supported, development workflow improved

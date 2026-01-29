@@ -99,14 +99,28 @@ export class ProxyWasmRunner {
       ...call,
       hook: "onRequestHeaders",
     });
+
+    // Pass modified headers from onRequestHeaders to onRequestBody
+    const headersAfterRequestHeaders = results.onRequestHeaders.request.headers;
+    this.logDebug(
+      `Headers after onRequestHeaders: ${JSON.stringify(headersAfterRequestHeaders)}`,
+    );
+
     results.onRequestBody = await this.callHook({
       ...call,
+      request: {
+        ...call.request,
+        headers: headersAfterRequestHeaders,
+      },
       hook: "onRequestBody",
     });
 
     // Get modified request data from hooks
     const modifiedRequestHeaders = results.onRequestBody.request.headers;
     const modifiedRequestBody = results.onRequestBody.request.body;
+    this.logDebug(
+      `Final headers for fetch: ${JSON.stringify(modifiedRequestHeaders)}`,
+    );
     const requestMethod = call.request.method ?? "GET";
 
     // Phase 2: Perform actual HTTP fetch

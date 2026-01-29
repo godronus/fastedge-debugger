@@ -12,11 +12,12 @@ function App() {
   const { wasmState, loading, error, loadWasm } = useWasm();
 
   const [method, setMethod] = useState("GET");
-  const [url, setUrl] = useState("https://example.com/api/endpoint");
+  const [url, setUrl] = useState("http://localhost:8181");
 
   const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>({
     host: "example.com",
     "content-type": "application/json",
+    "x-inject-body": "injected value from onRequestBody",
   });
 
   const [requestBody, setRequestBody] = useState('{"message": "Hello"}');

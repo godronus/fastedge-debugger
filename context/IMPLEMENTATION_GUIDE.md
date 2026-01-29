@@ -22,14 +22,17 @@ React UI (browser)
   ↓ API: sendFullFlow(url, method, {request_headers, request_body, properties, logLevel})
   ↓ POST /api/send with {url, request: {headers, body, method}, properties, logLevel}
 Server (Express) → ProxyWasmRunner.callFullFlow()
-  
+
   ↓ PHASE 1: Request Hooks
   ↓ Run onRequestHeaders hook
-  ↓   → WASM can modify headers via proxy_set_header_map_pairs
-  ↓ Run onRequestBody hook  
-  ↓   → WASM can modify body and headers
-  ↓ Capture modified headers and body
-  
+  ↓   → WASM can modify headers via proxy_add_header_map_value, proxy_replace_header_map_value
+  ↓   → HostFunctions captures modified headers
+  ↓ Chain modified headers to next hook (CRITICAL FIX: Jan 29, 2026)
+  ↓ Run onRequestBody hook with modified headers from onRequestHeaders
+  ↓   → WASM can modify body via set_buffer_bytes
+  ↓   → WASM can further modify headers
+  ↓ Capture modified headers and body from onRequestBody result
+
   ↓ PHASE 2: Real HTTP Fetch
   ↓ Detect binary content types (images, PDFs, etc.)
   ↓ Preserve host header as x-forwarded-host
@@ -38,14 +41,14 @@ Server (Express) → ProxyWasmRunner.callFullFlow()
   ↓   → Binary: Convert to base64, set isBase64 flag
   ↓   → Text: Read as string
   ↓ Extract response headers, status, contentType
-  
+
   ↓ PHASE 3: Response Hooks
   ↓ Run onResponseHeaders with real response headers
   ↓   → WASM can inspect/modify response headers
   ↓ Run onResponseBody with real response body
   ↓   → WASM can inspect/modify response body
   ↓ Capture final headers and body after WASM processing
-  
+
   ↓ Return FullFlowResult:
   ↓   hookResults: {onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody}
   ↓   finalResponse: {status, headers, body, contentType, isBase64}
@@ -53,7 +56,7 @@ Server (Express) → ProxyWasmRunner.callFullFlow()
 Server → React UI
   ↓ res.json({ok: true, hookResults: {...}, finalResponse: {...}})
   ↓ Frontend receives both hook logs and final response
-  
+
 React UI displays:
   ↓ HookStagesPanel shows logs/inputs for each hook
   ↓ ResponseViewer shows final response:
@@ -312,11 +315,13 @@ if (isBinary) {
 ### Frontend Display
 
 **Images:**
+
 ```typescript
 <img src={`data:${contentType};base64,${body}`} />
 ```
 
 **HTML:**
+
 ```typescript
 <iframe srcDoc={body} sandbox="allow-same-origin" />
 ```
@@ -333,8 +338,77 @@ Show message, hide Body tab, only show Headers tab.
 ### Auto Tab Selection
 
 - HTML/Images → Preview tab
-- Binary non-image → Headers tab  
+- Binary non-image → Headers tab
 - Text (JSON, XML, plain) → Body tab
+
+## Hook State Chaining
+
+**Critical Implementation Detail (Fixed Jan 29, 2026)**
+
+Each hook must receive the accumulated modifications from previous hooks, not the original input state.
+
+**Before (Broken):**
+
+```typescript
+results.onRequestHeaders = await this.callHook({
+  ...call,
+  hook: "onRequestHeaders",
+});
+results.onRequestBody = await this.callHook({ ...call, hook: "onRequestBody" });
+// ❌ Both hooks receive original headers - modifications lost!
+```
+
+**After (Fixed):**
+
+```typescript
+results.onRequestHeaders = await this.callHook({
+  ...call,
+  hook: "onRequestHeaders",
+});
+
+// Pass modified headers to next hook
+const headersAfterRequestHeaders = results.onRequestHeaders.request.headers;
+
+results.onRequestBody = await this.callHook({
+  ...call,
+  request: {
+    ...call.request,
+    headers: headersAfterRequestHeaders, // ✅ Use modified headers
+  },
+  hook: "onRequestBody",
+});
+
+// Final state includes all modifications
+const modifiedRequestHeaders = results.onRequestBody.request.headers;
+const modifiedRequestBody = results.onRequestBody.request.body;
+```
+
+**Why This Matters:**
+
+- WASM modifies headers in `onRequestHeaders` (e.g., adds authentication, custom headers)
+- Those modifications must be visible to `onRequestBody`
+- Final modifications must be applied to the actual HTTP fetch
+- Without chaining, WASM modifications are ignored
+
+**Same Pattern for Response Hooks:**
+
+```typescript
+results.onResponseHeaders = await this.callHook({
+  ...responseCall,
+  hook: "onResponseHeaders",
+});
+
+const headersAfterResponseHeaders = results.onResponseHeaders.response.headers;
+
+results.onResponseBody = await this.callHook({
+  ...responseCall,
+  response: {
+    ...responseCall.response,
+    headers: headersAfterResponseHeaders,
+  },
+  hook: "onResponseBody",
+});
+```
 
 ## Module Dependencies
 
@@ -564,6 +638,75 @@ Would need:
 - Often non-critical if hooks still work
 - Check which host function failed
 - Add missing host functions if needed
+
+## Hook State Chaining
+
+**Critical Implementation Detail (Fixed Jan 29, 2026)**
+
+Each hook must receive the accumulated modifications from previous hooks, not the original input state.
+
+**Before (Broken):**
+
+```typescript
+results.onRequestHeaders = await this.callHook({
+  ...call,
+  hook: "onRequestHeaders",
+});
+results.onRequestBody = await this.callHook({ ...call, hook: "onRequestBody" });
+// ❌ Both hooks receive original headers - modifications lost!
+```
+
+**After (Fixed):**
+
+```typescript
+results.onRequestHeaders = await this.callHook({
+  ...call,
+  hook: "onRequestHeaders",
+});
+
+// Pass modified headers to next hook
+const headersAfterRequestHeaders = results.onRequestHeaders.request.headers;
+
+results.onRequestBody = await this.callHook({
+  ...call,
+  request: {
+    ...call.request,
+    headers: headersAfterRequestHeaders, // ✅ Use modified headers
+  },
+  hook: "onRequestBody",
+});
+
+// Final state includes all modifications
+const modifiedRequestHeaders = results.onRequestBody.request.headers;
+const modifiedRequestBody = results.onRequestBody.request.body;
+```
+
+**Why This Matters:**
+
+- WASM modifies headers in `onRequestHeaders` (e.g., adds authentication, custom headers)
+- Those modifications must be visible to `onRequestBody`
+- Final modifications must be applied to the actual HTTP fetch
+- Without chaining, WASM modifications are ignored
+
+**Same Pattern for Response Hooks:**
+
+```typescript
+results.onResponseHeaders = await this.callHook({
+  ...responseCall,
+  hook: "onResponseHeaders",
+});
+
+const headersAfterResponseHeaders = results.onResponseHeaders.response.headers;
+
+results.onResponseBody = await this.callHook({
+  ...responseCall,
+  response: {
+    ...responseCall.response,
+    headers: headersAfterResponseHeaders,
+  },
+  hook: "onResponseBody",
+});
+```
 
 ### Memory errors
 
