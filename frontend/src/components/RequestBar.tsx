@@ -9,7 +9,7 @@ interface RequestBarProps {
   onSend: () => void;
 }
 
-const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+const METHODS = ["GET", "POST"];
 
 export function RequestBar({
   method,
@@ -29,19 +29,26 @@ export function RequestBar({
 
   return (
     <div className="request-bar">
-      <select value={method} onChange={handleMethodChange}>
-        {METHODS.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
-      <input
-        type="text"
-        value={url}
-        onChange={handleUrlChange}
-        placeholder="Enter request URL (e.g., https://example.com/api/endpoint)"
-      />
+      <div className="url-input-container">
+        <select
+          value={method}
+          onChange={handleMethodChange}
+          className="method-select"
+        >
+          {METHODS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          value={url}
+          onChange={handleUrlChange}
+          placeholder="Enter request URL (e.g., https://example.com/api/endpoint)"
+          className="url-input"
+        />
+      </div>
       <button onClick={onSend} disabled={!wasmLoaded} className="send-button">
         Send
       </button>
