@@ -1,5 +1,6 @@
 import { useState, ChangeEvent } from "react";
 import { HookCall, HookResult } from "../types";
+import { CollapsiblePanel } from "./CollapsiblePanel";
 
 interface HookStagesPanelProps {
   results: Record<string, HookResult>;
@@ -205,51 +206,53 @@ export function HookStagesPanel({
 
   return (
     <div className="hook-stages-panel">
-      <div className="stages-header">
-        <div className="tabs">
-          {HOOKS.map((hook) => (
-            <button
-              key={hook}
-              className={`tab ${activeHook === hook ? "active" : ""}`}
-              onClick={() => setActiveHook(hook)}
-            >
-              {hook}
-            </button>
-          ))}
+      <CollapsiblePanel title="Logging" defaultExpanded={false}>
+        <div className="stages-header">
+          <div className="tabs">
+            {HOOKS.map((hook) => (
+              <button
+                key={hook}
+                className={`tab ${activeHook === hook ? "active" : ""}`}
+                onClick={() => setActiveHook(hook)}
+              >
+                {hook}
+              </button>
+            ))}
+          </div>
+
+          <div className="log-level-selector">
+            <label>Log Level:</label>
+            <select value={logLevel} onChange={handleLogLevelChange}>
+              <option value="0">Trace (0)</option>
+              <option value="1">Debug (1)</option>
+              <option value="2">Info (2)</option>
+              <option value="3">Warn (3)</option>
+              <option value="4">Error (4)</option>
+              <option value="5">Critical (5)</option>
+            </select>
+          </div>
         </div>
 
-        <div className="log-level-selector">
-          <label>Log Level:</label>
-          <select value={logLevel} onChange={handleLogLevelChange}>
-            <option value="0">Trace (0)</option>
-            <option value="1">Debug (1)</option>
-            <option value="2">Info (2)</option>
-            <option value="3">Warn (3)</option>
-            <option value="4">Error (4)</option>
-            <option value="5">Critical (5)</option>
-          </select>
+        <div className="sub-view-tabs">
+          <button
+            className={`sub-tab ${activeSubView === "logs" ? "active" : ""}`}
+            onClick={() => setActiveSubView("logs")}
+          >
+            Logs
+          </button>
+          <button
+            className={`sub-tab ${activeSubView === "inputs" ? "active" : ""}`}
+            onClick={() => setActiveSubView("inputs")}
+          >
+            Inputs
+          </button>
         </div>
-      </div>
 
-      <div className="sub-view-tabs">
-        <button
-          className={`sub-tab ${activeSubView === "logs" ? "active" : ""}`}
-          onClick={() => setActiveSubView("logs")}
-        >
-          Logs
-        </button>
-        <button
-          className={`sub-tab ${activeSubView === "inputs" ? "active" : ""}`}
-          onClick={() => setActiveSubView("inputs")}
-        >
-          Inputs
-        </button>
-      </div>
-
-      <div className="stage-content">
-        {activeSubView === "logs" && renderLogs(activeHook)}
-        {activeSubView === "inputs" && renderInputs(activeHook)}
-      </div>
+        <div className="stage-content">
+          {activeSubView === "logs" && renderLogs(activeHook)}
+          {activeSubView === "inputs" && renderInputs(activeHook)}
+        </div>
+      </CollapsiblePanel>
     </div>
   );
 }

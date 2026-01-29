@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { CollapsiblePanel } from "./CollapsiblePanel";
 
 interface ResponseViewerProps {
   response: {
@@ -48,17 +49,11 @@ export function ResponseViewer({ response }: ResponseViewerProps) {
   if (!response) {
     return (
       <div className="response-viewer">
-        <div className="response-header">
-          <h2>Response</h2>
-          <div className="response-status">
-            <span style={{ color: "#666", fontStyle: "italic" }}>
-              No response yet
-            </span>
+        <CollapsiblePanel title="Response" defaultExpanded={true}>
+          <div className="response-empty">
+            Click "Send" to execute the request and view the response.
           </div>
-        </div>
-        <div className="response-empty">
-          Click "Send" to execute the request and view the response.
-        </div>
+        </CollapsiblePanel>
       </div>
     );
   }
@@ -288,62 +283,67 @@ export function ResponseViewer({ response }: ResponseViewerProps) {
 
   return (
     <div className="response-viewer">
-      <div className="response-header">
-        <h2>Response</h2>
-        <div className="response-status">
-          <span
-            style={{
-              color: getStatusColor(response.status),
-              fontWeight: 600,
-              fontSize: "14px",
-            }}
+      <CollapsiblePanel
+        title="Response"
+        defaultExpanded={true}
+        headerExtra={
+          <div className="response-status">
+            <span
+              style={{
+                color: getStatusColor(response.status),
+                fontWeight: 600,
+                fontSize: "13px",
+              }}
+            >
+              {response.status === 0
+                ? "ERROR"
+                : `${response.status} ${response.statusText}`}
+            </span>
+            <span
+              style={{ color: "#666", marginLeft: "12px", fontSize: "12px" }}
+            >
+              {response.contentType}
+            </span>
+          </div>
+        }
+      >
+        <div className="tabs">
+          {!isBinary && (
+            <button
+              className={`tab ${activeTab === "body" ? "active" : ""}`}
+              onClick={() => setActiveTab("body")}
+            >
+              Body
+            </button>
+          )}
+          {hasPreview && (
+            <button
+              className={`tab ${activeTab === "preview" ? "active" : ""}`}
+              onClick={() => setActiveTab("preview")}
+            >
+              Preview
+            </button>
+          )}
+          <button
+            className={`tab ${activeTab === "headers" ? "active" : ""}`}
+            onClick={() => setActiveTab("headers")}
           >
-            {response.status === 0
-              ? "ERROR"
-              : `${response.status} ${response.statusText}`}
-          </span>
-          <span style={{ color: "#666", marginLeft: "12px", fontSize: "12px" }}>
-            {response.contentType}
-          </span>
+            Headers
+          </button>
         </div>
-      </div>
 
-      <div className="tabs">
-        {!isBinary && (
-          <button
-            className={`tab ${activeTab === "body" ? "active" : ""}`}
-            onClick={() => setActiveTab("body")}
-          >
-            Body
-          </button>
-        )}
-        {hasPreview && (
-          <button
-            className={`tab ${activeTab === "preview" ? "active" : ""}`}
-            onClick={() => setActiveTab("preview")}
-          >
-            Preview
-          </button>
-        )}
-        <button
-          className={`tab ${activeTab === "headers" ? "active" : ""}`}
-          onClick={() => setActiveTab("headers")}
-        >
-          Headers
-        </button>
-      </div>
-
-      <div className="response-content">
-        {activeTab === "body" && !isBinary && (
-          <div className="response-body">{renderBody()}</div>
-        )}
-        {activeTab === "preview" && hasPreview && (
-          <div className="response-preview">{renderPreview()}</div>
-        )}
-        {activeTab === "headers" && (
-          <div className="response-headers">{renderHeaders()}</div>
-        )}
-      </div>
+        <div className="response-content">
+          {activeTab === "body" && !isBinary && (
+            <div className="response-body">{renderBody()}</div>
+          )}
+          {activeTab === "preview" && hasPreview && (
+            <div className="response-preview">{renderPreview()}</div>
+          )}
+          {activeTab === "headers" && (
+            <div className="response-headers">{renderHeaders()}</div>
+          )}
+        </div>
+      </CollapsiblePanel>
     </div>
   );
 }

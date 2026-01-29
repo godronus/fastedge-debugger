@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { HeadersEditor } from "./HeadersEditor";
 import { PropertiesEditor } from "./PropertiesEditor";
+import { CollapsiblePanel } from "./CollapsiblePanel";
 
 interface RequestTabsProps {
   headers: Record<string, string>;
@@ -25,52 +26,57 @@ export function RequestTabs({
 
   return (
     <div>
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === "headers" ? "active" : ""}`}
-          onClick={() => setActiveTab("headers")}
-        >
-          Headers
-        </button>
-        <button
-          className={`tab ${activeTab === "body" ? "active" : ""}`}
-          onClick={() => setActiveTab("body")}
-        >
-          Body
-        </button>
-        <button
-          className={`tab ${activeTab === "properties" ? "active" : ""}`}
-          onClick={() => setActiveTab("properties")}
-        >
-          Properties
-        </button>
-      </div>
+      <CollapsiblePanel title="Request" defaultExpanded={true}>
+        <div className="tabs">
+          <button
+            className={`tab ${activeTab === "headers" ? "active" : ""}`}
+            onClick={() => setActiveTab("headers")}
+          >
+            Headers
+          </button>
+          <button
+            className={`tab ${activeTab === "body" ? "active" : ""}`}
+            onClick={() => setActiveTab("body")}
+          >
+            Body
+          </button>
+          <button
+            className={`tab ${activeTab === "properties" ? "active" : ""}`}
+            onClick={() => setActiveTab("properties")}
+          >
+            Properties
+          </button>
+        </div>
 
-      <div className="tab-content">
-        {activeTab === "headers" && (
-          <HeadersEditor
-            title="Request Headers"
-            value={headers}
-            onChange={onHeadersChange}
-          />
-        )}
-
-        {activeTab === "body" && (
-          <div>
-            <label>Request Body</label>
-            <textarea
-              rows={8}
-              value={body}
-              onChange={(e) => onBodyChange(e.target.value)}
-              placeholder='{"key": "value"}'
+        <div className="tab-content">
+          {activeTab === "headers" && (
+            <HeadersEditor
+              title="Request Headers"
+              value={headers}
+              onChange={onHeadersChange}
             />
-          </div>
-        )}
+          )}
 
-        {activeTab === "properties" && (
-          <PropertiesEditor value={properties} onChange={onPropertiesChange} />
-        )}
-      </div>
+          {activeTab === "body" && (
+            <div>
+              <label>Request Body</label>
+              <textarea
+                rows={8}
+                value={body}
+                onChange={(e) => onBodyChange(e.target.value)}
+                placeholder='{"key": "value"}'
+              />
+            </div>
+          )}
+
+          {activeTab === "properties" && (
+            <PropertiesEditor
+              value={properties}
+              onChange={onPropertiesChange}
+            />
+          )}
+        </div>
+      </CollapsiblePanel>
     </div>
   );
 }
