@@ -1,7 +1,6 @@
 This is the demo code I am loading as the wasm file to run tests on.
 
 ```assemblyscript
-
 export * from "@gcoredev/proxy-wasm-sdk-as/assembly/proxy"; // this exports the required functions for the proxy to interact with us.
 import {
   BufferTypeValues,
@@ -18,7 +17,7 @@ import {
 } from "@gcoredev/proxy-wasm-sdk-as/assembly";
 import { setLogLevel } from "@gcoredev/proxy-wasm-sdk-as/assembly/fastedge";
 
-import { collectHeaders } from "as_utils/assembly/headers";
+import { injectFieldIntoJsonBody } from "as_utils/assembly/jsonBody";
 
 class HttpHeadersRoot extends RootContext {
   createContext(context_id: u32): Context {
@@ -51,7 +50,7 @@ class HttpHeaders extends Context {
     const isJsonContent =
       contentType !== null && contentType.includes("application/json");
 
-    if (injectHeader !== null && isJsonContent) {
+    if (injectHeader !== "" && isJsonContent) {
       // Remove content-length header as we will modify the body
       stream_context.headers.request.remove("content-length");
       log(
@@ -84,7 +83,7 @@ class HttpHeaders extends Context {
       contentType !== null && contentType.includes("application/json");
 
     // If we have a header to inject and content is JSON, modify the body
-    if (injectHeader !== null && isJsonContent) {
+    if (injectHeader !== "" && isJsonContent) {
       // Retrieve the body from the HttpRequestBody buffer
       const bodyBytes = get_buffer_bytes(
         BufferTypeValues.HttpRequestBody,
@@ -93,33 +92,11 @@ class HttpHeaders extends Context {
       );
 
       if (bodyBytes.byteLength > 0) {
-        const bodyString = String.UTF8.decode(bodyBytes);
-        log(
-          LogLevelValues.debug,
-          "onRequestBody >> Original body: " + bodyString,
-        );
-
-        // Manually inject the field into the JSON string
-        // Since AssemblyScript doesn't have JSON.parse, we'll do string manipulation
-        let modifiedBody = bodyString.trimEnd();
-
-        // Remove trailing } if it exists and add our field
-        if (modifiedBody.endsWith("}")) {
-          modifiedBody = modifiedBody.slice(0, -1);
-          // Check if we need a comma (if JSON object is not empty)
-          if (modifiedBody.trimEnd().endsWith("{")) {
-            modifiedBody += `"x-inject-req-body":"${injectHeader}"}`;
-          } else {
-            modifiedBody += `,"x-inject-req-body":"${injectHeader}"}`;
-          }
-        } else {
-          // Fallback: just append to the body
-          modifiedBody = bodyString + `{"x-inject-req-body":"${injectHeader}"}`;
-        }
-
-        log(
-          LogLevelValues.debug,
-          "onRequestBody >> Modified body: " + modifiedBody,
+        // Use utility function to inject field into JSON body
+        const modifiedBytes = injectFieldIntoJsonBody(
+          bodyBytes,
+          "x-inject-req-body",
+          injectHeader,
         );
 
         // Set the modified body
@@ -127,7 +104,7 @@ class HttpHeaders extends Context {
           BufferTypeValues.HttpRequestBody,
           0,
           <u32>body_buffer_length,
-          String.UTF8.encode(modifiedBody),
+          modifiedBytes,
         );
 
         log(
@@ -154,12 +131,12 @@ class HttpHeaders extends Context {
 
     // Check if we need to modify the response body (x-inject-res-body header exists and content-type is JSON)
     const injectHeader =
-      stream_context.headers.response.get("x-inject-res-body");
+      stream_context.headers.request.get("x-inject-res-body");
     const contentType = stream_context.headers.response.get("content-type");
     const isJsonContent =
       contentType !== null && contentType.includes("application/json");
 
-    if (injectHeader !== null && isJsonContent) {
+    if (injectHeader && injectHeader !== "" && isJsonContent) {
       // Remove content-length header as we will modify the body
       stream_context.headers.response.remove("content-length");
       log(
@@ -184,7 +161,7 @@ class HttpHeaders extends Context {
 
     // Check for x-inject-res-body header directly (each hook runs in its own sandbox)
     const injectHeader =
-      stream_context.headers.response.get("x-inject-res-body");
+      stream_context.headers.request.get("x-inject-res-body");
 
     // Check if Content-Type is application/json
     const contentType = stream_context.headers.response.get("content-type");
@@ -192,7 +169,7 @@ class HttpHeaders extends Context {
       contentType !== null && contentType.includes("application/json");
 
     // If we have a header to inject and content is JSON, modify the body
-    if (injectHeader !== null && isJsonContent) {
+    if (injectHeader && injectHeader !== "" && isJsonContent) {
       // Retrieve the body from the HttpResponseBody buffer
       const bodyBytes = get_buffer_bytes(
         BufferTypeValues.HttpResponseBody,
@@ -201,33 +178,11 @@ class HttpHeaders extends Context {
       );
 
       if (bodyBytes.byteLength > 0) {
-        const bodyString = String.UTF8.decode(bodyBytes);
-        log(
-          LogLevelValues.debug,
-          "onResponseBody >> Original body: " + bodyString,
-        );
-
-        // Manually inject the field into the JSON string
-        // Since AssemblyScript doesn't have JSON.parse, we'll do string manipulation
-        let modifiedBody = bodyString.trimEnd();
-
-        // Remove trailing } if it exists and add our field
-        if (modifiedBody.endsWith("}")) {
-          modifiedBody = modifiedBody.slice(0, -1);
-          // Check if we need a comma (if JSON object is not empty)
-          if (modifiedBody.trimEnd().endsWith("{")) {
-            modifiedBody += `"x-inject-res-body":"${injectHeader}"}`;
-          } else {
-            modifiedBody += `,"x-inject-res-body":"${injectHeader}"}`;
-          }
-        } else {
-          // Fallback: just append to the body
-          modifiedBody = bodyString + `{"x-inject-res-body":"${injectHeader}"}`;
-        }
-
-        log(
-          LogLevelValues.debug,
-          "onResponseBody >> Modified body: " + modifiedBody,
+        // Use utility function to inject field into JSON body
+        const modifiedBytes = injectFieldIntoJsonBody(
+          bodyBytes,
+          "x-inject-res-body",
+          injectHeader,
         );
 
         // Set the modified body
@@ -235,7 +190,7 @@ class HttpHeaders extends Context {
           BufferTypeValues.HttpResponseBody,
           0,
           <u32>body_buffer_length,
-          String.UTF8.encode(modifiedBody),
+          modifiedBytes,
         );
 
         log(
@@ -259,6 +214,5 @@ class HttpHeaders extends Context {
 registerRootContext((context_id: u32) => {
   return new HttpHeadersRoot(context_id);
 }, "httpheaders");
-
 
 ```

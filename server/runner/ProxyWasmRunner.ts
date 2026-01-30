@@ -101,7 +101,8 @@ export class ProxyWasmRunner {
     });
 
     // Pass modified headers from onRequestHeaders to onRequestBody
-    const headersAfterRequestHeaders = results.onRequestHeaders.request.headers;
+    const headersAfterRequestHeaders =
+      results.onRequestHeaders.output.request.headers;
     this.logDebug(
       `Headers after onRequestHeaders: ${JSON.stringify(headersAfterRequestHeaders)}`,
     );
@@ -116,8 +117,8 @@ export class ProxyWasmRunner {
     });
 
     // Get modified request data from hooks
-    const modifiedRequestHeaders = results.onRequestBody.request.headers;
-    const modifiedRequestBody = results.onRequestBody.request.body;
+    const modifiedRequestHeaders = results.onRequestBody.output.request.headers;
+    const modifiedRequestBody = results.onRequestBody.output.request.body;
     this.logDebug(
       `Final headers for fetch: ${JSON.stringify(modifiedRequestHeaders)}`,
     );
@@ -195,8 +196,14 @@ export class ProxyWasmRunner {
       this.logDebug(`Fetch completed: ${responseStatus} ${responseStatusText}`);
 
       // Phase 3: Run response hooks with real response data
+      // Use modified request headers from Phase 1, not original
       const responseCall = {
         ...call,
+        request: {
+          ...call.request,
+          headers: modifiedRequestHeaders,
+          body: modifiedRequestBody,
+        },
         response: {
           headers: responseHeaders,
           body: responseBody,
@@ -212,7 +219,7 @@ export class ProxyWasmRunner {
 
       // Pass modified headers from onResponseHeaders to onResponseBody
       const headersAfterResponseHeaders =
-        results.onResponseHeaders.response.headers;
+        results.onResponseHeaders.output.response.headers;
       this.logDebug(
         `Headers after onResponseHeaders: ${JSON.stringify(headersAfterResponseHeaders)}`,
       );
@@ -227,8 +234,8 @@ export class ProxyWasmRunner {
       });
 
       // Get final response after WASM modifications
-      const finalHeaders = results.onResponseBody.response.headers;
-      const finalBody = results.onResponseBody.response.body;
+      const finalHeaders = results.onResponseBody.output.response.headers;
+      const finalBody = results.onResponseBody.output.response.body;
       this.logDebug(`Final response body length: ${finalBody.length}`);
 
       return {
@@ -243,13 +250,40 @@ export class ProxyWasmRunner {
         },
       };
     } catch (error) {
-      this.logDebug(`Fetch error: ${String(error)}`);
+      // Extract detailed error information
+      let errorMessage = "Fetch failed";
+      let errorDetails = "";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (error.cause) {
+          errorDetails = ` (cause: ${String(error.cause)})`;
+        }
+      } else {
+        errorMessage = String(error);
+      }
+
+      const fullErrorMessage = `Failed to fetch ${requestMethod} ${targetUrl}: ${errorMessage}${errorDetails}`;
+      this.logDebug(fullErrorMessage);
+
+      // Get the last successful request state
+      const lastRequestState = results.onRequestBody?.output?.request || {
+        headers: modifiedRequestHeaders,
+        body: modifiedRequestBody,
+      };
+
       // Return error in response hooks
       const errorResult: HookResult = {
         returnCode: null,
-        logs: [{ level: 4, message: `Fetch error: ${String(error)}` }],
-        request: results.onRequestBody.request,
-        response: { headers: {}, body: "" },
+        logs: [{ level: 4, message: fullErrorMessage }],
+        input: {
+          request: lastRequestState,
+          response: { headers: {}, body: "" },
+        },
+        output: {
+          request: lastRequestState,
+          response: { headers: {}, body: "" },
+        },
         properties: call.properties,
       };
       results.onResponseHeaders = errorResult;
@@ -259,9 +293,9 @@ export class ProxyWasmRunner {
         hookResults: results,
         finalResponse: {
           status: 0,
-          statusText: "Fetch Error",
+          statusText: "Fetch Failed",
           headers: {},
-          body: `Error: ${String(error)}`,
+          body: fullErrorMessage,
           contentType: "text/plain",
         },
       };
@@ -348,6 +382,18 @@ export class ProxyWasmRunner {
       this.rootContextId,
     );
 
+    // Capture input state before hook execution
+    const inputState = {
+      request: {
+        headers: { ...requestHeaders },
+        body: requestBody,
+      },
+      response: {
+        headers: { ...responseHeaders },
+        body: responseBody,
+      },
+    };
+
     const { exportName, args } = this.buildHookInvocation(
       call.hook,
       requestHeaders,
@@ -357,14 +403,8 @@ export class ProxyWasmRunner {
     );
     const returnCode = this.callIfExported(exportName, ...args);
 
-    // Filter logs based on log level
-    const filteredLogs = this.logs.filter((log) =>
-      this.hostFunctions.shouldLog(log.level),
-    );
-
-    return {
-      returnCode,
-      logs: filteredLogs,
+    // Capture output state after hook execution
+    const outputState = {
       request: {
         headers: { ...this.hostFunctions.getRequestHeaders() },
         body: this.hostFunctions.getRequestBody(),
@@ -373,6 +413,18 @@ export class ProxyWasmRunner {
         headers: { ...this.hostFunctions.getResponseHeaders() },
         body: this.hostFunctions.getResponseBody(),
       },
+    };
+
+    // Filter logs based on log level
+    const filteredLogs = this.logs.filter((log) =>
+      this.hostFunctions.shouldLog(log.level),
+    );
+
+    return {
+      returnCode,
+      logs: filteredLogs,
+      input: inputState,
+      output: outputState,
       properties: { ...call.properties },
     };
   }

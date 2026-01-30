@@ -13,6 +13,27 @@ export interface HookResult {
   logs: string;
   returnValue?: number;
   error?: string;
+  input?: {
+    request: {
+      headers: Record<string, string>;
+      body: string;
+    };
+    response: {
+      headers: Record<string, string>;
+      body: string;
+    };
+  };
+  output?: {
+    request: {
+      headers: Record<string, string>;
+      body: string;
+    };
+    response: {
+      headers: Record<string, string>;
+      body: string;
+    };
+  };
+  properties?: Record<string, unknown>;
 }
 
 export interface WasmState {

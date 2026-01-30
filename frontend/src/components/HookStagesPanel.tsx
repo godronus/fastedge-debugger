@@ -16,7 +16,7 @@ const HOOKS = [
   "onResponseBody",
 ];
 
-type SubView = "logs" | "inputs";
+type SubView = "logs" | "inputs" | "outputs";
 
 export function HookStagesPanel({
   results,
@@ -31,29 +31,90 @@ export function HookStagesPanel({
     onLogLevelChange(parseInt(e.target.value, 10));
   };
 
+  const formatBody = (
+    body: string,
+    headers: Record<string, string>,
+  ): string => {
+    // Check if content-type indicates JSON
+    const contentType =
+      Object.entries(headers).find(
+        ([key]) => key.toLowerCase() === "content-type",
+      )?.[1] || "";
+
+    if (contentType.includes("application/json")) {
+      try {
+        const parsed = JSON.parse(body);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        // If parsing fails, return as-is
+        return body;
+      }
+    }
+    return body;
+  };
+
   const getInputsForHook = (hook: string) => {
+    const result = results[hook];
+
+    // If we have server-returned INPUT data, use it. Otherwise fall back to hookCall (pre-execution state)
+    if (result?.input) {
+      switch (hook) {
+        case "onRequestHeaders":
+          return {
+            headers: result.input.request.headers,
+            metadata:
+              "Request headers as received by this hook on the server (BEFORE modification)",
+          };
+        case "onRequestBody":
+          return {
+            body: result.input.request.body,
+            headers: result.input.request.headers,
+            metadata:
+              "Request body and headers as received by this hook on the server (BEFORE modification)",
+          };
+        case "onResponseHeaders":
+          return {
+            headers: result.input.response.headers,
+            requestHeaders: result.input.request.headers,
+            metadata:
+              "Response headers as received by this hook (with modified request headers from previous hooks)",
+          };
+        case "onResponseBody":
+          return {
+            body: result.input.response.body,
+            headers: result.input.response.headers,
+            requestHeaders: result.input.request.headers,
+            metadata:
+              "Response body and headers as received by this hook on the server",
+          };
+        default:
+          return { metadata: "No input data" };
+      }
+    }
+
+    // Fallback to hookCall data (before execution)
     switch (hook) {
       case "onRequestHeaders":
         return {
           headers: hookCall.request_headers || {},
-          metadata: "Request headers that will be processed by this hook",
+          metadata: "(Not yet executed - showing initial state)",
         };
       case "onRequestBody":
         return {
           body: hookCall.request_body || "",
           headers: hookCall.request_headers || {},
-          metadata: "Request body and headers available during this hook",
+          metadata: "(Not yet executed - showing initial state)",
         };
       case "onResponseHeaders":
         return {
           headers: hookCall.response_headers || {},
-          metadata: "Response headers that will be processed by this hook",
+          metadata: "(Not yet executed - showing initial state)",
         };
       case "onResponseBody":
         return {
           body: hookCall.response_body || "",
           headers: hookCall.response_headers || {},
-          metadata: "Response body and headers available during this hook",
+          metadata: "(Not yet executed - showing initial state)",
         };
       default:
         return { metadata: "No input data" };
@@ -62,12 +123,37 @@ export function HookStagesPanel({
 
   const renderInputs = (hook: string) => {
     const inputs = getInputsForHook(hook);
+    const result = results[hook];
 
     return (
       <div className="hook-inputs">
         <p style={{ color: "#b0b0b0", fontSize: "13px", marginBottom: "16px" }}>
           {inputs.metadata}
         </p>
+
+        {"requestHeaders" in inputs && (
+          <div style={{ marginBottom: "20px" }}>
+            <h4
+              style={{
+                color: "#e0e0e0",
+                fontSize: "13px",
+                marginBottom: "8px",
+              }}
+            >
+              Request Headers (Modified by Previous Hooks)
+            </h4>
+            <pre
+              style={{
+                background: "#1e1e1e",
+                padding: "12px",
+                borderRadius: "4px",
+                fontSize: "12px",
+              }}
+            >
+              {JSON.stringify(inputs.requestHeaders, null, 2)}
+            </pre>
+          </div>
+        )}
 
         {"headers" in inputs && (
           <div style={{ marginBottom: "20px" }}>
@@ -78,7 +164,9 @@ export function HookStagesPanel({
                 marginBottom: "8px",
               }}
             >
-              Headers
+              {hook.includes("Response")
+                ? "Response Headers"
+                : "Request Headers"}
             </h4>
             <pre
               style={{
@@ -102,7 +190,7 @@ export function HookStagesPanel({
                 marginBottom: "8px",
               }}
             >
-              Body
+              {hook.includes("Response") ? "Response Body" : "Request Body"}
             </h4>
             <pre
               style={{
@@ -112,12 +200,12 @@ export function HookStagesPanel({
                 fontSize: "12px",
               }}
             >
-              {inputs.body}
+              {formatBody(inputs.body, inputs.headers || {})}
             </pre>
           </div>
         )}
 
-        {hookCall.properties && Object.keys(hookCall.properties).length > 0 && (
+        {result?.properties && Object.keys(result.properties).length > 0 && (
           <div>
             <h4
               style={{
@@ -136,9 +224,130 @@ export function HookStagesPanel({
                 fontSize: "12px",
               }}
             >
-              {JSON.stringify(hookCall.properties, null, 2)}
+              {JSON.stringify(result.properties, null, 2)}
             </pre>
           </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderOutputs = (hook: string) => {
+    const result = results[hook];
+
+    if (!result?.output) {
+      return (
+        <div style={{ color: "#666", fontStyle: "italic", padding: "20px" }}>
+          No output yet. Click "Send" to execute this hook.
+        </div>
+      );
+    }
+
+    const outputs = result.output;
+
+    return (
+      <div className="hook-outputs">
+        <p style={{ color: "#b0b0b0", fontSize: "13px", marginBottom: "16px" }}>
+          Data produced by this hook AFTER execution (modifications made by
+          WASM)
+        </p>
+
+        {hook.includes("Request") && (
+          <div style={{ marginBottom: "20px" }}>
+            <h4
+              style={{
+                color: "#e0e0e0",
+                fontSize: "13px",
+                marginBottom: "8px",
+              }}
+            >
+              Request Headers (Modified)
+            </h4>
+            <pre
+              style={{
+                background: "#1e1e1e",
+                padding: "12px",
+                borderRadius: "4px",
+                fontSize: "12px",
+              }}
+            >
+              {JSON.stringify(outputs.request.headers, null, 2)}
+            </pre>
+          </div>
+        )}
+
+        {hook === "onRequestBody" && outputs.request.body && (
+          <div style={{ marginBottom: "20px" }}>
+            <h4
+              style={{
+                color: "#e0e0e0",
+                fontSize: "13px",
+                marginBottom: "8px",
+              }}
+            >
+              Request Body (Modified)
+            </h4>
+            <pre
+              style={{
+                background: "#1e1e1e",
+                padding: "12px",
+                borderRadius: "4px",
+                fontSize: "12px",
+              }}
+            >
+              {formatBody(outputs.request.body, outputs.request.headers)}
+            </pre>
+          </div>
+        )}
+
+        {hook.includes("Response") && (
+          <>
+            <div style={{ marginBottom: "20px" }}>
+              <h4
+                style={{
+                  color: "#e0e0e0",
+                  fontSize: "13px",
+                  marginBottom: "8px",
+                }}
+              >
+                Response Headers (Modified)
+              </h4>
+              <pre
+                style={{
+                  background: "#1e1e1e",
+                  padding: "12px",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                }}
+              >
+                {JSON.stringify(outputs.response.headers, null, 2)}
+              </pre>
+            </div>
+
+            {hook === "onResponseBody" && outputs.response.body && (
+              <div style={{ marginBottom: "20px" }}>
+                <h4
+                  style={{
+                    color: "#e0e0e0",
+                    fontSize: "13px",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Response Body (Modified)
+                </h4>
+                <pre
+                  style={{
+                    background: "#1e1e1e",
+                    padding: "12px",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                  }}
+                >
+                  {formatBody(outputs.response.body, outputs.response.headers)}
+                </pre>
+              </div>
+            )}
+          </>
         )}
       </div>
     );
@@ -246,11 +455,18 @@ export function HookStagesPanel({
           >
             Inputs
           </button>
+          <button
+            className={`sub-tab ${activeSubView === "outputs" ? "active" : ""}`}
+            onClick={() => setActiveSubView("outputs")}
+          >
+            Outputs
+          </button>
         </div>
 
         <div className="stage-content">
           {activeSubView === "logs" && renderLogs(activeHook)}
           {activeSubView === "inputs" && renderInputs(activeHook)}
+          {activeSubView === "outputs" && renderOutputs(activeHook)}
         </div>
       </CollapsiblePanel>
     </div>

@@ -18,7 +18,8 @@ frontend/
 ├── src/
 │   ├── components/          # React components
 │   │   ├── WasmLoader.tsx   # File upload component
-│   │   ├── HeadersEditor.tsx # Key:value header input
+│   │   ├── DictionaryInput.tsx # Postman-style key-value editor with defaults
+│   │   ├── HeadersEditor.tsx # Wrapper around DictionaryInput
 │   │   ├── PropertiesEditor.tsx # JSON properties editor
 │   │   ├── RequestBar.tsx   # Method + URL + Send button
 │   │   ├── RequestTabs.tsx  # Collapsible request config tabs
@@ -29,6 +30,8 @@ frontend/
 │   │   └── useWasm.ts       # WASM loading logic
 │   ├── api/
 │   │   └── index.ts         # Backend API client
+│   ├── utils/
+│   │   └── contentType.ts   # Auto content-type detection utility
 │   ├── types/
 │   │   └── index.ts         # TypeScript interfaces
 │   ├── App.tsx              # Main application component
@@ -51,8 +54,8 @@ Manages global state and orchestrates all components:
 ```typescript
 const App = () => {
   const { wasmState, loading, error, loadWasm } = useWasm();
-  const [method, setMethod] = useState("GET");
-  const [url, setUrl] = useState("https://example.com/api/endpoint");
+  const [method, setMethod] = useState("POST");
+  const [url, setUrl] = useState("http://localhost:8181");
   const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>(...);
   const [requestBody, setRequestBody] = useState(...);
   const [properties, setProperties] = useState<Record<string, string>>(...);
@@ -70,8 +73,15 @@ const App = () => {
         onMethodChange={setMethod}
         onUrlChange={setUrl}
         onSend={async () => {
+          // Apply auto content-type detection (Postman-like behavior)
+          const finalHeaders = applyDefaultContentType(requestHeaders, requestBody);
+
           // Calls sendFullFlow API - executes all hooks + real HTTP fetch
-          const { hookResults, finalResponse } = await sendFullFlow(url, method, hookCall);
+          const { hookResults, finalResponse } = await sendFullFlow(
+            url,
+            method,
+            { ...hookCall, request_headers: finalHeaders, logLevel }
+          );
           setResults(hookResults);
           setFinalResponse(finalResponse);
         }}
@@ -83,6 +93,19 @@ const App = () => {
         onHeadersChange={setRequestHeaders}
         onBodyChange={setRequestBody}
         onPropertiesChange={setProperties}
+        defaultHeaders={{
+          host: "example.com",
+          "content-type": {
+            value: "",
+            enabled: false,
+            placeholder: "<Calculated at runtime>",
+          },
+          Authorization: {
+            value: "",
+            enabled: false,
+            placeholder: "Bearer <token>",
+          },
+        }}
       />
       <HookStagesPanel
         results={results}
@@ -148,29 +171,137 @@ Handles WASM file upload:
 - Loading state display
 - Calls `onFileLoad(file)` when file selected
 
+### DictionaryInput.tsx (Reusable)
+
+Postman-style tabular key-value editor with enable/disable checkboxes and default values support:
+
+**Purpose:**
+
+- Replace text-area based editing with visual tabular layout
+- Allow temporarily disabling key-value pairs without deletion
+- Provide preset default values (like Postman's default headers)
+- Support per-row placeholders for contextual hints
+
+**Features:**
+
+- **Grid layout**: Checkbox | Key | Value | Delete button
+- **Enable/disable**: Checkbox in first column to toggle rows
+- **Default values**: Pre-populated suggestions that can be enabled/disabled
+- **Per-row placeholders**: Contextual hints specific to each default
+- **Auto-row addition**: Empty row added when typing in last row
+- **Delete button**: ✕ icon removes row (maintains at least one empty row)
+- **Visual feedback**: Disabled rows show at 50% opacity
+
+**Props:**
+
+```typescript
+export type DefaultValue =
+  | string
+  | { value: string; enabled?: boolean; placeholder?: string };
+
+interface DictionaryInputProps {
+  value: Record<string, string>;
+  onChange: (value: Record<string, string>) => void;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
+  defaultValues?: Record<string, DefaultValue>; // NEW: Preset headers/values
+}
+```
+
+**DefaultValue Formats:**
+
+```typescript
+// Simple string
+{ host: "example.com" }
+
+// With enabled state
+{ "content-type": { value: "", enabled: false } }
+
+// With placeholder
+{
+  Authorization: {
+    value: "",
+    enabled: false,
+    placeholder: "Bearer <token>"
+  }
+}
+```
+
+**Internal State:**
+
+```typescript
+interface Row {
+  id: string; // crypto.randomUUID()
+  key: string;
+  value: string;
+  enabled: boolean; // Checkbox state
+  placeholder?: string; // Optional per-row placeholder
+}
+```
+
+**State Management:**
+
+- Uses lazy initializer: `useState(() => parseValue(value))`
+- No `useEffect` dependency on `value` prop (prevents re-initialization)
+- Preserves enabled/disabled state across parent updates
+- Default values appear first, followed by user-added rows
+
+**CSS Classes:**
+
+- `.dictionary-input`: Container
+- `.dictionary-header`: Column labels row (4-column grid: 32px | 1fr | 1fr | 40px)
+- `.dictionary-row`: Data row (same grid structure)
+- `.dictionary-enabled`: Checkbox column
+- `.dictionary-key`, `.dictionary-value`: Input fields
+- `.dictionary-delete`: Delete button (✕)
+
+**Bug Fix History:**
+
+Previously had a critical bug where `useEffect([value])` would re-initialize rows on every parent update, losing the enabled state. Fixed by:
+
+1. Removing `value` from dependencies
+2. Using lazy initializer in `useState`
+3. Only initializing once on mount
+
 ### HeadersEditor.tsx (Reusable)
 
-Text area input for headers in `key: value` format:
+Simplified wrapper around DictionaryInput with default headers support:
 
-- Parses multi-line text input
-- Converts to `Record<string, string>`
-- Used by RequestForm and ResponseForm
+```typescript
+interface HeadersEditorProps {
+  value: Record<string, string>;
+  onChange: (value: Record<string, string>) => void;
+  defaultHeaders?: Record<string, DefaultValue>;
+}
+
+export const HeadersEditor = ({ value, onChange, defaultHeaders }: Props) => (
+  <DictionaryInput
+    value={value}
+    onChange={onChange}
+    keyPlaceholder="Header name"
+    valuePlaceholder="Header value"
+    defaultValues={defaultHeaders}
+  />
+);
+```
+
+Previously was a text area for `key: value` format. Now uses DictionaryInput for Postman-style editing.
 
 ### RequestForm.tsx
 
 Configure request data:
 
-- Request headers (HeadersEditor)
+- Request headers (HeadersEditor → DictionaryInput)
 - Request body (textarea)
-- Request trailers (HeadersEditor)
+- Request trailers (HeadersEditor → DictionaryInput)
 
 ### ResponseForm.tsx
 
 Configure response data:
 
-- Response headers (HeadersEditor)
+- Response headers (HeadersEditor → DictionaryInput)
 - Response body (textarea)
-- Response trailers (HeadersEditor)
+- Response trailers (HeadersEditor → DictionaryInput)
 
 ### PropertiesEditor.tsx
 
@@ -185,21 +316,87 @@ JSON editor for properties:
 Configure request data with tabbed interface wrapped in CollapsiblePanel:
 
 - **Tabs**: Headers, Body, Properties
-- **Headers tab**: HeadersEditor for key:value input
+- **Headers tab**: HeadersEditor for key:value input with default headers support
 - **Body tab**: Textarea for request body (JSON, XML, etc.)
 - **Properties tab**: PropertiesEditor for WASM properties
 - **Collapsible**: Uses CollapsiblePanel with title "Request", defaultExpanded={true}
+- **Default headers**: Can pass `defaultHeaders` prop to provide preset suggestions
+
+**Default Headers Example:**
+
+```typescript
+<RequestTabs
+  headers={headers}
+  onHeadersChange={setHeaders}
+  defaultHeaders={{
+    host: "example.com",
+    "content-type": {
+      value: "",
+      enabled: false,
+      placeholder: "<Calculated at runtime>",
+    },
+    Authorization: {
+      value: "",
+      enabled: false,
+      placeholder: "Bearer <token>",
+    },
+  }}
+/>
+```
 
 ### HookStagesPanel.tsx (Collapsible)
 
-Tabbed interface for viewing hook execution, wrapped in CollapsiblePanel:
+Three-tab interface for comprehensive hook execution inspection, wrapped in CollapsiblePanel:
 
 - **Main tabs**: One for each hook (onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody)
-- **Sub-tabs**: Logs and Inputs
-- **Logs view**: Shows output, return codes, errors for that hook
-- **Inputs view**: Shows data available to that hook (headers, body, properties)
-- **Log level selector**: Filter logs by severity
+- **Sub-tabs**: Logs, Inputs, and Outputs
+  - **Logs**: Shows WASM execution output, return codes, and errors for that hook
+  - **Inputs**: Shows data received by the hook BEFORE WASM modifications (server-side captured state)
+  - **Outputs**: Shows data produced by the hook AFTER WASM modifications (server-side captured state)
+- **Log level selector**: Filter logs by severity (Trace, Debug, Info, Warn, Error, Critical)
 - **Collapsible**: Uses CollapsiblePanel with title "Logging", defaultExpanded={false}
+
+**Input/Output Separation:**
+
+The panel displays true server-side state for both inputs and outputs:
+
+- **Inputs tab**: Shows what the hook actually received (e.g., original headers without WASM-added headers)
+- **Outputs tab**: Shows what the hook produced (e.g., headers with WASM-added custom headers)
+
+**Example for onRequestHeaders:**
+
+- **Inputs**: `{"content-type": "application/json", "host": "example.com"}`
+- **Outputs**: `{"content-type": "application/json", "host": "example.com", "x-custom-request": "I am injected from onRequestHeaders"}`
+
+**JSON Formatting:**
+
+Body content is automatically prettified when `content-type` is `application/json`:
+
+```typescript
+const formatBody = (body: string, headers: Record<string, string>): string => {
+  const contentType =
+    Object.entries(headers).find(
+      ([key]) => key.toLowerCase() === "content-type",
+    )?.[1] || "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.stringify(JSON.parse(body), null, 2);
+    } catch {
+      return body;
+    }
+  }
+  return body;
+};
+```
+
+**Response Hook Context:**
+
+For `onResponseHeaders` and `onResponseBody`, the Inputs tab shows:
+
+- Response headers/body that the hook received
+- Modified request headers from previous hooks (visible in separate section)
+- This provides complete context of what data was available during hook execution
 
 ### ResponseViewer.tsx (Collapsible)
 
@@ -316,13 +513,24 @@ const response = await fetch("/api/send", {
 
 // 2. Parse response with hook results and final response
 const result = await response.json();
+
+// Transform hook results with input/output data
+const hookResults: Record<string, HookResult> = {};
+for (const [hook, hookResult] of Object.entries(result.hookResults || {})) {
+  const hr = hookResult as any;
+  const logs = hr?.logs || [];
+  hookResults[hook] = {
+    logs: logs.map((log: any) => log.message || String(log)).join("\n"),
+    returnValue: hr?.returnCode,
+    error: hr?.error,
+    input: hr?.input, // What hook received (before WASM)
+    output: hr?.output, // What hook produced (after WASM)
+    properties: hr?.properties,
+  };
+}
+
 return {
-  hookResults: {
-    onRequestHeaders: { logs, returnValue, error },
-    onRequestBody: { logs, returnValue, error },
-    onResponseHeaders: { logs, returnValue, error },
-    onResponseBody: { logs, returnValue, error },
-  },
+  hookResults,
   finalResponse: {
     status: 200,
     statusText: "OK",
@@ -333,6 +541,19 @@ return {
   },
 };
 ```
+
+**Input/Output Tracking:**
+
+Each hook result now includes both `input` and `output` fields captured by the backend:
+
+- `input`: Data state BEFORE the hook executed (what was provided to WASM)
+- `output`: Data state AFTER the hook executed (what WASM produced)
+
+This enables the frontend to show:
+
+- **Inputs tab**: Original data received by hook
+- **Outputs tab**: Modified data produced by hook
+- Clear visibility into WASM modifications
 
 ## Type System
 
@@ -354,6 +575,27 @@ export interface HookResult {
   logs: string;
   returnValue?: number;
   error?: string;
+  input?: {
+    request: {
+      headers: Record<string, string>;
+      body: string;
+    };
+    response: {
+      headers: Record<string, string>;
+      body: string;
+    };
+  };
+  output?: {
+    request: {
+      headers: Record<string, string>;
+      body: string;
+    };
+    response: {
+      headers: Record<string, string>;
+      body: string;
+    };
+  };
+  properties?: Record<string, unknown>;
 }
 
 export interface WasmState {
@@ -476,6 +718,67 @@ In production (`pnpm run build:frontend`):
 }
 ```
 
+## Utilities
+
+### contentType.ts (`utils/contentType.ts`)
+
+Utility function for automatic content-type detection (Postman-like behavior):
+
+```typescript
+/**
+ * Applies default content-type header based on request body content if not already set.
+ * Mimics Postman's automatic content-type detection behavior.
+ */
+export function applyDefaultContentType(
+  headers: Record<string, string>,
+  body: string,
+): Record<string, string> {
+  const finalHeaders = { ...headers };
+
+  // Only auto-calculate if content-type is not present in headers
+  if (!finalHeaders["content-type"] && body.trim()) {
+    const trimmedBody = body.trim();
+    const lowerBody = trimmedBody.toLowerCase();
+
+    // Try to detect content type from body
+    if (trimmedBody.startsWith("{") || trimmedBody.startsWith("[")) {
+      finalHeaders["content-type"] = "application/json";
+    } else if (
+      lowerBody.startsWith("<!doctype html") ||
+      lowerBody.startsWith("<html")
+    ) {
+      finalHeaders["content-type"] = "text/html";
+    } else if (trimmedBody.startsWith("<?xml")) {
+      finalHeaders["content-type"] = "application/xml";
+    } else if (trimmedBody.startsWith("<")) {
+      // Generic XML/HTML - default to HTML as it's more common in testing
+      finalHeaders["content-type"] = "text/html";
+    } else {
+      finalHeaders["content-type"] = "text/plain";
+    }
+  }
+
+  return finalHeaders;
+}
+```
+
+**Detection Priority:**
+
+1. User-set header (never override)
+2. JSON: `{` or `[`
+3. HTML DOCTYPE: `<!doctype html`
+4. HTML tag: `<html`
+5. XML declaration: `<?xml`
+6. Generic markup: `<`
+7. Plain text: fallback
+
+**Usage in App.tsx:**
+
+```typescript
+const finalHeaders = applyDefaultContentType(requestHeaders, requestBody);
+await sendFullFlow(url, method, { ...hookCall, request_headers: finalHeaders });
+```
+
 ## Styling
 
 Simple CSS in `App.css`:
@@ -571,5 +874,11 @@ pnpm start
 - No `node_modules` in frontend/ - uses parent's via pnpm
 - Build output goes to parent directory for easier deployment
 - Backend serves both API and static frontend (single server deployment)
+- **G-Core SDK quirk**: Returns empty string `""` for missing headers, not `null`
+- Content-type detection runs only when header not explicitly set by user
+- Default headers support three formats: string, {value, enabled}, {value, enabled, placeholder}
+- **Input/Output tracking**: Backend captures state before and after each hook execution
+- **JSON prettification**: Automatic formatting for JSON bodies based on content-type header
+- **Three-tab interface**: Logs (execution output), Inputs (before WASM), Outputs (after WASM)
 
-Last Updated: January 27, 2026
+Last Updated: January 30, 2026

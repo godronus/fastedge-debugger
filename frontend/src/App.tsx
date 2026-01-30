@@ -6,6 +6,7 @@ import { RequestTabs } from "./components/RequestTabs";
 import { HookStagesPanel } from "./components/HookStagesPanel";
 import { ResponseViewer } from "./components/ResponseViewer";
 import { HookResult, FinalResponse } from "./types";
+import { applyDefaultContentType } from "./utils/contentType";
 import "./App.css";
 
 function App() {
@@ -15,8 +16,6 @@ function App() {
   const [url, setUrl] = useState("http://localhost:8181");
 
   const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>({
-    host: "example.com",
-    "content-type": "application/json",
     "x-inject-req-body": "Injected WASM value onRequestBody",
     "x-inject-res-body": "Injected WASM value onResponseBody",
   });
@@ -73,12 +72,18 @@ function App() {
         onUrlChange={setUrl}
         onSend={async () => {
           try {
+            const finalHeaders = applyDefaultContentType(
+              requestHeaders,
+              requestBody,
+            );
+
             const { sendFullFlow } = await import("./api");
             const { hookResults, finalResponse: response } = await sendFullFlow(
               url,
               method,
               {
                 ...hookCall,
+                request_headers: finalHeaders,
                 logLevel,
               },
             );
@@ -112,6 +117,19 @@ function App() {
         onHeadersChange={setRequestHeaders}
         onBodyChange={setRequestBody}
         onPropertiesChange={setProperties}
+        defaultHeaders={{
+          host: "example.com",
+          "content-type": {
+            value: "",
+            enabled: false,
+            placeholder: "<Calculated at runtime>",
+          },
+          Authorization: {
+            value: "",
+            enabled: false,
+            placeholder: "Bearer <token>",
+          },
+        }}
       />
 
       <HookStagesPanel

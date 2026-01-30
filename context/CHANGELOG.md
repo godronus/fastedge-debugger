@@ -1,5 +1,373 @@
 # Proxy-WASM Runner - Changelog
 
+## January 30, 2026 (Part 2) - Input/Output Tracking & Enhanced Debugging
+
+### Overview
+
+Added comprehensive input/output tracking for all hooks, showing what each hook received vs. what it produced. Enhanced error messages for fetch failures and improved JSON body display formatting.
+
+### 🎯 Changes Made
+
+#### 1. Input/Output Separation for Hook Execution
+
+**Problem:** The HookStagesPanel was showing the OUTPUT of hooks (modified data) in the "Inputs" tab, making it confusing to understand what data was actually provided to each hook.
+
+**Solution:**
+
+- Backend now captures both input state (before hook execution) and output state (after hook execution)
+- Frontend displays true inputs in "Inputs" tab and modifications in new "Outputs" tab
+- Each hook result now includes:
+  - `input`: What the hook received (before WASM modifications)
+  - `output`: What the hook produced (after WASM modifications)
+
+**Example:** In `onRequestHeaders`:
+
+- **Inputs** shows original headers without WASM-added headers
+- **Outputs** shows modified headers WITH WASM-added headers like `x-custom-request`
+
+**Files Changed:**
+
+- `/server/runner/types.ts` - Updated `HookResult` type with input/output structure
+- `/server/runner/ProxyWasmRunner.ts` - Capture state before and after hook execution
+- `/frontend/src/types/index.ts` - Updated frontend `HookResult` type
+- `/frontend/src/api/index.ts` - Pass through input/output from server
+- `/frontend/src/components/HookStagesPanel.tsx` - Use input data for Inputs tab
+
+**Type Structure:**
+
+```typescript
+export type HookResult = {
+  returnCode: number | null;
+  logs: { level: number; message: string }[];
+  input: {
+    request: { headers: HeaderMap; body: string };
+    response: { headers: HeaderMap; body: string };
+  };
+  output: {
+    request: { headers: HeaderMap; body: string };
+    response: { headers: HeaderMap; body: string };
+  };
+  properties: Record<string, unknown>;
+};
+```
+
+#### 2. Three-Tab Interface for Hook Inspection
+
+**Added:** New "Outputs" tab alongside existing "Logs" and "Inputs" tabs
+
+**Tab Purposes:**
+
+- **Logs**: WASM execution logs and return codes
+- **Inputs**: Data received by the hook (BEFORE modification)
+- **Outputs**: Data produced by the hook (AFTER modification)
+
+**Benefits:**
+
+- Clear visibility into hook behavior
+- Easy comparison of input vs output
+- Understand exactly what WASM code modified
+
+**Files Changed:**
+
+- `/frontend/src/components/HookStagesPanel.tsx` - Added `renderOutputs()` function and "Outputs" tab
+
+#### 3. Enhanced Fetch Error Messages
+
+**Problem:** Fetch failures showed generic "TypeError: fetch failed" messages without useful debugging information.
+
+**Solution:**
+
+- Extract detailed error information including error cause
+- Include HTTP method and target URL in error message
+- Display full error in ResponseViewer body
+- Show error in hook logs with proper context
+
+**Error Format:**
+
+```
+Failed to fetch POST http://localhost:8181: fetch failed (cause: Error: connect ECONNREFUSED 127.0.0.1:8181)
+```
+
+**Files Changed:**
+
+- `/server/runner/ProxyWasmRunner.ts` - Enhanced error handling in `callFullFlow()` catch block
+
+#### 4. JSON Body Prettification
+
+**Problem:** JSON bodies displayed as single-line strings, making them hard to read.
+
+**Solution:**
+
+- Auto-detect JSON content based on `content-type` header
+- Parse and re-format with 2-space indentation
+- Apply to both Inputs and Outputs tabs for request/response bodies
+- Gracefully handle invalid JSON (display as-is)
+
+**Before:**
+
+```
+{"hello":"http-responder works!","method":"POST","reqBody":"{\"message\": \"Hello\"}"}
+```
+
+**After:**
+
+```json
+{
+  "hello": "http-responder works!",
+  "method": "POST",
+  "reqBody": "{\"message\": \"Hello\"}"
+}
+```
+
+**Files Changed:**
+
+- `/frontend/src/components/HookStagesPanel.tsx` - Added `formatBody()` helper function
+
+**Implementation:**
+
+```typescript
+const formatBody = (body: string, headers: Record<string, string>): string => {
+  const contentType =
+    Object.entries(headers).find(
+      ([key]) => key.toLowerCase() === "content-type",
+    )?.[1] || "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      const parsed = JSON.parse(body);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return body;
+    }
+  }
+  return body;
+};
+```
+
+#### 5. Backend Error Handling Improvements
+
+**Changes:**
+
+- Safe fallback for `results.onRequestBody.output.request` in error handler
+- Use last known good request state when fetch fails
+- Proper error propagation to response hooks
+- Detailed error messages in `finalResponse.body`
+
+**Files Changed:**
+
+- `/server/runner/ProxyWasmRunner.ts` - Enhanced error handling with fallbacks
+
+### 📦 Summary
+
+**Backend Changes:**
+
+- ✅ Input/output state capture for all hooks
+- ✅ Enhanced fetch error messages with details
+- ✅ Safe error handling with fallbacks
+- ✅ Updated `HookResult` type structure
+
+**Frontend Changes:**
+
+- ✅ Three-tab interface (Logs, Inputs, Outputs)
+- ✅ True input data display (before WASM modifications)
+- ✅ Output data display (after WASM modifications)
+- ✅ JSON body prettification
+- ✅ Updated type definitions
+
+**Developer Experience:**
+
+- 🎯 Clear separation of input vs output
+- 🎯 Better debugging with detailed error messages
+- 🎯 Readable JSON formatting
+- 🎯 Complete visibility into hook execution flow
+
+## January 30, 2026 (Part 1) - Enhanced DictionaryInput & Auto Content-Type Detection
+
+### Overview
+
+Fixed critical DictionaryInput bugs, added defaultValues feature with preset headers support, and implemented Postman-like automatic content-type detection for request bodies.
+
+### 🎯 Changes Made
+
+#### 1. DictionaryInput Bug Fix - Checkbox State Preservation
+
+**Problem:** When unchecking headers, they would disappear from the DOM entirely instead of remaining visible as disabled entries.
+
+**Root Cause:** The `useEffect` had `[value]` in its dependency array, causing re-initialization whenever the parent updated the value prop. This reset the internal `rows` state and lost the enabled/disabled state.
+
+**Solution:**
+
+- Removed `[value]` from `useEffect` dependencies
+- Used lazy initializer in `useState(() => parseValue(value))` instead
+- Now only initializes once on mount, preserving internal state thereafter
+
+**Files Changed:**
+
+- `/frontend/src/components/DictionaryInput.tsx`
+
+#### 2. DefaultValues Feature - Preset Headers with Enhanced Control
+
+**Purpose:** Provide pre-populated header suggestions (like Postman's defaults) that users can enable/disable.
+
+**Features:**
+
+- Three formats supported:
+  - Simple string: `"example.com"`
+  - With enabled state: `{ value: "", enabled: false }`
+  - With placeholder: `{ value: "", enabled: false, placeholder: "Bearer <token>" }`
+- Default headers appear above user-added headers
+- Each default can be individually enabled/disabled
+- Per-row placeholders provide contextual hints
+- Users can override default values
+
+**Type Definition:**
+
+```typescript
+export type DefaultValue =
+  | string
+  | { value: string; enabled?: boolean; placeholder?: string };
+
+interface DictionaryInputProps {
+  value: Record<string, string>;
+  onChange: (value: Record<string, string>) => void;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
+  defaultValues?: Record<string, DefaultValue>; // NEW
+}
+```
+
+**Example Usage:**
+
+```typescript
+<DictionaryInput
+  value={headers}
+  onChange={setHeaders}
+  defaultValues={{
+    host: "example.com",
+    "content-type": {
+      value: "",
+      enabled: false,
+      placeholder: "<Calculated at runtime>",
+    },
+    Authorization: {
+      value: "",
+      enabled: false,
+      placeholder: "Bearer <token>",
+    },
+  }}
+/>
+```
+
+**Files Changed:**
+
+- `/frontend/src/components/DictionaryInput.tsx` - Added defaultValues prop and logic
+- `/frontend/src/components/HeadersEditor.tsx` - Pass through defaultHeaders
+- `/frontend/src/components/RequestTabs.tsx` - Pass through defaultHeaders
+- `/frontend/src/App.tsx` - Configure default headers
+
+#### 3. Auto Content-Type Detection (Postman-like)
+
+**Purpose:** Automatically detect and set content-type header based on request body content, matching Postman's behavior.
+
+**Detection Logic:**
+
+1. Only applies if content-type is NOT already set by user
+2. Checks body content to determine type:
+   - Starts with `{` or `[` → `application/json`
+   - Starts with `<!doctype html` or `<html` → `text/html`
+   - Starts with `<?xml` → `application/xml`
+   - Starts with `<` → `text/html` (generic markup)
+   - Otherwise → `text/plain`
+
+**Implementation:**
+
+```typescript
+// NEW utility file
+export function applyDefaultContentType(
+  headers: Record<string, string>,
+  body: string,
+): Record<string, string> {
+  const finalHeaders = { ...headers };
+  if (!finalHeaders["content-type"] && body.trim()) {
+    // Detection logic here
+  }
+  return finalHeaders;
+}
+```
+
+**Files Changed:**
+
+- `/frontend/src/utils/contentType.ts` - NEW utility module
+- `/frontend/src/App.tsx` - Call `applyDefaultContentType()` before sending request
+
+**UI Integration:**
+
+- Content-type default header shows placeholder: `<Calculated at runtime>`
+- Starts disabled by default
+- User can enable and set explicit value to override auto-detection
+
+#### 4. Backend Fix - Response Hook Header Chaining
+
+**Problem:** Response hooks (onResponseHeaders, onResponseBody) were receiving the original request headers, not the modified headers from request hooks.
+
+**Impact:** Response hooks couldn't see modifications made by onRequestHeaders or onRequestBody hooks.
+
+**Solution:** Modified `ProxyWasmRunner.responseCall()` to use `modifiedRequestHeaders` and `modifiedRequestBody` instead of original values.
+
+**Files Changed:**
+
+- `/server/runner/ProxyWasmRunner.ts`
+
+#### 5. SDK Behavior Investigation
+
+**Discovery:** G-Core proxy-wasm AssemblyScript SDK returns empty string `""` for missing headers, NOT `null`.
+
+**Details:**
+
+- When `stream_context.headers.request.get("header-name")` is called for non-existent header
+- SDK's `get_header_map_value()` returns `new ArrayBuffer(0)`
+- This decodes to empty string `""`
+- WASM code must check `header !== ""` instead of `header !== null`
+
+**Impact:** User's WASM code needed updating to check for empty strings:
+
+```typescript
+// WRONG
+if (injectHeader !== null) { ... }
+
+// CORRECT
+if (injectHeader && injectHeader !== "") { ... }
+```
+
+### 📦 Component Summary
+
+**DictionaryInput.tsx** - Now production-ready with:
+
+- ✅ Checkbox state preservation fix
+- ✅ DefaultValues with enabled/disabled state
+- ✅ Per-row placeholder support
+- ✅ Automatic empty row addition
+- ✅ Delete functionality
+- ✅ Visual feedback (50% opacity for disabled)
+
+**HeadersEditor.tsx** - Simple wrapper passing through:
+
+- ✅ defaultHeaders prop to DictionaryInput
+
+**RequestTabs.tsx** - Manages request configuration:
+
+- ✅ defaultHeaders prop support
+
+**App.tsx** - Main orchestration:
+
+- ✅ Auto content-type detection on send
+- ✅ Default headers configuration (host, content-type, Authorization)
+
+**contentType.ts (NEW)** - Utility module:
+
+- ✅ `applyDefaultContentType()` function
+- ✅ Business logic separation from UI components
+
 ## January 29, 2026 - Critical MapType Bug Fix
 
 ### Overview

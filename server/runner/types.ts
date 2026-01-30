@@ -22,10 +22,13 @@ export type HookCall = {
 export type HookResult = {
   returnCode: number | null;
   logs: { level: number; message: string }[];
-  request: { headers: HeaderMap; body: string };
-  response: {
-    headers: HeaderMap;
-    body: string;
+  input: {
+    request: { headers: HeaderMap; body: string };
+    response: { headers: HeaderMap; body: string };
+  };
+  output: {
+    request: { headers: HeaderMap; body: string };
+    response: { headers: HeaderMap; body: string };
   };
   properties: Record<string, unknown>;
 };

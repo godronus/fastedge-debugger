@@ -125,6 +125,9 @@ export async function sendFullFlow(
       logs: logs.map((log: any) => log.message || String(log)).join("\n"),
       returnValue: hr?.returnCode,
       error: hr?.error,
+      input: hr?.input,
+      output: hr?.output,
+      properties: hr?.properties,
     };
   }
 

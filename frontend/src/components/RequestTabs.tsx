@@ -3,6 +3,12 @@ import { HeadersEditor } from "./HeadersEditor";
 import { PropertiesEditor } from "./PropertiesEditor";
 import { CollapsiblePanel } from "./CollapsiblePanel";
 
+interface DefaultValue {
+  value: string;
+  enabled?: boolean;
+  placeholder?: string;
+}
+
 interface RequestTabsProps {
   headers: Record<string, string>;
   body: string;
@@ -10,6 +16,7 @@ interface RequestTabsProps {
   onHeadersChange: (headers: Record<string, string>) => void;
   onBodyChange: (body: string) => void;
   onPropertiesChange: (properties: Record<string, string>) => void;
+  defaultHeaders?: Record<string, string | DefaultValue>;
 }
 
 type Tab = "headers" | "body" | "properties";
@@ -21,6 +28,7 @@ export function RequestTabs({
   onHeadersChange,
   onBodyChange,
   onPropertiesChange,
+  defaultHeaders,
 }: RequestTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("headers");
 
@@ -54,6 +62,7 @@ export function RequestTabs({
               title="Request Headers"
               value={headers}
               onChange={onHeadersChange}
+              defaultValues={defaultHeaders}
             />
           )}
 
