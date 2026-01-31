@@ -29,6 +29,51 @@ server/
 
 ## Core Components
 
+### PropertyResolver.ts (Property Path Resolution)
+
+**⚠️ Outstanding Work: Full Integration Needed**
+
+The PropertyResolver currently provides basic property resolution, but needs significant enhancement to properly integrate with the ServerPropertiesPanel UI and runtime request data.
+
+**Current Implementation:**
+
+- Resolves common property paths (request.path, request.method, response.code, etc.)
+- Uses user-provided properties from UI (passed via `properties` parameter)
+- Basic path parsing with `.`, `/`, and `\0` separators
+
+**Required Enhancements:**
+
+1. **Runtime Property Extraction:**
+   - Parse `request.url` from actual target URL in callFullFlow
+   - Extract `request.host` from URL or Host header
+   - Calculate `request.path`, `request.query`, `request.scheme` from URL
+   - Determine `request.extension` from path
+   - Set `request.method` from HTTP request method
+
+2. **Property Merge Strategy:**
+   - User-provided properties from ServerPropertiesPanel (geo-location, country, etc.)
+   - Runtime-calculated properties from actual HTTP request
+   - User values should override calculated values when provided
+   - Read-only calculated properties (`<Calculated>` placeholders) filled at runtime
+
+3. **SDK Integration:**
+   - Review `get_property` implementation in HostFunctions.ts
+   - Review `set_property` implementation in HostFunctions.ts
+   - Ensure compatibility with G-Core proxy-wasm AssemblyScript SDK
+   - Reference: https://github.com/G-Core/proxy-wasm-sdk-as
+
+4. **Testing:**
+   - Test that WASM code can successfully call get_property for all paths
+   - Verify property values are correct in hook execution
+   - Test set_property behavior (if supported)
+
+**Current Limitations:**
+
+- Properties are passed through but not fully populated from request
+- Calculated properties show `<Calculated>` but aren't actually calculated
+- No automatic URL parsing into property components
+- get_property may not return correct values for all paths
+
 ### server.ts (Express Server)
 
 Main HTTP server with three endpoints:

@@ -90,6 +90,18 @@ frontend/                     # React + Vite frontend
 
 ### 🚧 Not Yet Implemented
 
+- **Server Properties Integration** (UI exists, backend integration incomplete)
+  - Properties UI in ServerPropertiesPanel provides user input (country, geo-location, etc.)
+  - Backend needs to merge user-provided properties with runtime-calculated properties
+  - Runtime properties must be extracted from actual HTTP request:
+    - `request.url`, `request.host`, `request.path` → parsed from target URL
+    - `request.scheme` → http/https from URL
+    - `request.query` → query string from URL
+    - `request.extension` → file extension from path
+    - `request.method` → HTTP method from request
+  - Need to implement proper `get_property` and `set_property` host functions
+  - Reference: proxy-wasm SDK property handling in G-Core AssemblyScript SDK
+  - Current state: Properties passed to hooks but not fully integrated with WASM property system
 - HTTP callouts (proxy_http_call)
 - Shared data/queue operations
 - Metrics support
@@ -127,6 +139,18 @@ frontend/                     # React + Vite frontend
 
 ### 🚧 Not Yet Implemented
 
+- **Server Properties Integration** (UI exists, backend integration incomplete)
+  - Properties UI in ServerPropertiesPanel provides user input (country, geo-location, etc.)
+  - Backend needs to merge user-provided properties with runtime-calculated properties
+  - Runtime properties must be extracted from actual HTTP request:
+    - `request.url`, `request.host`, `request.path` → parsed from target URL
+    - `request.scheme` → http/https from URL
+    - `request.query` → query string from URL
+    - `request.extension` → file extension from path
+    - `request.method` → HTTP method from request
+  - Need to implement proper `get_property` and `set_property` host functions
+  - Reference: proxy-wasm SDK property handling in G-Core AssemblyScript SDK
+  - Current state: Properties passed to hooks but not fully integrated with WASM property system
 - HTTP callouts (proxy_http_call)
 - Shared data/queue operations
 - Metrics support

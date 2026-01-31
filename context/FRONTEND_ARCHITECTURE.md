@@ -523,7 +523,7 @@ Configure request data with tabbed interface wrapped in CollapsiblePanel:
 
 **Default Headers Example:**
 
-```typescript
+````typescript
 <RequestTabs
   headers={headers}
   onHeadersChange={setHeaders}
@@ -569,7 +569,7 @@ The panel displays true server-side state for both inputs and outputs:
   "host": "example.com",
 + "x-custom-request": "I am injected from onRequestHeaders"
 }
-```
+````
 
 **Smart JSON Handling:**
 
