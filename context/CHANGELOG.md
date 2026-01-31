@@ -1,5 +1,446 @@
 # Proxy-WASM Runner - Changelog
 
+## January 31, 2026 - Read-Only Properties & ServerPropertiesPanel
+
+### Overview
+
+Added read-only support to DictionaryInput for non-editable display-only rows. Moved properties from RequestTabs to a dedicated ServerPropertiesPanel positioned above the Hooks panel. Calculated properties (request.url, request.host, etc.) are now read-only with disabled styling.
+
+### 🎯 Changes Made
+
+#### 1. DictionaryInput Read-Only Support
+
+**New Feature:**
+
+- Added `readOnly?: boolean` property to `DefaultValue` interface
+- Read-only rows are non-interactive with visual disabled state
+- Prevents focus, editing, and checkbox changes
+- No delete button shown for read-only rows
+
+**Behavior:**
+
+```typescript
+// Mark a row as read-only
+{
+  "request.url": {
+    value: "",
+    placeholder: "<Calculated>",
+    enabled: true,
+    readOnly: true  // Can't be edited or deleted
+  }
+}
+```
+
+**Implementation:**
+
+- `tabIndex={-1}` prevents keyboard focus
+- `readOnly` HTML attribute prevents editing
+- `pointer-events: none` CSS prevents mouse interaction
+- Disabled checkbox with browser's disabled styling
+- 50% opacity for grayed-out appearance
+- No focus outline (orange border) on read-only inputs
+
+**Files Modified:**
+
+- `/frontend/src/components/DictionaryInput.tsx` - Added read-only tracking and rendering
+- `/frontend/src/App.css` - Added CSS rules for read-only inputs
+
+#### 2. PropertiesEditor Calculated Properties
+
+**Changes:**
+
+- Marked all calculated properties as `readOnly: true`
+- Changed calculated properties from `enabled: false` to `enabled: true`
+- Properties like `request.url`, `request.host`, `request.path` are now checked but uneditable
+- Visual distinction: Enabled but grayed out with disabled checkbox
+
+**Calculated Properties (Read-Only):**
+
+- `request.url` - Full request URL (calculated from target)
+- `request.host` - Host header (calculated from URL)
+- `request.path` - URL path (calculated from URL)
+- `request.scheme` - http/https (calculated from URL)
+- `request.extension` - File extension (calculated from path)
+- `request.query` - Query string (calculated from URL)
+- `request.x_real_ip` - Client IP (runtime)
+- `request.asn` - AS number (runtime)
+- `request.var` - Custom variables (runtime)
+
+**User-Editable Properties:**
+
+- Country presets (Luxembourg, Germany) with geo-location data
+- `request.country`, `request.city`, `request.region`, etc.
+
+**Files Modified:**
+
+- `/frontend/src/components/PropertiesEditor.tsx` - Updated all calculated properties
+
+#### 3. ServerPropertiesPanel Component
+
+**New Component:**
+
+Created dedicated collapsible panel for server properties, separate from request configuration.
+
+**Features:**
+
+- Title: "Server Properties"
+- Default state: Collapsed (`defaultExpanded={false}`)
+- Positioned between RequestTabs and HookStagesPanel
+- Contains PropertiesEditor with country presets
+
+**Component Structure:**
+
+```typescript
+export function ServerPropertiesPanel({
+  properties,
+  onPropertiesChange,
+}: ServerPropertiesPanelProps) {
+  return (
+    <CollapsiblePanel title="Server Properties" defaultExpanded={false}>
+      <PropertiesEditor value={properties} onChange={onPropertiesChange} />
+    </CollapsiblePanel>
+  );
+}
+```
+
+**Files Created:**
+
+- `/frontend/src/components/ServerPropertiesPanel.tsx` - New component
+
+#### 4. RequestTabs Refactoring
+
+**Changes:**
+
+- Removed "Properties" tab from RequestTabs
+- Now only contains "Headers" and "Body" tabs
+- Removed `properties` and `onPropertiesChange` from props
+- Removed `PropertiesEditor` import
+- Simplified tab type: `type Tab = "headers" | "body"`
+
+**Rationale:**
+
+- Properties are server-side concerns, not request configuration
+- Better organization: Request data separate from server properties
+- Clearer UI hierarchy with dedicated panel
+
+**Files Modified:**
+
+- `/frontend/src/components/RequestTabs.tsx` - Removed properties tab
+- `/frontend/src/App.tsx` - Added ServerPropertiesPanel import and usage
+
+### 📝 UI Layout Changes
+
+**Before:**
+
+```
+Request Bar (Method + URL + Send)
+Request Panel (Headers | Body | Properties)
+Hooks Panel (Logging + Results)
+Response Panel
+```
+
+**After:**
+
+```
+Request Bar (Method + URL + Send)
+Request Panel (Headers | Body)
+Server Properties Panel (Collapsed by default)
+Hooks Panel (Logging + Results)
+Response Panel
+```
+
+### 🎨 CSS Changes
+
+**New Styles:**
+
+```css
+.dictionary-key:read-only,
+.dictionary-value:read-only {
+  cursor: default;
+  pointer-events: none;
+}
+
+.dictionary-key:read-only:focus,
+.dictionary-value:read-only:focus {
+  background: #252525;
+  outline: none;
+}
+```
+
+**Effect:**
+
+- Read-only inputs show default cursor (not text cursor)
+- Cannot be clicked or selected
+- No focus outline/orange border
+- Background stays dark (no highlight on attempted focus)
+
+### 📁 Files Summary
+
+**Created:**
+
+- `/frontend/src/components/ServerPropertiesPanel.tsx`
+
+**Modified:**
+
+- `/frontend/src/components/DictionaryInput.tsx`
+- `/frontend/src/components/PropertiesEditor.tsx`
+- `/frontend/src/components/RequestTabs.tsx`
+- `/frontend/src/App.tsx`
+- `/frontend/src/App.css`
+
+---
+
+## January 30, 2026 (Part 4) - PropertiesEditor Country Presets & DictionaryInput Fixes
+
+### Overview
+
+Enhanced PropertiesEditor with country-based presets (Luxembourg, Germany) using flag icons for visual selection. Fixed multiple DictionaryInput issues including focus loss, default value handling, and delete button logic. Improved component to use simple counter-based IDs instead of crypto.randomUUID.
+
+### 🎯 Changes Made
+
+#### 1. PropertiesEditor Country Presets
+
+**Features:**
+
+- **Country selector**: Radio buttons with flag emojis (🇱🇺 Luxembourg, 🇩🇪 Germany)
+- **Geo-location presets**: Pre-populated coordinates, region, continent
+- **Property ordering**: Enabled properties first, disabled ones at bottom
+- **Available properties**: Based on Rust constants (request.url, request.host, request.path, etc.)
+
+**Country Presets:**
+
+```typescript
+const countryPresets = {
+  luxembourg: {
+    code: "LU",
+    city: "Luxembourg",
+    geoLat: "49.6116",
+    geoLong: "6.1319",
+    region: "Luxembourg",
+    continent: "Europe",
+  },
+  germany: {
+    code: "DE",
+    city: "Frankfurt",
+    geoLat: "50.1109",
+    geoLong: "8.6821",
+    region: "Hesse",
+    continent: "Europe",
+  },
+};
+```
+
+**Available Properties:**
+
+- `request.url`, `request.host`, `request.path`, `request.scheme`
+- `request.extension`, `request.query`, `request.x_real_ip`
+- `request.country`, `request.city`, `request.asn`
+- `request.geo.lat`, `request.geo.long`, `request.region`
+- `request.continent`, `request.country.name`, `request.var`
+
+#### 2. DictionaryInput Major Refactor
+
+**Critical Fixes:**
+
+1. **Removed crypto.randomUUID**: Replaced with simple counter (`row-${++rowIdCounter}`)
+   - Lighter weight, no security needed for UI keys
+   - More predictable for debugging
+
+2. **Removed useEffect on defaultValues/value**:
+   - Previously caused focus loss on every keystroke
+   - Default values now used ONLY for initial state
+   - User can delete default rows (they don't come back)
+
+3. **Fixed checkbox logic**:
+
+   ```typescript
+   // OLD: disabled={!row.key.trim() && !row.value.trim()}
+   // NEW: disabled={!row.key.trim()}
+   // Allows enabling headers with empty values (like "Authorization: ")
+   ```
+
+4. **Fixed updateParent logic**:
+
+   ```typescript
+   // OLD: if (row.enabled && row.key.trim() && row.value.trim())
+   // NEW: if (row.enabled && row.key.trim())
+   // Allows empty values to be included
+   ```
+
+5. **Smart delete button logic**:
+   ```typescript
+   disabled={
+     rows.length === 1 ||
+     (rows.length === index + 1 && !row.key.trim() && !row.value.trim())
+   }
+   // Prevents deleting the last empty entry row
+   ```
+
+**Behavior Changes:**
+
+- Default headers (host, Authorization, content-type) can now be deleted
+- Typing in inputs no longer causes focus loss
+- Spaces and special characters work correctly
+- Unchecked rows can still be edited
+- Last empty row can't be accidentally deleted
+- Enabled state preserved across all operations
+
+**Files Modified:**
+
+- `/frontend/src/components/DictionaryInput.tsx` - Complete refactor
+- `/frontend/src/components/PropertiesEditor.tsx` - Added country presets
+- `/frontend/src/App.css` - Added `.dictionary-row.no-delete` grid variant
+
+### 📝 Documentation Updates
+
+- Updated FRONTEND_ARCHITECTURE.md with PropertiesEditor country preset details
+- Updated DictionaryInput section with new state management approach
+- Documented all bug fixes and behavior changes
+
+---
+
+## January 30, 2026 (Part 3) - JsonDisplay Component with Smart Diff
+
+### Overview
+
+Created a reusable `JsonDisplay` component with intelligent JSON diffing capabilities. The component automatically parses JSON bodies, handles nested objects, and provides git-style diffs showing exactly what changed between input and output states.
+
+### 🎯 Changes Made
+
+#### 1. JsonDisplay Component
+
+**Purpose:** Centralized, reusable component for rendering JSON with optional diff view.
+
+**Features:**
+
+- **Smart JSON rendering**: Automatically prettifies JSON with 2-space indentation
+- **Git-style diffs**: When `compareWith` prop provided, shows red (removed) and green (added) lines
+- **Object-level diffing**: Compares JSON structure, not just text lines (avoids trailing comma issues)
+- **Nested object support**: Properly indents and formats nested objects and arrays
+- **JSON string parsing**: Auto-detects and parses JSON strings (like `reqBody: "{...}"`)
+- **Multi-line handling**: Each nested line gets appropriate diff marker
+
+**Props:**
+
+```typescript
+interface JsonDisplayProps {
+  data: unknown; // The JSON data to display
+  compareWith?: unknown; // Optional: data to compare against (for diff view)
+  title?: string; // Optional: header title
+  style?: React.CSSProperties; // Optional: custom styling
+}
+```
+
+**Files Created:**
+
+- `/frontend/src/components/JsonDisplay.tsx` - React component for rendering
+- `/frontend/src/utils/diff.ts` - Diff algorithms and utilities
+
+#### 2. Diff Utility Module
+
+**Purpose:** Separation of concerns - business logic extracted from UI component.
+
+**Exports:**
+
+- `DiffLine` type - Represents a line in the diff (added/removed/unchanged)
+- `isPlainObject()` - Helper to check for plain objects
+- `computeJsonDiff()` - Main entry point for computing diffs
+- `computeLineDiff()` - Line-by-line diff using LCS algorithm
+- `findLCS()` - Longest Common Subsequence implementation
+- `computeObjectDiff()` - Object-level diff with smart formatting
+
+**Key Algorithm:** Uses LCS (Longest Common Subsequence) for line-based diffing and object-level comparison for JSON objects to avoid trailing comma issues.
+
+**Files Created:**
+
+- `/frontend/src/utils/diff.ts`
+
+#### 3. Enhanced HookStagesPanel
+
+**Improvements:**
+
+- Replaced all inline JSON rendering with `JsonDisplay` component
+- Added `isJsonContent()` helper to detect JSON via content-type header
+- Added `parseBodyIfJson()` to parse JSON bodies before rendering
+- Both Inputs and Outputs tabs now use `JsonDisplay`
+- Request/response bodies automatically parsed and prettified when JSON
+- Outputs tab shows diffs for bodies, highlighting WASM modifications
+
+**Files Changed:**
+
+- `/frontend/src/components/HookStagesPanel.tsx`
+
+**Example Diff Output:**
+
+```diff
+{
+  "hello": "http-responder works!",
+  "method": "POST",
+  "reqBody": {
+    "message": "Hello",
++   "x-inject-req-body": "Injected WASM value onRequestBody"
+  },
+  "reqHeaders": {
+    "accept": "*/*",
+    "content-type": "application/json",
++   "x-custom-request": "I am injected from onRequestHeaders"
+  },
++ "x-inject-res-body": "Injected WASM value onResponseBody"
+}
+```
+
+#### 4. ResponseViewer Integration
+
+**Changes:**
+
+- Uses `JsonDisplay` for JSON response bodies
+- Maintains existing HTML/XML formatting
+- Consistent JSON rendering across entire app
+
+**Files Changed:**
+
+- `/frontend/src/components/ResponseViewer.tsx`
+
+### 📦 Technical Details
+
+**Object-Level Diff Algorithm:**
+
+1. Collects all keys from both objects
+2. Sorts keys alphabetically for consistent display
+3. For each key:
+   - Key only in after → green (added)
+   - Key only in before → red (removed)
+   - Key in both but value changed → red (old) then green (new)
+   - Key in both with same value → white (unchanged)
+4. Handles nested objects by formatting with proper indentation
+5. Auto-parses JSON strings that start with `{` or `[`
+
+**Benefits:**
+
+- **DRY principle**: Single source of truth for JSON rendering
+- **Testability**: Utility functions can be unit tested independently
+- **Maintainability**: Easier to update diff logic in one place
+- **Reusability**: JsonDisplay can be used anywhere in the app
+- **Performance**: Uses `useMemo` to cache diff computations
+- **Better UX**: Clear visual indication of what changed
+
+### 🎨 Visual Improvements
+
+**Before:**
+
+- JSON shown as inline strings
+- No visual indication of changes
+- Nested objects collapsed on one line
+- JSON strings displayed as escaped text
+
+**After:**
+
+- Prettified JSON with proper indentation
+- Green/red diff markers for changes
+- Nested objects expanded with indentation
+- JSON strings auto-parsed and formatted
+- Multi-line values properly aligned
+
 ## January 30, 2026 (Part 2) - Input/Output Tracking & Enhanced Debugging
 
 ### Overview

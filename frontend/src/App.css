@@ -552,6 +552,10 @@ pre {
   border-top: 1px solid #3d3d3d;
 }
 
+.dictionary-row.no-delete {
+  grid-template-columns: 32px 1fr 1fr;
+}
+
 .dictionary-row:first-child {
   border-top: none;
 }
@@ -592,6 +596,18 @@ pre {
   background: #2a2a2a;
   outline: 1px solid #ff6c37;
   outline-offset: -1px;
+}
+
+.dictionary-key:read-only,
+.dictionary-value:read-only {
+  cursor: default;
+  pointer-events: none;
+}
+
+.dictionary-key:read-only:focus,
+.dictionary-value:read-only:focus {
+  background: #252525;
+  outline: none;
 }
 
 .dictionary-key::placeholder,

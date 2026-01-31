@@ -1,0 +1,18 @@
+import { CollapsiblePanel } from "./CollapsiblePanel";
+import { PropertiesEditor } from "./PropertiesEditor";
+
+interface ServerPropertiesPanelProps {
+  properties: Record<string, string>;
+  onPropertiesChange: (properties: Record<string, string>) => void;
+}
+
+export function ServerPropertiesPanel({
+  properties,
+  onPropertiesChange,
+}: ServerPropertiesPanelProps) {
+  return (
+    <CollapsiblePanel title="Server Properties" defaultExpanded={false}>
+      <PropertiesEditor value={properties} onChange={onPropertiesChange} />
+    </CollapsiblePanel>
+  );
+}

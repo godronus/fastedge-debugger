@@ -75,6 +75,19 @@ frontend/                     # React + Vite frontend
   - Workaround: Original host is preserved as `X-Forwarded-Host`
   - This is standard proxy behavior
 
+### ⚠️ Known Limitations
+
+- **Response streaming not implemented**: Responses are fetched completely before processing
+  - Current: `await response.text()` waits for entire response
+  - Hooks receive complete body in single call with `end_of_stream=true`
+  - Production behavior: Hooks called incrementally as chunks arrive
+  - Impact: Cannot test streaming scenarios or incremental processing
+  - Works correctly for: Final state testing, total body modifications
+  - Possible solutions:
+    - Chunk-based processing: Read stream incrementally, call hooks for each chunk
+    - Configurable chunk size: Split responses into artificial chunks for testing
+    - Current approach: Document limitation, suitable for most testing needs
+
 ### 🚧 Not Yet Implemented
 
 - HTTP callouts (proxy_http_call)

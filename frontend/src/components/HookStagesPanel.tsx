@@ -1,6 +1,7 @@
 import { useState, ChangeEvent } from "react";
 import { HookCall, HookResult } from "../types";
 import { CollapsiblePanel } from "./CollapsiblePanel";
+import { JsonDisplay } from "./JsonDisplay";
 
 interface HookStagesPanelProps {
   results: Record<string, HookResult>;
@@ -31,22 +32,29 @@ export function HookStagesPanel({
     onLogLevelChange(parseInt(e.target.value, 10));
   };
 
-  const formatBody = (
-    body: string,
-    headers: Record<string, string>,
-  ): string => {
-    // Check if content-type indicates JSON
+  /**
+   * Check if the content-type indicates JSON
+   */
+  const isJsonContent = (headers: Record<string, string>): boolean => {
     const contentType =
       Object.entries(headers).find(
         ([key]) => key.toLowerCase() === "content-type",
       )?.[1] || "";
+    return contentType.includes("application/json");
+  };
 
-    if (contentType.includes("application/json")) {
+  /**
+   * Parse body if it's JSON, otherwise return as-is
+   */
+  const parseBodyIfJson = (
+    body: string,
+    headers: Record<string, string>,
+  ): unknown => {
+    if (isJsonContent(headers)) {
       try {
-        const parsed = JSON.parse(body);
-        return JSON.stringify(parsed, null, 2);
+        return JSON.parse(body);
       } catch {
-        // If parsing fails, return as-is
+        // If parsing fails, return as string
         return body;
       }
     }
@@ -133,99 +141,40 @@ export function HookStagesPanel({
 
         {"requestHeaders" in inputs && (
           <div style={{ marginBottom: "20px" }}>
-            <h4
-              style={{
-                color: "#e0e0e0",
-                fontSize: "13px",
-                marginBottom: "8px",
-              }}
-            >
-              Request Headers (Modified by Previous Hooks)
-            </h4>
-            <pre
-              style={{
-                background: "#1e1e1e",
-                padding: "12px",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {JSON.stringify(inputs.requestHeaders, null, 2)}
-            </pre>
+            <JsonDisplay
+              data={inputs.requestHeaders}
+              title="Request Headers (Modified by Previous Hooks)"
+            />
           </div>
         )}
 
         {"headers" in inputs && (
           <div style={{ marginBottom: "20px" }}>
-            <h4
-              style={{
-                color: "#e0e0e0",
-                fontSize: "13px",
-                marginBottom: "8px",
-              }}
-            >
-              {hook.includes("Response")
-                ? "Response Headers"
-                : "Request Headers"}
-            </h4>
-            <pre
-              style={{
-                background: "#1e1e1e",
-                padding: "12px",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {JSON.stringify(inputs.headers, null, 2)}
-            </pre>
+            <JsonDisplay
+              data={inputs.headers}
+              title={
+                hook.includes("Response")
+                  ? "Response Headers"
+                  : "Request Headers"
+              }
+            />
           </div>
         )}
 
         {"body" in inputs && inputs.body && (
           <div style={{ marginBottom: "20px" }}>
-            <h4
-              style={{
-                color: "#e0e0e0",
-                fontSize: "13px",
-                marginBottom: "8px",
-              }}
-            >
-              {hook.includes("Response") ? "Response Body" : "Request Body"}
-            </h4>
-            <pre
-              style={{
-                background: "#1e1e1e",
-                padding: "12px",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {formatBody(inputs.body, inputs.headers || {})}
-            </pre>
+            <JsonDisplay
+              data={parseBodyIfJson(inputs.body, inputs.headers || {})}
+              title={
+                hook.includes("Response") ? "Response Body" : "Request Body"
+              }
+            />
           </div>
         )}
 
         {result?.properties && Object.keys(result.properties).length > 0 && (
           <div>
-            <h4
-              style={{
-                color: "#e0e0e0",
-                fontSize: "13px",
-                marginBottom: "8px",
-              }}
-            >
-              Properties
-            </h4>
-            <pre
-              style={{
-                background: "#1e1e1e",
-                padding: "12px",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {JSON.stringify(result.properties, null, 2)}
-            </pre>
+            <JsonDisplay data={result.properties} title="Properties" />
           </div>
         )}
       </div>
@@ -244,6 +193,7 @@ export function HookStagesPanel({
     }
 
     const outputs = result.output;
+    const inputs = result.input;
 
     return (
       <div className="hook-outputs">
@@ -254,97 +204,58 @@ export function HookStagesPanel({
 
         {hook.includes("Request") && (
           <div style={{ marginBottom: "20px" }}>
-            <h4
-              style={{
-                color: "#e0e0e0",
-                fontSize: "13px",
-                marginBottom: "8px",
-              }}
-            >
-              Request Headers (Modified)
-            </h4>
-            <pre
-              style={{
-                background: "#1e1e1e",
-                padding: "12px",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {JSON.stringify(outputs.request.headers, null, 2)}
-            </pre>
+            <JsonDisplay
+              data={outputs.request.headers}
+              compareWith={inputs?.request.headers}
+              title="Request Headers (Modified)"
+            />
           </div>
         )}
 
         {hook === "onRequestBody" && outputs.request.body && (
           <div style={{ marginBottom: "20px" }}>
-            <h4
-              style={{
-                color: "#e0e0e0",
-                fontSize: "13px",
-                marginBottom: "8px",
-              }}
-            >
-              Request Body (Modified)
-            </h4>
-            <pre
-              style={{
-                background: "#1e1e1e",
-                padding: "12px",
-                borderRadius: "4px",
-                fontSize: "12px",
-              }}
-            >
-              {formatBody(outputs.request.body, outputs.request.headers)}
-            </pre>
+            <JsonDisplay
+              data={parseBodyIfJson(
+                outputs.request.body,
+                outputs.request.headers,
+              )}
+              compareWith={
+                inputs?.request.body
+                  ? parseBodyIfJson(inputs.request.body, inputs.request.headers)
+                  : undefined
+              }
+              title="Request Body (Modified)"
+            />
           </div>
         )}
 
         {hook.includes("Response") && (
           <>
             <div style={{ marginBottom: "20px" }}>
-              <h4
-                style={{
-                  color: "#e0e0e0",
-                  fontSize: "13px",
-                  marginBottom: "8px",
-                }}
-              >
-                Response Headers (Modified)
-              </h4>
-              <pre
-                style={{
-                  background: "#1e1e1e",
-                  padding: "12px",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-              >
-                {JSON.stringify(outputs.response.headers, null, 2)}
-              </pre>
+              <JsonDisplay
+                data={outputs.response.headers}
+                compareWith={inputs?.response.headers}
+                title="Response Headers (Modified)"
+              />
             </div>
 
             {hook === "onResponseBody" && outputs.response.body && (
               <div style={{ marginBottom: "20px" }}>
-                <h4
-                  style={{
-                    color: "#e0e0e0",
-                    fontSize: "13px",
-                    marginBottom: "8px",
-                  }}
-                >
-                  Response Body (Modified)
-                </h4>
-                <pre
-                  style={{
-                    background: "#1e1e1e",
-                    padding: "12px",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                  }}
-                >
-                  {formatBody(outputs.response.body, outputs.response.headers)}
-                </pre>
+                <JsonDisplay
+                  data={parseBodyIfJson(
+                    outputs.response.body,
+                    outputs.response.headers,
+                  )}
+                  compareWith={
+                    inputs?.response.body
+                      ? parseBodyIfJson(
+                          inputs.response.body,
+                          inputs.response.headers,
+                        )
+                      : undefined
+                  }
+                  title="Response Body (Modified)"
+                />
               </div>
             )}
           </>

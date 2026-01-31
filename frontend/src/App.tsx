@@ -3,6 +3,7 @@ import { useWasm } from "./hooks/useWasm";
 import { WasmLoader } from "./components/WasmLoader";
 import { RequestBar } from "./components/RequestBar";
 import { RequestTabs } from "./components/RequestTabs";
+import { ServerPropertiesPanel } from "./components/ServerPropertiesPanel";
 import { HookStagesPanel } from "./components/HookStagesPanel";
 import { ResponseViewer } from "./components/ResponseViewer";
 import { HookResult, FinalResponse } from "./types";
@@ -30,9 +31,7 @@ function App() {
 
   const [responseBody, setResponseBody] = useState('{"response": "OK"}');
 
-  const [properties, setProperties] = useState<Record<string, string>>({
-    "my.custom.property": "test-value",
-  });
+  const [properties, setProperties] = useState<Record<string, string>>({});
 
   const [logLevel, setLogLevel] = useState(0); // Trace
   const [results, setResults] = useState<Record<string, HookResult>>({});
@@ -113,16 +112,14 @@ function App() {
       <RequestTabs
         headers={requestHeaders}
         body={requestBody}
-        properties={properties}
         onHeadersChange={setRequestHeaders}
         onBodyChange={setRequestBody}
-        onPropertiesChange={setProperties}
         defaultHeaders={{
           host: "example.com",
           "content-type": {
             value: "",
             enabled: false,
-            placeholder: "<Calculated at runtime>",
+            placeholder: "<Calculated>",
           },
           Authorization: {
             value: "",
@@ -130,6 +127,11 @@ function App() {
             placeholder: "Bearer <token>",
           },
         }}
+      />
+
+      <ServerPropertiesPanel
+        properties={properties}
+        onPropertiesChange={setProperties}
       />
 
       <HookStagesPanel

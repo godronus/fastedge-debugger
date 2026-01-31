@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { CollapsiblePanel } from "./CollapsiblePanel";
+import { JsonDisplay } from "./JsonDisplay";
 
 interface ResponseViewerProps {
   response: {
@@ -173,9 +174,7 @@ export function ResponseViewer({ response }: ResponseViewerProps) {
     if (isJson) {
       try {
         const parsed = JSON.parse(response.body);
-        return (
-          <pre style={{ margin: 0 }}>{JSON.stringify(parsed, null, 2)}</pre>
-        );
+        return <JsonDisplay data={parsed} style={{ margin: 0 }} />;
       } catch {
         return <pre style={{ margin: 0 }}>{response.body}</pre>;
       }

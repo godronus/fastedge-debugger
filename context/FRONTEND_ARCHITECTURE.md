@@ -18,20 +18,23 @@ frontend/
 ├── src/
 │   ├── components/          # React components
 │   │   ├── WasmLoader.tsx   # File upload component
-│   │   ├── DictionaryInput.tsx # Postman-style key-value editor with defaults
+│   │   ├── DictionaryInput.tsx # Postman-style key-value editor with defaults & read-only
 │   │   ├── HeadersEditor.tsx # Wrapper around DictionaryInput
-│   │   ├── PropertiesEditor.tsx # JSON properties editor
+│   │   ├── PropertiesEditor.tsx # Properties editor with country presets
+│   │   ├── ServerPropertiesPanel.tsx # Collapsible server properties panel
 │   │   ├── RequestBar.tsx   # Method + URL + Send button
-│   │   ├── RequestTabs.tsx  # Collapsible request config tabs
-│   │   ├── HookStagesPanel.tsx # Collapsible hook logs/inputs viewer
+│   │   ├── RequestTabs.tsx  # Collapsible request config (Headers/Body)
+│   │   ├── HookStagesPanel.tsx # Collapsible hook logs/inputs/outputs viewer
 │   │   ├── ResponseViewer.tsx # Collapsible response display
-│   │   └── CollapsiblePanel.tsx # Reusable collapsible wrapper
+│   │   ├── CollapsiblePanel.tsx # Reusable collapsible wrapper
+│   │   └── JsonDisplay.tsx  # Smart JSON renderer with diff capabilities
 │   ├── hooks/
 │   │   └── useWasm.ts       # WASM loading logic
 │   ├── api/
 │   │   └── index.ts         # Backend API client
 │   ├── utils/
-│   │   └── contentType.ts   # Auto content-type detection utility
+│   │   ├── contentType.ts   # Auto content-type detection utility
+│   │   └── diff.ts          # JSON diff algorithms and utilities
 │   ├── types/
 │   │   └── index.ts         # TypeScript interfaces
 │   ├── App.tsx              # Main application component
@@ -89,10 +92,8 @@ const App = () => {
       <RequestTabs
         headers={requestHeaders}
         body={requestBody}
-        properties={properties}
         onHeadersChange={setRequestHeaders}
         onBodyChange={setRequestBody}
-        onPropertiesChange={setProperties}
         defaultHeaders={{
           host: "example.com",
           "content-type": {
@@ -106,6 +107,10 @@ const App = () => {
             placeholder: "Bearer <token>",
           },
         }}
+      />
+      <ServerPropertiesPanel
+        properties={properties}
+        onPropertiesChange={setProperties}
       />
       <HookStagesPanel
         results={results}
@@ -188,23 +193,30 @@ Postman-style tabular key-value editor with enable/disable checkboxes and defaul
 - **Enable/disable**: Checkbox in first column to toggle rows
 - **Default values**: Pre-populated suggestions that can be enabled/disabled
 - **Per-row placeholders**: Contextual hints specific to each default
+- **Read-only rows**: Non-editable display-only rows (no focus, no interaction)
 - **Auto-row addition**: Empty row added when typing in last row
 - **Delete button**: ✕ icon removes row (maintains at least one empty row)
-- **Visual feedback**: Disabled rows show at 50% opacity
+- **Visual feedback**: Disabled/read-only rows show at 50% opacity
 
 **Props:**
 
 ```typescript
 export type DefaultValue =
   | string
-  | { value: string; enabled?: boolean; placeholder?: string };
+  | {
+      value: string;
+      enabled?: boolean;
+      placeholder?: string;
+      readOnly?: boolean; // NEW: Make row non-editable (Jan 31, 2026)
+    };
 
 interface DictionaryInputProps {
   value: Record<string, string>;
   onChange: (value: Record<string, string>) => void;
   keyPlaceholder?: string;
   valuePlaceholder?: string;
-  defaultValues?: Record<string, DefaultValue>; // NEW: Preset headers/values
+  defaultValues?: Record<string, DefaultValue>; // Preset headers/values
+  disableDelete?: boolean; // Disable delete button for all rows
 }
 ```
 
@@ -225,13 +237,23 @@ interface DictionaryInputProps {
     placeholder: "Bearer <token>"
   }
 }
+
+// Read-only (NEW: Jan 31, 2026)
+{
+  "request.url": {
+    value: "",
+    enabled: true,
+    placeholder: "<Calculated>",
+    readOnly: true  // Non-editable, no focus, purely display
+  }
+}
 ```
 
 **Internal State:**
 
 ```typescript
 interface Row {
-  id: string; // crypto.randomUUID()
+  id: string; // Generated via counter: `row-${++rowIdCounter}`
   key: string;
   value: string;
   enabled: boolean; // Checkbox state
@@ -242,9 +264,81 @@ interface Row {
 **State Management:**
 
 - Uses lazy initializer: `useState(() => parseValue(value))`
-- No `useEffect` dependency on `value` prop (prevents re-initialization)
-- Preserves enabled/disabled state across parent updates
-- Default values appear first, followed by user-added rows
+- **No `useEffect` on `value` or `defaultValues`** (prevents interference with user input)
+- Default values used ONLY for initial state, can be deleted by user
+- Preserves enabled/disabled state across all operations
+- Simple counter-based ID generation (no crypto.randomUUID needed)
+
+**Delete Button Logic:**
+
+```typescript
+// Disabled when:
+// 1. Only 1 row total, OR
+// 2. It's the last row AND it's empty (the entry row)
+disabled={
+  rows.length === 1 ||
+  (rows.length === index + 1 && !row.key.trim() && !row.value.trim())
+}
+```
+
+This ensures there's always an empty row for adding new entries (unless `disableDelete={true}`).
+
+**Checkbox Logic:**
+
+```typescript
+// Checkbox disabled only when no key (allows enabling headers with empty values)
+disabled={!row.key.trim()}
+```
+
+**Update Parent Logic:**
+
+```typescript
+// Only requires key, value can be empty
+if (row.enabled && row.key.trim()) {
+  dict[row.key.trim()] = row.value.trim();
+}
+```
+
+**Props:**
+
+```typescript
+interface DictionaryInputProps {
+  value: Record<string, string>;
+  onChange: (value: Record<string, string>) => void;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
+  defaultValues?: Record<string, DefaultValue>; // Used ONLY for initial state
+  disableDelete?: boolean; // Hide delete buttons, disable row additions
+}
+```
+
+**disableDelete Mode:**
+
+When `disableDelete={true}`:
+
+- Delete buttons hidden (CSS: `.dictionary-row.no-delete` with 3-column grid)
+- No empty row at bottom
+- No auto-adding rows when typing
+- Used by PropertiesEditor for fixed property set
+
+**CSS Classes:**
+
+- `.dictionary-input`: Container
+- `.dictionary-header`: Column labels row (4-column grid: 32px | 1fr | 1fr | 40px)
+- `.dictionary-row`: Data row (same grid structure)
+- `.dictionary-row.no-delete`: 3-column variant when delete disabled (32px | 1fr | 1fr)
+- `.dictionary-enabled`: Checkbox column
+- `.dictionary-key`, `.dictionary-value`: Input fields
+- `.dictionary-delete`: Delete button (✕)
+
+**Key Improvements (Jan 30, 2026):**
+
+1. **Removed crypto.randomUUID**: Simple counter-based IDs (`row-${++rowIdCounter}`)
+2. **Removed useEffect dependencies**: No longer reacts to `value` or `defaultValues` changes
+3. **Default values are ephemeral**: Used only for initial state, can be deleted
+4. **Smart delete button**: Prevents deleting last empty row
+5. **Checkbox requires only key**: Can enable rows with empty values
+6. **updateParent allows empty values**: Only requires key to be included
 
 **CSS Classes:**
 
@@ -305,20 +399,125 @@ Configure response data:
 
 ### PropertiesEditor.tsx
 
-JSON editor for properties:
+Proxy-WASM properties editor with country presets:
 
-- Textarea with JSON validation
-- Real-time error display
-- Default properties pre-populated
+**Purpose:**
+
+- Edit proxy-wasm property values for testing (request.path, request.country, etc.)
+- Provide country-specific presets for geo-location properties
+- Use DictionaryInput for consistent UX with headers editor
+
+**Features:**
+
+- **Country selector**: Radio buttons with flag emojis (🇱🇺 Luxembourg, 🇩🇪 Germany)
+- **Country presets**: Pre-populated geo data (coordinates, region, continent)
+- **Property list**: Based on Rust constants from proxy-wasm implementation
+- **Enabled/disabled states**: Calculated properties start unchecked
+- **Fixed property set**: Uses `disableDelete={true}` to prevent adding/removing properties
+
+**Available Properties (from Rust):**
+
+```typescript
+// Enabled by default (country-specific values)
+"request.country": "LU" / "DE"
+"request.city": "Luxembourg" / "Frankfurt"
+"request.geo.lat": "49.6116" / "50.1109"
+"request.geo.long": "6.1319" / "8.6821"
+"request.region": "Luxembourg" / "Hesse"
+"request.continent": "Europe"
+"request.country.name": "Luxembourg" / "Germany"
+
+// Disabled by default (calculated at runtime)
+"request.url": "<Calculated>"
+"request.host": "<Calculated>"
+"request.path": "<Calculated>"
+"request.scheme": "<Calculated>"
+"request.extension": "<Calculated>"
+"request.query": "<Calculated>"
+"request.x_real_ip": "<Calculated>"
+"request.asn": "<Calculated>"
+"request.var": "<Calculated>"
+```
+
+**Country Presets Structure:**
+
+```typescript
+type CountryPreset = {
+  code: string;
+  name: string;
+  city: string;
+  geoLat: string;
+  geoLong: string;
+  region: string;
+  continent: string;
+  flag: string;
+};
+
+const countryPresets: Record<string, CountryPreset> = {
+  luxembourg: { code: "LU", name: "Luxembourg", city: "Luxembourg", ... },
+  germany: { code: "DE", name: "Germany", city: "Frankfurt", ... },
+};
+```
+
+**Behavior:**
+
+- Switching countries updates all country-specific property values
+- Calculated properties (request.url, request.host, etc.) are read-only and enabled
+- User can edit geo-location properties (country, city, coordinates)
+- Properties are ordered with user-editable ones first, calculated ones at bottom
+- All interactions go through DictionaryInput component with `disableDelete={true}`
+
+### ServerPropertiesPanel.tsx (Collapsible)
+
+Dedicated panel for server-side proxy-wasm properties, positioned between Request and Hooks panels:
+
+**Purpose:**
+
+- Separate server properties from request configuration
+- Provide clear visual hierarchy
+- Start collapsed to reduce UI clutter
+
+**Features:**
+
+- **Title**: "Server Properties"
+- **Default state**: Collapsed (`defaultExpanded={false}`)
+- **Position**: Between RequestTabs and HookStagesPanel
+- **Content**: PropertiesEditor with country presets
+
+**Component:**
+
+```typescript
+interface ServerPropertiesPanelProps {
+  properties: Record<string, string>;
+  onPropertiesChange: (properties: Record<string, string>) => void;
+}
+
+export function ServerPropertiesPanel({
+  properties,
+  onPropertiesChange,
+}: ServerPropertiesPanelProps) {
+  return (
+    <CollapsiblePanel title="Server Properties" defaultExpanded={false}>
+      <PropertiesEditor value={properties} onChange={onPropertiesChange} />
+    </CollapsiblePanel>
+  );
+}
+```
+
+**Rationale for Separation:**
+
+- Properties are server-side concerns (geo-location, ASN, etc.), not part of HTTP request
+- Request panel focused purely on HTTP data (headers, body)
+- Better organization and discoverability
+- Reduces cognitive load with collapsed-by-default state
 
 ### RequestTabs.tsx (Collapsible)
 
 Configure request data with tabbed interface wrapped in CollapsiblePanel:
 
-- **Tabs**: Headers, Body, Properties
+- **Tabs**: Headers, Body (Properties moved to ServerPropertiesPanel)
 - **Headers tab**: HeadersEditor for key:value input with default headers support
 - **Body tab**: Textarea for request body (JSON, XML, etc.)
-- **Properties tab**: PropertiesEditor for WASM properties
 - **Collapsible**: Uses CollapsiblePanel with title "Request", defaultExpanded={true}
 - **Default headers**: Can pass `defaultHeaders` prop to provide preset suggestions
 
@@ -342,7 +541,6 @@ Configure request data with tabbed interface wrapped in CollapsiblePanel:
     },
   }}
 />
-```
 
 ### HookStagesPanel.tsx (Collapsible)
 
@@ -352,7 +550,7 @@ Three-tab interface for comprehensive hook execution inspection, wrapped in Coll
 - **Sub-tabs**: Logs, Inputs, and Outputs
   - **Logs**: Shows WASM execution output, return codes, and errors for that hook
   - **Inputs**: Shows data received by the hook BEFORE WASM modifications (server-side captured state)
-  - **Outputs**: Shows data produced by the hook AFTER WASM modifications (server-side captured state)
+  - **Outputs**: Shows data produced by the hook AFTER WASM modifications with git-style diffs (server-side captured state)
 - **Log level selector**: Filter logs by severity (Trace, Debug, Info, Warn, Error, Critical)
 - **Collapsible**: Uses CollapsiblePanel with title "Logging", defaultExpanded={false}
 
@@ -361,27 +559,38 @@ Three-tab interface for comprehensive hook execution inspection, wrapped in Coll
 The panel displays true server-side state for both inputs and outputs:
 
 - **Inputs tab**: Shows what the hook actually received (e.g., original headers without WASM-added headers)
-- **Outputs tab**: Shows what the hook produced (e.g., headers with WASM-added custom headers)
+- **Outputs tab**: Shows what the hook produced with visual diffs comparing to inputs (e.g., headers with WASM-added custom headers highlighted in green)
 
-**Example for onRequestHeaders:**
+**Example for onRequestHeaders Outputs:**
 
-- **Inputs**: `{"content-type": "application/json", "host": "example.com"}`
-- **Outputs**: `{"content-type": "application/json", "host": "example.com", "x-custom-request": "I am injected from onRequestHeaders"}`
+```diff
+{
+  "content-type": "application/json",
+  "host": "example.com",
++ "x-custom-request": "I am injected from onRequestHeaders"
+}
+```
 
-**JSON Formatting:**
+**Smart JSON Handling:**
 
-Body content is automatically prettified when `content-type` is `application/json`:
+Uses `JsonDisplay` component for all JSON rendering:
 
 ```typescript
-const formatBody = (body: string, headers: Record<string, string>): string => {
+const isJsonContent = (headers: Record<string, string>): boolean => {
   const contentType =
     Object.entries(headers).find(
       ([key]) => key.toLowerCase() === "content-type",
     )?.[1] || "";
+  return contentType.includes("application/json");
+};
 
-  if (contentType.includes("application/json")) {
+const parseBodyIfJson = (
+  body: string,
+  headers: Record<string, string>,
+): unknown => {
+  if (isJsonContent(headers)) {
     try {
-      return JSON.stringify(JSON.parse(body), null, 2);
+      return JSON.parse(body);
     } catch {
       return body;
     }
@@ -390,6 +599,14 @@ const formatBody = (body: string, headers: Record<string, string>): string => {
 };
 ```
 
+**Diff Support:**
+
+- Headers are always diffed in Outputs tab
+- Bodies are parsed as JSON (when content-type indicates JSON) and diffed
+- Nested objects are properly formatted with indentation
+- JSON strings within values are auto-detected and parsed
+- Multi-line values get diff markers on each line
+
 **Response Hook Context:**
 
 For `onResponseHeaders` and `onResponseBody`, the Inputs tab shows:
@@ -397,6 +614,64 @@ For `onResponseHeaders` and `onResponseBody`, the Inputs tab shows:
 - Response headers/body that the hook received
 - Modified request headers from previous hooks (visible in separate section)
 - This provides complete context of what data was available during hook execution
+
+### JsonDisplay.tsx (Reusable Component)
+
+Smart JSON renderer with optional git-style diff capabilities:
+
+**Features:**
+
+- **Automatic JSON prettification**: 2-space indentation
+- **Optional diff view**: Shows added (green) and removed (red) lines
+- **Nested object support**: Multi-line formatting with proper indentation
+- **JSON string parsing**: Auto-parses stringified JSON (e.g., `reqBody: "{...}"`)
+- **Object-level diffing**: Compares structure, not just text (avoids trailing comma issues)
+
+**Props:**
+
+```typescript
+interface JsonDisplayProps {
+  data: unknown; // The JSON data to display
+  compareWith?: unknown; // Optional: data to compare against
+  title?: string; // Optional: section title
+  style?: React.CSSProperties; // Optional: custom styling
+}
+```
+
+**Usage:**
+
+```typescript
+// Simple display
+<JsonDisplay data={headers} title="Request Headers" />
+
+// With diff
+<JsonDisplay
+  data={outputHeaders}
+  compareWith={inputHeaders}
+  title="Request Headers (Modified)"
+/>
+```
+
+**Example Output with Nested Objects:**
+
+```diff
+{
+  "hello": "http-responder works!",
+  "method": "POST",
+  "reqBody": {
+    "message": "Hello",
++   "x-inject-req-body": "Injected WASM value"
+  },
+  "reqHeaders": {
+    "accept": "*/*",
+    "content-type": "application/json",
++   "x-custom-request": "I am injected from onRequestHeaders"
+  },
++ "x-inject-res-body": "Injected WASM value onResponseBody"
+}
+```
+
+**Used by**: HookStagesPanel (all tabs), ResponseViewer (JSON bodies)
 
 ### ResponseViewer.tsx (Collapsible)
 
@@ -554,6 +829,93 @@ This enables the frontend to show:
 - **Inputs tab**: Original data received by hook
 - **Outputs tab**: Modified data produced by hook
 - Clear visibility into WASM modifications
+
+## Utility Modules
+
+### Diff Utility (`utils/diff.ts`)
+
+Provides JSON diffing algorithms with object-level comparison for better results than line-by-line text diffing.
+
+**Exports:**
+
+```typescript
+export type DiffLine = {
+  type: "added" | "removed" | "unchanged";
+  content: string;
+  lineNumber?: number;
+};
+
+// Main entry point - automatically chooses best diff strategy
+export function computeJsonDiff(
+  before: unknown,
+  after: unknown,
+): DiffLine[] | null;
+
+// Helper to check for plain objects
+export function isPlainObject(value: unknown): boolean;
+```
+
+**Key Algorithms:**
+
+1. **Object-level diffing** (`computeObjectDiff`):
+   - Compares JSON objects by keys, not by text lines
+   - Avoids trailing comma issues
+   - Handles nested objects with proper indentation
+   - Auto-parses JSON strings (e.g., `"{\"key\": \"value\"}"`)
+   - Formats multi-line values with appropriate diff markers
+
+2. **Line-by-line diffing** (`computeLineDiff`):
+   - Uses LCS (Longest Common Subsequence) algorithm
+   - Falls back for non-object types (arrays, primitives)
+   - Good for comparing formatted text
+
+3. **LCS Algorithm** (`findLCS`):
+   - Dynamic programming approach
+   - O(m\*n) time complexity
+   - Finds longest common subsequence of lines
+   - Used to identify unchanged content
+
+**Smart Features:**
+
+- Detects JSON strings and parses them automatically
+- Nested objects formatted with proper indentation
+- Multi-line values handled correctly in diffs
+- Each nested line gets appropriate diff marker (added/removed/unchanged)
+
+**Example Usage:**
+
+```typescript
+import { computeJsonDiff } from "../utils/diff";
+
+const before = { foo: "bar", nested: { a: 1 } };
+const after = { foo: "bar", nested: { a: 1, b: 2 }, new: "value" };
+
+const diffLines = computeJsonDiff(before, after);
+// Returns array of DiffLine objects showing the differences
+```
+
+### Content Type Utility (`utils/contentType.ts`)
+
+Provides automatic content-type detection for request bodies (Postman-like behavior).
+
+**Export:**
+
+```typescript
+export function applyDefaultContentType(
+  headers: Record<string, string>,
+  body: string,
+): Record<string, string>;
+```
+
+**Detection Logic:**
+
+- Only applies if content-type header not already set
+- Examines body content to determine type:
+  - Starts with `{` or `[` → `application/json`
+  - Starts with `<!doctype` or `<html` → `text/html`
+  - Starts with `<?xml` → `application/xml`
+  - Starts with `<` → `text/html`
+  - Otherwise → `text/plain`
 
 ## Type System
 

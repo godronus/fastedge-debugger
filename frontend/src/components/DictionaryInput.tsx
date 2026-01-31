@@ -4,6 +4,7 @@ interface DefaultValue {
   value: string;
   enabled?: boolean; // Whether the default should be checked (default: true)
   placeholder?: string; // Optional placeholder for this specific row
+  readOnly?: boolean; // Whether the row should be read-only (default: false)
 }
 
 interface DictionaryInputProps {
@@ -12,6 +13,7 @@ interface DictionaryInputProps {
   keyPlaceholder?: string;
   valuePlaceholder?: string;
   defaultValues?: Record<string, string | DefaultValue>; // Default key-value pairs with optional enabled state
+  disableDelete?: boolean; // Disable the delete button for all rows
 }
 
 interface Row {
@@ -20,7 +22,12 @@ interface Row {
   value: string;
   enabled: boolean;
   placeholder?: string; // Per-row placeholder override
+  readOnly?: boolean; // Whether the row is read-only
 }
+
+// Counter for generating unique row IDs
+let rowIdCounter = 0;
+const generateRowId = () => `row-${++rowIdCounter}`;
 
 export function DictionaryInput({
   value,
@@ -28,13 +35,15 @@ export function DictionaryInput({
   keyPlaceholder = "Key",
   valuePlaceholder = "Value",
   defaultValues = {},
+  disableDelete = false,
 }: DictionaryInputProps) {
   const [rows, setRows] = useState<Row[]>(() => {
     // Build maps to track which keys come from defaults and their properties
     const defaultsMap = new Map<string, boolean>();
     const placeholdersMap = new Map<string, string>();
+    const readOnlyMap = new Map<string, boolean>();
 
-    // Process defaultValues to normalize them and track enabled state + placeholders
+    // Process defaultValues to normalize them and track enabled state + placeholders + readOnly
     Object.entries(defaultValues).forEach(([key, val]) => {
       if (typeof val === "string") {
         defaultsMap.set(key, true); // String defaults are enabled by default
@@ -42,6 +51,9 @@ export function DictionaryInput({
         defaultsMap.set(key, val.enabled ?? true); // Use specified enabled state or default to true
         if (val.placeholder) {
           placeholdersMap.set(key, val.placeholder);
+        }
+        if (val.readOnly) {
+          readOnlyMap.set(key, true);
         }
       }
     });
@@ -61,10 +73,10 @@ export function DictionaryInput({
     );
     if (entries.length === 0) {
       // Start with one empty row
-      return [{ id: crypto.randomUUID(), key: "", value: "", enabled: true }];
+      return [{ id: generateRowId(), key: "", value: "", enabled: true }];
     } else {
       const newRows = entries.map(([key, val]) => ({
-        id: crypto.randomUUID(),
+        id: generateRowId(),
         key,
         value: val,
         // Use the enabled state from defaultsMap if this key came from defaults,
@@ -74,14 +86,18 @@ export function DictionaryInput({
           : value.hasOwnProperty(key),
         // Use the placeholder from placeholdersMap if available
         placeholder: placeholdersMap.get(key),
+        // Use the readOnly state from readOnlyMap if available
+        readOnly: readOnlyMap.get(key) || false,
       }));
-      // Add one empty row at the end
-      newRows.push({
-        id: crypto.randomUUID(),
-        key: "",
-        value: "",
-        enabled: true,
-      });
+      // Add one empty row at the end (unless delete is disabled)
+      if (!disableDelete) {
+        newRows.push({
+          id: generateRowId(),
+          key: "",
+          value: "",
+          enabled: true,
+        });
+      }
       return newRows;
     }
   });
@@ -89,7 +105,7 @@ export function DictionaryInput({
   const updateParent = (updatedRows: Row[]) => {
     const dict: Record<string, string> = {};
     updatedRows.forEach((row) => {
-      if (row.enabled && row.key.trim() && row.value.trim()) {
+      if (row.enabled && row.key.trim()) {
         dict[row.key.trim()] = row.value.trim();
       }
     });
@@ -98,18 +114,20 @@ export function DictionaryInput({
 
   const handleKeyChange = (id: string, newKey: string) => {
     const updatedRows = rows.map((row) =>
-      row.id === id ? { ...row, key: newKey } : row,
+      row.id === id && !row.readOnly ? { ...row, key: newKey } : row,
     );
 
-    // If this is the last row and now has content, add a new empty row
-    const lastRow = updatedRows[updatedRows.length - 1];
-    if (lastRow.id === id && (newKey.trim() || lastRow.value.trim())) {
-      updatedRows.push({
-        id: crypto.randomUUID(),
-        key: "",
-        value: "",
-        enabled: true,
-      });
+    // If this is the last row and now has content, add a new empty row (unless delete is disabled)
+    if (!disableDelete) {
+      const lastRow = updatedRows[updatedRows.length - 1];
+      if (lastRow.id === id && (newKey.trim() || lastRow.value.trim())) {
+        updatedRows.push({
+          id: generateRowId(),
+          key: "",
+          value: "",
+          enabled: true,
+        });
+      }
     }
 
     setRows(updatedRows);
@@ -118,18 +136,20 @@ export function DictionaryInput({
 
   const handleValueChange = (id: string, newValue: string) => {
     const updatedRows = rows.map((row) =>
-      row.id === id ? { ...row, value: newValue } : row,
+      row.id === id && !row.readOnly ? { ...row, value: newValue } : row,
     );
 
-    // If this is the last row and now has content, add a new empty row
-    const lastRow = updatedRows[updatedRows.length - 1];
-    if (lastRow.id === id && (lastRow.key.trim() || newValue.trim())) {
-      updatedRows.push({
-        id: crypto.randomUUID(),
-        key: "",
-        value: "",
-        enabled: true,
-      });
+    // If this is the last row and now has content, add a new empty row (unless delete is disabled)
+    if (!disableDelete) {
+      const lastRow = updatedRows[updatedRows.length - 1];
+      if (lastRow.id === id && (lastRow.key.trim() || newValue.trim())) {
+        updatedRows.push({
+          id: generateRowId(),
+          key: "",
+          value: "",
+          enabled: true,
+        });
+      }
     }
 
     setRows(updatedRows);
@@ -138,7 +158,7 @@ export function DictionaryInput({
 
   const handleEnabledChange = (id: string, enabled: boolean) => {
     const updatedRows = rows.map((row) =>
-      row.id === id ? { ...row, enabled } : row,
+      row.id === id && !row.readOnly ? { ...row, enabled } : row,
     );
     setRows(updatedRows);
     updateParent(updatedRows);
@@ -149,7 +169,7 @@ export function DictionaryInput({
     // Ensure at least one empty row remains
     if (updatedRows.length === 0) {
       updatedRows.push({
-        id: crypto.randomUUID(),
+        id: generateRowId(),
         key: "",
         value: "",
         enabled: true,
@@ -168,13 +188,16 @@ export function DictionaryInput({
         <div className="dictionary-header-actions"></div>
       </div>
       {rows.map((row, index) => (
-        <div key={row.id} className="dictionary-row">
+        <div
+          key={row.id}
+          className={`dictionary-row ${disableDelete || row.readOnly ? "no-delete" : ""}`}
+        >
           <div className="dictionary-enabled">
             <input
               type="checkbox"
               checked={row.enabled}
               onChange={(e) => handleEnabledChange(row.id, e.target.checked)}
-              disabled={!row.key.trim() && !row.value.trim()}
+              disabled={!row.key.trim() || row.readOnly}
             />
           </div>
           <input
@@ -183,7 +206,9 @@ export function DictionaryInput({
             value={row.key}
             onChange={(e) => handleKeyChange(row.id, e.target.value)}
             placeholder={keyPlaceholder}
-            style={{ opacity: row.enabled ? 1 : 0.5 }}
+            readOnly={row.readOnly}
+            tabIndex={row.readOnly ? -1 : undefined}
+            style={{ opacity: row.readOnly || !row.enabled ? 0.5 : 1 }}
           />
           <input
             type="text"
@@ -191,16 +216,25 @@ export function DictionaryInput({
             value={row.value}
             onChange={(e) => handleValueChange(row.id, e.target.value)}
             placeholder={row.placeholder || valuePlaceholder}
-            style={{ opacity: row.enabled ? 1 : 0.5 }}
+            readOnly={row.readOnly}
+            tabIndex={row.readOnly ? -1 : undefined}
+            style={{ opacity: row.readOnly || !row.enabled ? 0.5 : 1 }}
           />
-          <button
-            className="dictionary-delete"
-            onClick={() => handleDelete(row.id)}
-            disabled={rows.length === 1}
-            title="Delete row"
-          >
-            ✕
-          </button>
+          {!disableDelete && !row.readOnly && (
+            <button
+              className="dictionary-delete"
+              onClick={() => handleDelete(row.id)}
+              disabled={
+                rows.length === 1 ||
+                (rows.length === index + 1 &&
+                  !row.key.trim() &&
+                  !row.value.trim())
+              }
+              title="Delete row"
+            >
+              ✕
+            </button>
+          )}
         </div>
       ))}
     </div>

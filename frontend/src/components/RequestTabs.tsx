@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { HeadersEditor } from "./HeadersEditor";
-import { PropertiesEditor } from "./PropertiesEditor";
 import { CollapsiblePanel } from "./CollapsiblePanel";
 
 interface DefaultValue {
@@ -12,22 +11,18 @@ interface DefaultValue {
 interface RequestTabsProps {
   headers: Record<string, string>;
   body: string;
-  properties: Record<string, string>;
   onHeadersChange: (headers: Record<string, string>) => void;
   onBodyChange: (body: string) => void;
-  onPropertiesChange: (properties: Record<string, string>) => void;
   defaultHeaders?: Record<string, string | DefaultValue>;
 }
 
-type Tab = "headers" | "body" | "properties";
+type Tab = "headers" | "body";
 
 export function RequestTabs({
   headers,
   body,
-  properties,
   onHeadersChange,
   onBodyChange,
-  onPropertiesChange,
   defaultHeaders,
 }: RequestTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("headers");
@@ -47,12 +42,6 @@ export function RequestTabs({
             onClick={() => setActiveTab("body")}
           >
             Body
-          </button>
-          <button
-            className={`tab ${activeTab === "properties" ? "active" : ""}`}
-            onClick={() => setActiveTab("properties")}
-          >
-            Properties
           </button>
         </div>
 
@@ -76,13 +65,6 @@ export function RequestTabs({
                 placeholder='{"key": "value"}'
               />
             </div>
-          )}
-
-          {activeTab === "properties" && (
-            <PropertiesEditor
-              value={properties}
-              onChange={onPropertiesChange}
-            />
           )}
         </div>
       </CollapsiblePanel>

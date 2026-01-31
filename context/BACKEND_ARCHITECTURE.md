@@ -128,6 +128,10 @@ const response = await fetch(targetUrl, {
   body: modifiedRequestBody,
 });
 
+// Read complete response (streaming not implemented)
+// Note: Waits for entire response before processing
+const responseBody = await response.text();  // or arrayBuffer() for binary
+
 // Phase 3: Response Hooks (with modified request context)
 results.onResponseHeaders = await this.callHook({
   hook: "onResponseHeaders",
@@ -143,6 +147,41 @@ results.onResponseBody = await this.callHook({
   response: { headers: headersAfterResponseHeaders, body: responseBody }
 });
 ```
+
+**⚠️ Streaming Limitation:**
+
+The current implementation does not support streaming responses. It uses `await response.text()` or `await response.arrayBuffer()` which waits for the entire response to complete before processing.
+
+**Differences from Production:**
+
+| Aspect            | Test Runner                      | Production (nginx + wasmtime)  |
+| ----------------- | -------------------------------- | ------------------------------ |
+| Response handling | Single complete chunk            | Incremental chunks             |
+| Hook calls        | Once with full body              | Multiple calls as data arrives |
+| `end_of_stream`   | Always `true`                    | `false` until last chunk       |
+| Memory usage      | Loads entire response            | Processes incrementally        |
+| Testing scope     | Final state, total modifications | Streaming logic, backpressure  |
+
+**What works correctly:**
+
+- ✅ Final state after complete response
+- ✅ Total body modifications
+- ✅ Header modifications
+- ✅ Testing non-streaming use cases
+- ✅ Most real-world proxy scenarios
+
+**What cannot be tested:**
+
+- ❌ Incremental chunk processing
+- ❌ Streaming-specific logic (early termination, chunk-by-chunk transforms)
+- ❌ Backpressure handling
+- ❌ Behavior when `end_of_stream=false`
+
+**Potential solutions for future:**
+
+1. **Chunk-based processing**: Use `response.body.getReader()` to read stream incrementally
+2. **Configurable chunk size**: Split complete responses into artificial chunks for testing
+3. **Hybrid mode**: Add a flag to enable streaming vs. complete response testing
 
 **callHook(call: HookCall): Promise<HookResult>**
 
