@@ -4,6 +4,7 @@ import { MemoryManager } from "./MemoryManager";
 import { HeaderManager } from "./HeaderManager";
 import { PropertyResolver } from "./PropertyResolver";
 import { HostFunctions } from "./HostFunctions";
+import type { StateManager } from "../websocket/StateManager.js";
 
 const textEncoder = new TextEncoder();
 
@@ -18,6 +19,7 @@ export class ProxyWasmRunner {
   private currentContextId = 1;
   private initialized = false;
   private debug = process.env.PROXY_RUNNER_DEBUG === "1";
+  private stateManager: StateManager | null = null;
 
   constructor() {
     this.memory = new MemoryManager();
@@ -32,6 +34,13 @@ export class ProxyWasmRunner {
     this.memory.setLogCallback((level: number, message: string) => {
       this.logs.push({ level, message });
     });
+  }
+
+  /**
+   * Set state manager for event emission
+   */
+  setStateManager(stateManager: StateManager): void {
+    this.stateManager = stateManager;
   }
 
   async load(buffer: Buffer): Promise<void> {
@@ -94,11 +103,34 @@ export class ProxyWasmRunner {
 
     const results: Record<string, HookResult> = {};
 
+    // Emit request started event
+    if (this.stateManager) {
+      const requestMethod = call.request.method ?? "GET";
+      this.stateManager.emitRequestStarted(
+        targetUrl,
+        requestMethod,
+        call.request.headers || {},
+        "system",
+      );
+    }
+
     // Phase 1: Run request hooks
     results.onRequestHeaders = await this.callHook({
       ...call,
       hook: "onRequestHeaders",
     });
+
+    // Emit hook executed event
+    if (this.stateManager) {
+      this.stateManager.emitHookExecuted(
+        "onRequestHeaders",
+        results.onRequestHeaders.returnCode,
+        results.onRequestHeaders.logs.length,
+        results.onRequestHeaders.input,
+        results.onRequestHeaders.output,
+        "system",
+      );
+    }
 
     // Pass modified headers from onRequestHeaders to onRequestBody
     const headersAfterRequestHeaders =
@@ -115,6 +147,18 @@ export class ProxyWasmRunner {
       },
       hook: "onRequestBody",
     });
+
+    // Emit hook executed event
+    if (this.stateManager) {
+      this.stateManager.emitHookExecuted(
+        "onRequestBody",
+        results.onRequestBody.returnCode,
+        results.onRequestBody.logs.length,
+        results.onRequestBody.input,
+        results.onRequestBody.output,
+        "system",
+      );
+    }
 
     // Get modified request data from hooks
     const modifiedRequestHeaders = results.onRequestBody.output.request.headers;
@@ -217,6 +261,18 @@ export class ProxyWasmRunner {
         hook: "onResponseHeaders",
       });
 
+      // Emit hook executed event
+      if (this.stateManager) {
+        this.stateManager.emitHookExecuted(
+          "onResponseHeaders",
+          results.onResponseHeaders.returnCode,
+          results.onResponseHeaders.logs.length,
+          results.onResponseHeaders.input,
+          results.onResponseHeaders.output,
+          "system",
+        );
+      }
+
       // Pass modified headers from onResponseHeaders to onResponseBody
       const headersAfterResponseHeaders =
         results.onResponseHeaders.output.response.headers;
@@ -232,6 +288,18 @@ export class ProxyWasmRunner {
         },
         hook: "onResponseBody",
       });
+
+      // Emit hook executed event
+      if (this.stateManager) {
+        this.stateManager.emitHookExecuted(
+          "onResponseBody",
+          results.onResponseBody.returnCode,
+          results.onResponseBody.logs.length,
+          results.onResponseBody.input,
+          results.onResponseBody.output,
+          "system",
+        );
+      }
 
       // Get final response after WASM modifications
       const finalHeaders = results.onResponseBody.output.response.headers;

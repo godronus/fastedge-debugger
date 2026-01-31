@@ -4,6 +4,8 @@
 
 The backend is a Node.js + Express + TypeScript server that orchestrates WASM execution for proxy-wasm testing. It loads WASM binaries, executes hooks, performs HTTP requests, and returns detailed execution results.
 
+**✅ Real-Time Synchronization**: WebSocket integration (January 2026) enables real-time event broadcasting to all connected clients. See [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) for details.
+
 ## Technology Stack
 
 - **Node.js 20.x**: Runtime environment
@@ -11,20 +13,26 @@ The backend is a Node.js + Express + TypeScript server that orchestrates WASM ex
 - **TypeScript 5.4.5**: Type safety
 - **WebAssembly API**: WASM execution (Node.js native)
 - **WASI**: WebAssembly System Interface support
+- **ws 8.19.0**: WebSocket server for real-time updates
 
 ## Project Structure
 
 ```
 server/
-├── server.ts              # Express app and API endpoints
+├── server.ts              # Express app, API endpoints, WebSocket setup
 ├── tsconfig.json         # TypeScript configuration
-└── runner/
-    ├── ProxyWasmRunner.ts    # Main WASM orchestration
-    ├── HostFunctions.ts      # WASM host function implementations
-    ├── MemoryManager.ts      # WASM memory management
-    ├── HeaderManager.ts      # HTTP header serialization
-    ├── PropertyResolver.ts   # Property/metadata resolution
-    └── types.ts              # Shared type definitions
+├── runner/
+│   ├── ProxyWasmRunner.ts    # Main WASM orchestration + event emission
+│   ├── HostFunctions.ts      # WASM host function implementations
+│   ├── MemoryManager.ts      # WASM memory management
+│   ├── HeaderManager.ts      # HTTP header serialization
+│   ├── PropertyResolver.ts   # Property/metadata resolution
+│   └── types.ts              # Shared type definitions
+└── websocket/            # Real-time synchronization (Jan 2026)
+    ├── WebSocketManager.ts   # Connection management (314 lines)
+    ├── StateManager.ts       # Event coordination (153 lines)
+    ├── types.ts              # Event type definitions
+    └── index.ts              # Module exports
 ```
 
 ## Core Components

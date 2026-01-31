@@ -1,9 +1,20 @@
 import express, { type Request, type Response } from "express";
 import path from "node:path";
-import { ProxyWasmRunner } from "./runner/ProxyWasmRunner";
+import { createServer } from "node:http";
+import { ProxyWasmRunner } from "./runner/ProxyWasmRunner.js";
+import { WebSocketManager, StateManager } from "./websocket/index.js";
 
 const app = express();
+const httpServer = createServer(app);
 const runner = new ProxyWasmRunner();
+
+// Initialize WebSocket infrastructure
+const debug = process.env.PROXY_RUNNER_DEBUG === "1";
+const wsManager = new WebSocketManager(httpServer, debug);
+const stateManager = new StateManager(wsManager, debug);
+
+// Make state manager available to runner
+runner.setStateManager(stateManager);
 
 app.use(express.json({ limit: "20mb" }));
 app.use(express.static(path.join(__dirname, "frontend")));
@@ -18,6 +29,11 @@ app.post("/api/load", async (req: Request, res: Response) => {
   try {
     const buffer = Buffer.from(wasmBase64, "base64");
     await runner.load(buffer);
+
+    // Emit WASM loaded event
+    const source = (req.headers["x-source"] as any) || "ui";
+    stateManager.emitWasmLoaded("binary.wasm", buffer.length, source);
+
     res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ ok: false, error: String(error) });
@@ -65,8 +81,24 @@ app.post("/api/send", async (req: Request, res: Response) => {
       url,
     );
 
+    // Emit request completed event
+    const source = (req.headers["x-source"] as any) || "ui";
+    stateManager.emitRequestCompleted(
+      fullFlowResult.hookResults,
+      fullFlowResult.finalResponse,
+      source,
+    );
+
     res.json({ ok: true, ...fullFlowResult });
   } catch (error) {
+    // Emit request failed event
+    const source = (req.headers["x-source"] as any) || "ui";
+    stateManager.emitRequestFailed(
+      "Request execution failed",
+      String(error),
+      source,
+    );
+
     res.status(500).json({ ok: false, error: String(error) });
   }
 });
@@ -77,6 +109,26 @@ app.get("*", (req: Request, res: Response) => {
 });
 
 const port = process.env.PORT ? Number(process.env.PORT) : 5179;
-app.listen(port, () => {
+httpServer.listen(port, () => {
   console.log(`Proxy runner listening on http://localhost:${port}`);
+  console.log(`WebSocket available at ws://localhost:${port}/ws`);
+});
+
+// Graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, closing server...");
+  wsManager.close();
+  httpServer.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received, closing server...");
+  wsManager.close();
+  httpServer.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
 });

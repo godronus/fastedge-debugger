@@ -14,5 +14,6 @@ export default defineConfig({
   },
   build: {
     outDir: "../dist/frontend",
+    emptyOutDir: true, // Safe to clean - we control this directory
   },
 });

@@ -29,7 +29,7 @@ Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run 
 
 ```
 server/                       # Backend code (formerly src/)
-  server.ts                   # Express server with /api/load and /api/call endpoints
+  server.ts                   # Express server with /api/load, /api/call, /api/send, WebSocket
   tsconfig.json              # Extends base tsconfig.json
   runner/
     ProxyWasmRunner.ts        # Main orchestrator (340 lines)
@@ -38,6 +38,11 @@ server/                       # Backend code (formerly src/)
     MemoryManager.ts          # WASM memory operations (165 lines)
     PropertyResolver.ts       # Property path resolution (160 lines)
     types.ts                  # Shared TypeScript types (60 lines)
+  websocket/                  # WebSocket real-time synchronization (Jan 2026)
+    WebSocketManager.ts       # Connection management, client tracking (314 lines)
+    StateManager.ts           # Event coordination and broadcasting (153 lines)
+    types.ts                  # Event type definitions
+    index.ts                  # Module exports
 
 frontend/                     # React + Vite frontend
   src/
@@ -51,7 +56,9 @@ frontend/                     # React + Vite frontend
       ResponseViewer.tsx     # Response display with Body/Preview/Headers tabs
       CollapsiblePanel.tsx   # Reusable collapsible panel wrapper
     hooks/
-      useWasm.ts            #React UI (base64 upload)
+      useWasm.ts                # WASM loading and hook execution
+      useWebSocket.ts           # WebSocket connection with auto-reconnect (314 lines)
+      websocket-types.ts        # Frontend event type definitions
 - [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
 - [x] Capture logs from `proxy_log` and `fd_write` (stdout) with log level filtering
 - [x] Log level filtering: Trace(0), Debug(1), Info(2), Warn(3), Error(4), Critical(5)
@@ -64,6 +71,14 @@ frontend/                     # React + Vite frontend
 - [x] TypeScript type safety throughout (frontend + backend)
 - [x] Vite build system for fast development
 - [x] SPA routing with Express fallback
+- [x] **WebSocket real-time synchronization** (January 2026)
+  - Bi-directional communication between server and all clients
+  - Auto-reconnection with exponential backoff
+  - Visual connection status indicator
+  - Events: request_started, hook_executed, request_completed, wasm_loaded
+  - Multi-client support - all users see all activity
+  - AI agent integration - API requests visible in UI
+  - Optimized for instant connections (<100ms via 127.0.0.1)
 
 ### ⚠️ Known Issues
 

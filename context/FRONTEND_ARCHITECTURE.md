@@ -4,12 +4,15 @@
 
 The frontend is a React 19 + TypeScript application built with Vite. It provides a modern, type-safe interface for testing proxy-wasm binaries.
 
+**✅ Real-Time Updates**: WebSocket integration (January 2026) provides instant synchronization with server state. All activity from UI interactions and AI agent API calls appears in real-time. See [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) for details.
+
 ## Technology Stack
 
 - **React 19.2.3**: UI framework with hooks
 - **TypeScript 5.4.5**: Type safety
 - **Vite 7.3.1**: Build tool and dev server
 - **CSS**: Vanilla CSS (no framework)
+- **WebSocket**: Real-time server communication (ws protocol)
 
 ## Project Structure
 
@@ -27,9 +30,12 @@ frontend/
 │   │   ├── HookStagesPanel.tsx # Collapsible hook logs/inputs/outputs viewer
 │   │   ├── ResponseViewer.tsx # Collapsible response display
 │   │   ├── CollapsiblePanel.tsx # Reusable collapsible wrapper
+│   │   ├── ConnectionStatus.tsx # WebSocket connection indicator
 │   │   └── JsonDisplay.tsx  # Smart JSON renderer with diff capabilities
 │   ├── hooks/
-│   │   └── useWasm.ts       # WASM loading logic
+│   │   ├── useWasm.ts       # WASM loading logic
+│   │   ├── useWebSocket.ts  # WebSocket connection with auto-reconnect (314 lines)
+│   │   └── websocket-types.ts # Event type definitions
 │   ├── api/
 │   │   └── index.ts         # Backend API client
 │   ├── utils/
@@ -37,9 +43,9 @@ frontend/
 │   │   └── diff.ts          # JSON diff algorithms and utilities
 │   ├── types/
 │   │   └── index.ts         # TypeScript interfaces
-│   ├── App.tsx              # Main application component
-│   ├── App.css              # Global styles
-│   └── main.tsx             # React entry point
+│   ├── App.tsx              # Main application component + WebSocket event handling
+│   ├── App.css              # Global styles + connection status styles
+│   └── main.tsx             # React entry point (StrictMode disabled for WebSocket stability)
 ├── public/                  # Static assets (empty currently)
 ├── index.html               # HTML entry point
 ├── vite.config.ts           # Vite configuration

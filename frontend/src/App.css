@@ -25,6 +25,9 @@ header {
   padding: 12px 20px;
   background: #2d2d2d;
   border-bottom: 1px solid #3d3d3d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 h1 {
@@ -32,6 +35,26 @@ h1 {
   color: #ff6c37;
   font-size: 18px;
   font-weight: 600;
+}
+
+/* Connection Status Indicator */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #b0b0b0;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+}
+
+.status-text {
+  font-weight: 500;
 }
 
 h2 {
