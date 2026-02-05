@@ -73,6 +73,7 @@ export interface RequestCompletedEvent extends BaseEvent {
       contentType: string;
       isBase64?: boolean;
     };
+    calculatedProperties?: Record<string, unknown>;
   };
 }
 

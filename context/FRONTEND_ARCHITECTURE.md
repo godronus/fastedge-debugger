@@ -6,6 +6,10 @@ The frontend is a React 19 + TypeScript application built with Vite. It provides
 
 **✅ Real-Time Updates**: WebSocket integration (January 2026) provides instant synchronization with server state. All activity from UI interactions and AI agent API calls appears in real-time. See [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) for details.
 
+**✅ Configuration Sharing** (February 2026): Load/save test configurations to share between UI and AI agents. See [CONFIG_SHARING.md](./CONFIG_SHARING.md) for details.
+
+**✅ Client-Side Log Filtering** (February 2026): Server returns all logs at Trace level. UI filters dynamically - change log level without re-running requests.
+
 ## Technology Stack
 
 - **React 19.2.3**: UI framework with hooks
@@ -64,7 +68,7 @@ Manages global state and orchestrates all components:
 const App = () => {
   const { wasmState, loading, error, loadWasm } = useWasm();
   const [method, setMethod] = useState("POST");
-  const [url, setUrl] = useState("http://localhost:8181");
+  const [url, setUrl] = useState("https://cdn-origin-4732724.fastedge.cdn.gc.onl/");
   const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>(...);
   const [requestBody, setRequestBody] = useState(...);
   const [properties, setProperties] = useState<Record<string, string>>(...);
@@ -555,25 +559,45 @@ Three-tab interface for comprehensive hook execution inspection, wrapped in Coll
 - **Main tabs**: One for each hook (onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody)
 - **Sub-tabs**: Logs, Inputs, and Outputs
   - **Logs**: Shows WASM execution output, return codes, and errors for that hook
-  - **Inputs**: Shows data received by the hook BEFORE WASM modifications (server-side captured state)
-  - **Outputs**: Shows data produced by the hook AFTER WASM modifications with git-style diffs (server-side captured state)
+  - **Inputs**: Shows data received by the hook BEFORE WASM modifications (server-side captured state) - includes properties
+  - **Outputs**: Shows data produced by the hook AFTER WASM modifications with git-style diffs (server-side captured state) - includes modified properties
 - **Log level selector**: Filter logs by severity (Trace, Debug, Info, Warn, Error, Critical)
 - **Collapsible**: Uses CollapsiblePanel with title "Logging", defaultExpanded={false}
 
-**Input/Output Separation:**
+**Input/Output Separation (Updated February 5, 2026):**
 
-The panel displays true server-side state for both inputs and outputs:
+The panel displays true server-side state for both inputs and outputs, including properties:
 
-- **Inputs tab**: Shows what the hook actually received (e.g., original headers without WASM-added headers)
-- **Outputs tab**: Shows what the hook produced with visual diffs comparing to inputs (e.g., headers with WASM-added custom headers highlighted in green)
+- **Inputs tab**: Shows what the hook actually received:
+  - Request/response headers and bodies
+  - **Properties before hook execution** (all merged properties: user + calculated)
+  - Displays using `result.input.properties`
+
+- **Outputs tab**: Shows what the hook produced with visual diffs:
+  - Modified headers/bodies highlighted (green for added/changed, red for removed)
+  - **Modified properties with diff highlighting** comparing to input properties
+  - Displays using `result.output.properties` compared with `result.input.properties`
 
 **Example for onRequestHeaders Outputs:**
 
+Headers:
 ```diff
 {
   "content-type": "application/json",
   "host": "example.com",
 + "x-custom-request": "I am injected from onRequestHeaders"
+}
+```
+
+Properties:
+```diff
+{
+  "request.url": "https://www.godronus.xyz/200",
+  "request.host": "www.godronus.xyz",
+- "request.path": "/200"
++ "request.path": "/400"
+  "request.country": "LU",
+  ...
 }
 ````
 

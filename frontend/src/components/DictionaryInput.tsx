@@ -102,6 +102,42 @@ export function DictionaryInput({
     }
   });
 
+  // Sync rows when value prop changes externally (e.g., from calculated properties)
+  useEffect(() => {
+    setRows((currentRows) => {
+      const updatedRows = currentRows.map((row) => {
+        // If this key exists in the new value prop, update it
+        if (row.key && value.hasOwnProperty(row.key)) {
+          return { ...row, value: value[row.key] };
+        }
+        return row;
+      });
+
+      // Add any new keys from value that don't exist in current rows
+      const existingKeys = new Set(currentRows.map((r) => r.key));
+      const newKeys = Object.keys(value).filter((k) => !existingKeys.has(k));
+
+      if (newKeys.length > 0) {
+        const newRows = newKeys.map((key) => ({
+          id: generateRowId(),
+          key,
+          value: value[key],
+          enabled: true,
+        }));
+
+        // Insert new rows before the last empty row if it exists
+        const lastRow = updatedRows[updatedRows.length - 1];
+        if (!disableDelete && lastRow && !lastRow.key && !lastRow.value) {
+          return [...updatedRows.slice(0, -1), ...newRows, lastRow];
+        } else {
+          return [...updatedRows, ...newRows];
+        }
+      }
+
+      return updatedRows;
+    });
+  }, [value, disableDelete]);
+
   const updateParent = (updatedRows: Row[]) => {
     const dict: Record<string, string> = {};
     updatedRows.forEach((row) => {

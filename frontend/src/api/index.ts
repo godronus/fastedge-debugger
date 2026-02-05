@@ -46,7 +46,7 @@ export async function callHook(
       trailers: params.response_trailers || {},
     },
     properties: params.properties || {},
-    logLevel: params.logLevel !== undefined ? params.logLevel : 2,
+    // logLevel not sent - server always returns all logs for client-side filtering
   };
 
   const response = await fetch(`${API_BASE}/call`, {
@@ -65,7 +65,7 @@ export async function callHook(
   const result = await response.json();
   const logs = result.result?.logs || [];
   return {
-    logs: logs.map((log: any) => log.message || String(log)).join("\n"),
+    logs: logs, // Keep as array for client-side filtering
     returnValue: result.result?.returnCode,
     error: result.error,
   };
@@ -85,6 +85,7 @@ export async function sendFullFlow(
     contentType: string;
     isBase64?: boolean;
   };
+  calculatedProperties?: Record<string, unknown>;
 }> {
   const payload = {
     url,
@@ -98,7 +99,7 @@ export async function sendFullFlow(
       body: params.response_body || "",
     },
     properties: params.properties || {},
-    logLevel: params.logLevel !== undefined ? params.logLevel : 2,
+    // logLevel not sent - server always returns all logs for client-side filtering
   };
 
   const response = await fetch(`${API_BASE}/send`, {
@@ -122,7 +123,7 @@ export async function sendFullFlow(
     const hr = hookResult as any;
     const logs = hr?.logs || [];
     hookResults[hook] = {
-      logs: logs.map((log: any) => log.message || String(log)).join("\n"),
+      logs: logs, // Keep as array for client-side filtering
       returnValue: hr?.returnCode,
       error: hr?.error,
       input: hr?.input,
@@ -134,5 +135,54 @@ export async function sendFullFlow(
   return {
     hookResults,
     finalResponse: result.finalResponse,
+    calculatedProperties: result.calculatedProperties,
   };
+}
+
+export interface TestConfig {
+  description?: string;
+  wasm?: {
+    path: string;
+    description?: string;
+  };
+  request: {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+    body: string;
+  };
+  properties: Record<string, string>;
+  logLevel: number;
+}
+
+export async function loadConfig(): Promise<TestConfig> {
+  const response = await fetch(`${API_BASE}/config`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.error || "Failed to load config");
+  }
+
+  const result = await response.json();
+  return result.config;
+}
+
+export async function saveConfig(config: TestConfig): Promise<void> {
+  const response = await fetch(`${API_BASE}/config`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ config }),
+  });
+
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.error || "Failed to save config");
+  }
 }

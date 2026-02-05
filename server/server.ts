@@ -1,5 +1,6 @@
 import express, { type Request, type Response } from "express";
 import path from "node:path";
+import { promises as fs } from "node:fs";
 import { createServer } from "node:http";
 import { ProxyWasmRunner } from "./runner/ProxyWasmRunner.js";
 import { WebSocketManager, StateManager } from "./websocket/index.js";
@@ -48,12 +49,13 @@ app.post("/api/call", async (req: Request, res: Response) => {
   }
 
   try {
+    // Always capture all logs (trace level) - filtering happens client-side
     const result = await runner.callHook({
       hook,
       request: request ?? { headers: {}, body: "" },
       response: response ?? { headers: {}, body: "" },
       properties: properties ?? {},
-      logLevel: logLevel !== undefined ? logLevel : 2, // Default to Info level
+      logLevel: 0, // Always use Trace to capture all logs
     });
 
     res.json({ ok: true, result });
@@ -70,13 +72,14 @@ app.post("/api/send", async (req: Request, res: Response) => {
   }
 
   try {
+    // Always capture all logs (trace level) - filtering happens client-side
     const fullFlowResult = await runner.callFullFlow(
       {
         hook: "", // Not used in fullFlow
         request: request ?? { headers: {}, body: "", method: "GET" },
         response: response ?? { headers: {}, body: "" },
         properties: properties ?? {},
-        logLevel: logLevel !== undefined ? logLevel : 2,
+        logLevel: 0, // Always use Trace to capture all logs
       },
       url,
     );
@@ -86,6 +89,7 @@ app.post("/api/send", async (req: Request, res: Response) => {
     stateManager.emitRequestCompleted(
       fullFlowResult.hookResults,
       fullFlowResult.finalResponse,
+      fullFlowResult.calculatedProperties,
       source,
     );
 
@@ -99,6 +103,42 @@ app.post("/api/send", async (req: Request, res: Response) => {
       source,
     );
 
+    res.status(500).json({ ok: false, error: String(error) });
+  }
+});
+
+// Get test configuration
+app.get("/api/config", async (req: Request, res: Response) => {
+  try {
+    const configPath = path.join(__dirname, "..", "test-config.json");
+    const configData = await fs.readFile(configPath, "utf-8");
+    const config = JSON.parse(configData);
+    res.json({ ok: true, config });
+  } catch (error) {
+    res.status(404).json({ ok: false, error: "Config file not found" });
+  }
+});
+
+// Save test configuration
+app.post("/api/config", async (req: Request, res: Response) => {
+  try {
+    const { config } = req.body ?? {};
+    if (!config) {
+      res.status(400).json({ error: "Missing config" });
+      return;
+    }
+
+    const configPath = path.join(__dirname, "..", "test-config.json");
+    await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
+
+    // Emit properties updated event if properties changed
+    if (config.properties) {
+      const source = (req.headers["x-source"] as any) || "ui";
+      stateManager.emitPropertiesUpdated(config.properties, source);
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
     res.status(500).json({ ok: false, error: String(error) });
   }
 });

@@ -11,6 +11,7 @@ import { HookStagesPanel } from "./components/HookStagesPanel";
 import { ResponseViewer } from "./components/ResponseViewer";
 import { HookResult, FinalResponse } from "./types";
 import { applyDefaultContentType } from "./utils/contentType";
+import { loadConfig, saveConfig, type TestConfig } from "./api";
 import "./App.css";
 
 function App() {
@@ -24,7 +25,9 @@ function App() {
   });
 
   const [method, setMethod] = useState("POST");
-  const [url, setUrl] = useState("http://localhost:8181");
+  const [url, setUrl] = useState(
+    "https://cdn-origin-4732724.fastedge.cdn.gc.onl/", // Initial test url - updated from http://localhost:8181 to make development easier
+  );
 
   const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>({
     "x-inject-req-body": "Injected WASM value onRequestBody",
@@ -96,6 +99,25 @@ function App() {
         // Full request completed - update all results and final response
         setResults(event.data.hookResults);
         setFinalResponse(event.data.finalResponse);
+
+        // Update calculated properties from WebSocket event
+        console.log(
+          "[WebSocket] request_completed calculatedProperties:",
+          event.data.calculatedProperties,
+        );
+        if (event.data.calculatedProperties) {
+          setProperties((prev) => {
+            console.log("[WebSocket] Updating properties. Previous:", prev);
+            const merged = { ...prev };
+            for (const [key, value] of Object.entries(
+              event.data.calculatedProperties!,
+            )) {
+              merged[key] = String(value);
+            }
+            console.log("[WebSocket] New merged properties:", merged);
+            return merged;
+          });
+        }
         break;
 
       case "request_failed":
@@ -125,6 +147,57 @@ function App() {
     }
   }
 
+  /**
+   * Load configuration from test-config.json
+   */
+  const handleLoadConfig = async () => {
+    try {
+      const config = await loadConfig();
+
+      // Apply configuration to state
+      setMethod(config.request.method);
+      setUrl(config.request.url);
+      setRequestHeaders(config.request.headers);
+      setRequestBody(config.request.body);
+      setProperties(config.properties);
+      setLogLevel(config.logLevel);
+
+      alert("✅ Configuration loaded successfully!");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      alert(`❌ Failed to load config: ${msg}`);
+    }
+  };
+
+  /**
+   * Save current configuration to test-config.json
+   */
+  const handleSaveConfig = async () => {
+    try {
+      const config: TestConfig = {
+        description: "Test configuration for proxy-wasm debugging",
+        wasm: {
+          path: wasmState.wasmPath || "wasm/cdn_header_change.wasm",
+          description: "Current loaded WASM binary",
+        },
+        request: {
+          method,
+          url,
+          headers: requestHeaders,
+          body: requestBody,
+        },
+        properties,
+        logLevel,
+      };
+
+      await saveConfig(config);
+      alert("✅ Configuration saved to test-config.json!");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      alert(`❌ Failed to save config: ${msg}`);
+    }
+  };
+
   const hookCall = {
     request_headers: requestHeaders,
     request_body: requestBody,
@@ -144,7 +217,12 @@ function App() {
 
       {error && <div className="error">{error}</div>}
 
-      <WasmLoader onFileLoad={loadWasm} loading={loading} />
+      <WasmLoader
+        onFileLoad={loadWasm}
+        loading={loading}
+        onLoadConfig={handleLoadConfig}
+        onSaveConfig={handleSaveConfig}
+      />
 
       <RequestBar
         method={method}
@@ -160,18 +238,40 @@ function App() {
             );
 
             const { sendFullFlow } = await import("./api");
-            const { hookResults, finalResponse: response } = await sendFullFlow(
-              url,
-              method,
-              {
-                ...hookCall,
-                request_headers: finalHeaders,
-                logLevel,
-              },
-            );
+            const {
+              hookResults,
+              finalResponse: response,
+              calculatedProperties,
+            } = await sendFullFlow(url, method, {
+              ...hookCall,
+              request_headers: finalHeaders,
+              logLevel,
+            });
             // Update hook results and final response
             setResults(hookResults);
             setFinalResponse(response);
+
+            // Merge calculated properties into the UI
+            // Always update calculated properties since they're runtime values
+            // User-provided properties (country, city, etc.) aren't in calculatedProperties so they're preserved
+            console.log(
+              "[API] Received calculatedProperties:",
+              calculatedProperties,
+            );
+            if (calculatedProperties) {
+              setProperties((prev) => {
+                console.log("[API] Updating properties. Previous:", prev);
+                const merged = { ...prev };
+                // Always update calculated properties - they change with each request
+                for (const [key, value] of Object.entries(
+                  calculatedProperties,
+                )) {
+                  merged[key] = String(value);
+                }
+                console.log("[API] New merged properties:", merged);
+                return merged;
+              });
+            }
           } catch (err) {
             // Show error in all hooks
             const errorMsg =

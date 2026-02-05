@@ -9,8 +9,13 @@ export interface HookCall {
   logLevel?: number;
 }
 
+export interface LogEntry {
+  level: number;
+  message: string;
+}
+
 export interface HookResult {
-  logs: string;
+  logs: LogEntry[];
   returnValue?: number;
   error?: string;
   input?: {

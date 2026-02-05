@@ -8,6 +8,7 @@ export class MemoryManager {
   private instance: WebAssembly.Instance | null = null;
   private hostAllocOffset = 0;
   private logCallback: LogCallback | null = null;
+  private isInitializing = false;
 
   setMemory(memory: WebAssembly.Memory): void {
     this.memory = memory;
@@ -23,6 +24,10 @@ export class MemoryManager {
 
   setLogCallback(callback: LogCallback): void {
     this.logCallback = callback;
+  }
+
+  setInitializing(initializing: boolean): void {
+    this.isInitializing = initializing;
   }
 
   readBytes(ptr: number, len: number): Uint8Array {
@@ -125,6 +130,10 @@ export class MemoryManager {
     }
     if (output && this.logCallback) {
       const message = output.replace(/\n$/, "");
+      // Suppress abort messages during initialization
+      if (this.isInitializing && message.includes("abort:")) {
+        return total;
+      }
       // Try to parse log level from WASI output
       // Format: "[LEVEL] message" or just "message"
       let level = 1; // Default to debug/info

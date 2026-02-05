@@ -25,10 +25,12 @@ export type HookResult = {
   input: {
     request: { headers: HeaderMap; body: string };
     response: { headers: HeaderMap; body: string };
+    properties?: Record<string, unknown>;
   };
   output: {
     request: { headers: HeaderMap; body: string };
     response: { headers: HeaderMap; body: string };
+    properties?: Record<string, unknown>;
   };
   properties: Record<string, unknown>;
 };
@@ -68,4 +70,5 @@ export type FullFlowResult = {
     contentType: string;
     isBase64?: boolean;
   };
+  calculatedProperties?: Record<string, unknown>;
 };

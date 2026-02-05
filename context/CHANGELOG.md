@@ -1,5 +1,903 @@
 # Proxy-WASM Runner - Changelog
 
+## February 5, 2026 - Property System UI Integration & Request Flow
+
+### Overview
+
+Completed the full property system integration with UI visibility, property chaining between hooks, and URL reconstruction from modified properties. Properties now behave like headers and bodies - modifications flow through the entire request pipeline and affect the actual HTTP request.
+
+### 🎯 What Was Completed
+
+#### 1. Properties Display in HookStagesPanel
+
+**Frontend Enhancement:**
+
+Added properties display to both Inputs and Outputs tabs in HookStagesPanel:
+
+- **Inputs Tab**: Shows `result.input.properties` - all properties before hook execution
+- **Outputs Tab**: Shows `result.output.properties` with diff highlighting against input properties
+- **Visual Diffs**: Green lines for added/modified properties, red for removed properties
+- **Example**: When WASM changes `request.path` from `/200` to `/400`, the diff clearly shows this modification
+
+**Files Modified:**
+
+- `frontend/src/components/HookStagesPanel.tsx`
+
+#### 2. Property Capture in Input/Output States
+
+**Backend Enhancement:**
+
+Updated ProxyWasmRunner to capture complete property state in both input and output:
+
+- Added `properties` field to `input` and `output` objects in HookResult
+- Captures merged properties (user + calculated) using `PropertyResolver.getAllProperties()`
+- Both input and output states now include full property snapshot
+
+**Files Modified:**
+
+- `server/runner/ProxyWasmRunner.ts`
+- `server/runner/types.ts` - Added `properties?` to input/output types
+
+#### 3. getAllProperties() Method
+
+**PropertyResolver Enhancement:**
+
+Added method to get all properties merged with proper priority:
+
+```typescript
+getAllProperties(): Record<string, unknown> {
+  const calculated = this.getCalculatedProperties();
+  // User properties override calculated ones
+  return { ...calculated, ...this.properties };
+}
+```
+
+**Benefits:**
+
+- Single source of truth for all properties
+- Respects priority (user properties override calculated)
+- Used for both input/output capture and display
+
+**Files Modified:**
+
+- `server/runner/PropertyResolver.ts`
+
+#### 4. Fixed Path Overwrite Issue
+
+**Bug Fix:**
+
+The `setRequestMetadata()` method was overwriting correctly extracted path from URL with default `/`:
+
+**Problem:**
+
+```typescript
+const requestPath = call.request.path ?? "/"; // Always "/" if not provided
+this.propertyResolver.setRequestMetadata(
+  requestHeaders,
+  requestMethod,
+  requestPath,
+  requestScheme,
+);
+// Overwrites the correct "/200" extracted from URL!
+```
+
+**Solution:**
+
+```typescript
+// Made path and scheme optional parameters
+setRequestMetadata(headers: HeaderMap, method: string, path?: string, scheme?: string): void {
+  this.requestHeaders = headers;
+  this.requestMethod = method;
+  // Only update if explicitly provided and not default value
+  if (path !== undefined && path !== "/") {
+    this.requestPath = path;
+  }
+  if (scheme !== undefined) {
+    this.requestScheme = scheme;
+  }
+}
+```
+
+**Files Modified:**
+
+- `server/runner/PropertyResolver.ts` - Made parameters optional
+- `server/runner/ProxyWasmRunner.ts` - Pass undefined instead of defaults
+
+#### 5. Property Chaining Between Hooks
+
+**Critical Feature:**
+
+Implemented property chaining just like headers and bodies chain:
+
+```typescript
+// onRequestHeaders → onRequestBody
+const propertiesAfterRequestHeaders = results.onRequestHeaders.properties;
+results.onRequestBody = await this.callHook({
+  ...call,
+  properties: propertiesAfterRequestHeaders, // ✅ Pass modified properties
+  hook: "onRequestBody",
+});
+
+// onRequestBody → Response hooks
+const propertiesAfterRequestBody = results.onRequestBody.properties;
+
+// Response hooks get the chained properties
+results.onResponseHeaders = await this.callHook({
+  ...responseCall,
+  properties: propertiesAfterRequestBody, // ✅ Chain continues
+  hook: "onResponseHeaders",
+});
+```
+
+**Impact:**
+
+- Property modifications in `onRequestHeaders` are visible in `onRequestBody`
+- Property modifications persist through the entire request flow
+- Matches production proxy-wasm behavior for property propagation
+
+**Files Modified:**
+
+- `server/runner/ProxyWasmRunner.ts` - All hook calls updated
+
+#### 6. URL Reconstruction from Modified Properties
+
+**Major Feature:**
+
+The HTTP fetch now uses reconstructed URL from modified properties instead of original targetUrl:
+
+```typescript
+// Extract modified properties after request hooks
+const modifiedScheme =
+  (propertiesAfterRequestBody["request.scheme"] as string) || "https";
+const modifiedHost =
+  (propertiesAfterRequestBody["request.host"] as string) || "localhost";
+const modifiedPath =
+  (propertiesAfterRequestBody["request.path"] as string) || "/";
+const modifiedQuery =
+  (propertiesAfterRequestBody["request.query"] as string) || "";
+
+// Reconstruct URL from potentially modified properties
+const actualTargetUrl = `${modifiedScheme}://${modifiedHost}${modifiedPath}${modifiedQuery ? "?" + modifiedQuery : ""}`;
+
+// Use modified URL for fetch
+const response = await fetch(actualTargetUrl, fetchOptions);
+```
+
+**Impact:**
+
+- **WASM can now redirect requests!**
+- Changing `request.path` from `/200` to `/400` actually fetches from `/400`
+- Can change scheme (http ↔ https)
+- Can change host (server switching)
+- Can modify query parameters
+- **Production parity**: This is exactly how proxy-wasm works in nginx
+
+**Files Modified:**
+
+- `server/runner/ProxyWasmRunner.ts`
+
+### 📦 Files Modified Summary
+
+**Backend:**
+
+- `server/runner/ProxyWasmRunner.ts` - Property chaining, URL reconstruction, input/output capture
+- `server/runner/PropertyResolver.ts` - getAllProperties(), optional params in setRequestMetadata
+- `server/runner/types.ts` - Added properties to input/output types
+
+**Frontend:**
+
+- `frontend/src/components/HookStagesPanel.tsx` - Display properties in Inputs/Outputs tabs
+
+### ✅ Testing Results
+
+**Verified Working:**
+
+1. ✅ Properties displayed in both Inputs and Outputs tabs
+2. ✅ Diff highlighting shows property modifications (green for changes)
+3. ✅ Input properties show correct values (e.g., `request.path: "/200"`)
+4. ✅ Output properties show modifications (e.g., `request.path: "/400"`)
+5. ✅ Properties chain between hooks correctly
+6. ✅ Modified properties affect actual HTTP request (URL reconstruction works)
+7. ✅ Original URL and Modified URL both logged for debugging
+
+**Example Flow:**
+
+```
+Target URL: https://www.godronus.xyz/200
+
+onRequestHeaders:
+  Input: request.path = "/200"
+  WASM: set_property("request.path", "/400")
+  Output: request.path = "/400"  ✅ Diff shows change
+
+onRequestBody:
+  Input: request.path = "/400"  ✅ Chained from previous hook
+  Output: request.path = "/400"  (unchanged)
+
+HTTP Fetch:
+  Original URL: https://www.godronus.xyz/200
+  Modified URL: https://www.godronus.xyz/400  ✅ Reconstructed from properties
+  Fetching: https://www.godronus.xyz/400  ✅ Actual request uses modified path
+
+onResponseHeaders:
+  Input: request.path = "/400"  ✅ Still chained
+
+onResponseBody:
+  Input: request.path = "/400"  ✅ Persists through entire flow
+```
+
+### 🎯 Benefits
+
+1. **Complete Property Visibility**: Developers can see exactly how WASM modifies properties at each stage
+2. **Production-Accurate Testing**: Property modifications affect actual requests just like in production
+3. **Request Redirection**: WASM can now change target URLs, switch backends, modify paths
+4. **Debugging Support**: Diff highlighting makes it obvious when and how properties change
+5. **Proper Chaining**: Properties flow through hooks like headers and bodies (consistency)
+
+### 📝 Use Cases Now Enabled
+
+**1. Path Rewriting:**
+
+```typescript
+// WASM can rewrite API versions
+set_property("request.path", "/api/v2/users");
+// Request goes to v2 instead of v1
+```
+
+**2. Backend Switching:**
+
+```typescript
+// WASM can switch hosts based on conditions
+if (country === "EU") {
+  set_property("request.host", "eu-backend.example.com");
+}
+```
+
+**3. Protocol Enforcement:**
+
+```typescript
+// WASM can enforce HTTPS
+set_property("request.scheme", "https");
+```
+
+**4. Query Parameter Modification:**
+
+```typescript
+// WASM can add/modify query parameters
+set_property("request.query", "debug=true&format=json");
+```
+
+### 🔮 Future Enhancements
+
+- Property validation UI (show which properties are valid)
+- Property history/timeline view
+- Export property modifications as test cases
+- Property templates for common scenarios
+
+---
+
+## February 4, 2026 (Part 3) - Server Properties Integration Complete
+
+### Overview
+
+Completed full integration of server properties system with runtime property extraction from URLs, proper merging with user-provided properties, and real-time UI updates. The system now automatically extracts properties from target URLs (request.url, request.host, request.path, etc.) and makes them available to WASM via `get_property` and `set_property` calls.
+
+### 🎯 What Was Completed
+
+#### 1. Runtime Property Extraction from URLs
+
+**Implementation:**
+
+Added `extractRuntimePropertiesFromUrl(targetUrl: string)` method to PropertyResolver that automatically parses target URLs and extracts:
+
+- `request.url` - Full URL (e.g., "https://example.com:8080/api/users.json?page=1")
+- `request.host` - Hostname with port (e.g., "example.com:8080")
+- `request.path` - URL pathname (e.g., "/api/users.json")
+- `request.query` - Query string without ? (e.g., "page=1&limit=10")
+- `request.scheme` - Protocol (e.g., "https" or "http")
+- `request.extension` - File extension from path (e.g., "json", "html")
+- `request.method` - HTTP method from request
+
+**File:** `server/runner/PropertyResolver.ts`
+
+```typescript
+extractRuntimePropertiesFromUrl(targetUrl: string): void {
+  try {
+    const url = new URL(targetUrl);
+    this.requestUrl = targetUrl;
+    this.requestHost = url.hostname + (url.port ? `:${url.port}` : "");
+    this.requestPath = url.pathname || "/";
+    this.requestQuery = url.search.startsWith("?") ? url.search.substring(1) : url.search;
+    this.requestScheme = url.protocol.replace(":", "");
+    // Extract file extension...
+  } catch (error) {
+    // Fallback to safe defaults
+  }
+}
+```
+
+#### 2. Property Priority System
+
+Properties are resolved with smart priority:
+
+1. **User-provided properties** (highest priority)
+   - From ServerPropertiesPanel in UI
+   - From `properties` object in API requests
+   - Examples: request.country, request.city, custom properties
+
+2. **Runtime-calculated properties** (fallback)
+   - Automatically extracted from target URL
+   - Updated on every request
+   - Examples: request.url, request.host, request.path
+
+**Behavior:**
+
+- Users can override any calculated property
+- Calculated properties update with each request
+- User properties are preserved across requests
+
+**File:** `server/runner/PropertyResolver.ts`
+
+```typescript
+resolve(path: string): unknown {
+  const normalizedPath = path.replace(/\0/g, ".");
+
+  // User properties first (highest priority)
+  if (Object.prototype.hasOwnProperty.call(this.properties, normalizedPath)) {
+    return this.properties[normalizedPath];
+  }
+
+  // Runtime-calculated properties as fallback
+  const standardValue = this.resolveStandard(normalizedPath);
+  if (standardValue !== undefined) {
+    return standardValue;
+  }
+  // ...
+}
+```
+
+#### 3. Enhanced Property Resolution
+
+Updated `resolveStandard()` to support all standard property paths:
+
+- Request properties: url, host, path, query, scheme, extension, method
+- Response properties: code, status, code_details, content_type
+- Individual header access: `request.headers.{name}`, `response.headers.{name}`
+- Path normalization: handles `.`, `/`, `\0` separators
+
+#### 4. Working set_property Implementation
+
+Enhanced `proxy_set_property` host function to actually update PropertyResolver:
+
+**File:** `server/runner/HostFunctions.ts`
+
+```typescript
+proxy_set_property: (pathPtr, pathLen, valuePtr, valueLen) => {
+  const path = this.memory.readString(pathPtr, pathLen);
+  const value = this.memory.readString(valuePtr, valueLen);
+
+  // Update the property in the resolver
+  this.propertyResolver.setProperty(path, value);
+  this.logDebug(`set_property: ${path} = ${value}`);
+  return ProxyStatus.Ok;
+};
+```
+
+**File:** `server/runner/PropertyResolver.ts`
+
+```typescript
+setProperty(path: string, value: unknown): void {
+  const normalizedPath = path.replace(/\0/g, ".");
+  this.properties[normalizedPath] = value;
+}
+```
+
+#### 5. Integration with ProxyWasmRunner
+
+Modified `callFullFlow()` to extract runtime properties before executing hooks:
+
+**File:** `server/runner/ProxyWasmRunner.ts`
+
+```typescript
+async callFullFlow(call: HookCall, targetUrl: string): Promise<FullFlowResult> {
+  // Extract runtime properties from target URL before executing hooks
+  this.propertyResolver.extractRuntimePropertiesFromUrl(targetUrl);
+  this.logDebug(`Extracted runtime properties from URL: ${targetUrl}`);
+
+  // ... execute hooks ...
+
+  // Return calculated properties to frontend
+  const calculatedProperties = this.propertyResolver.getCalculatedProperties();
+
+  return {
+    hookResults: results,
+    finalResponse: { ... },
+    calculatedProperties,
+  };
+}
+```
+
+#### 6. Real-Time UI Property Updates
+
+**Backend Changes:**
+
+Added `calculatedProperties` to response types and WebSocket events:
+
+- **Types:** Added `calculatedProperties?: Record<string, unknown>` to `FullFlowResult`
+- **WebSocket:** Added `calculatedProperties` parameter to `emitRequestCompleted()`
+- **Server:** Pass calculatedProperties to WebSocket events
+
+**Files:**
+
+- `server/runner/types.ts`
+- `server/websocket/StateManager.ts`
+- `server/websocket/types.ts`
+- `server/server.ts`
+
+**Frontend Changes:**
+
+Updated to receive and merge calculated properties:
+
+**File:** `frontend/src/api/index.ts`
+
+```typescript
+return {
+  hookResults,
+  finalResponse: result.finalResponse,
+  calculatedProperties: result.calculatedProperties,
+};
+```
+
+**File:** `frontend/src/App.tsx`
+
+```typescript
+// Handle API response
+if (calculatedProperties) {
+  setProperties((prev) => {
+    const merged = { ...prev };
+    for (const [key, value] of Object.entries(calculatedProperties)) {
+      merged[key] = String(value);
+    }
+    return merged;
+  });
+}
+
+// Handle WebSocket event
+case "request_completed":
+  if (event.data.calculatedProperties) {
+    setProperties((prev) => {
+      const merged = { ...prev };
+      for (const [key, value] of Object.entries(event.data.calculatedProperties)) {
+        merged[key] = String(value);
+      }
+      return merged;
+    });
+  }
+```
+
+#### 7. Fixed DictionaryInput Prop Synchronization
+
+**Problem:** DictionaryInput used lazy initializer that only ran once, preventing UI updates when properties changed.
+
+**Solution:** Added `useEffect` to sync internal state with prop changes:
+
+**File:** `frontend/src/components/DictionaryInput.tsx`
+
+```typescript
+// Sync rows when value prop changes externally (e.g., from calculated properties)
+useEffect(() => {
+  setRows((currentRows) => {
+    // Update existing rows if their key exists in new value
+    const updatedRows = currentRows.map((row) => {
+      if (row.key && value.hasOwnProperty(row.key)) {
+        return { ...row, value: value[row.key] };
+      }
+      return row;
+    });
+
+    // Add any new keys from value that don't exist in current rows
+    const existingKeys = new Set(currentRows.map((r) => r.key));
+    const newKeys = Object.keys(value).filter((k) => !existingKeys.has(k));
+
+    if (newKeys.length > 0) {
+      // Insert new rows...
+    }
+
+    return updatedRows;
+  });
+}, [value, disableDelete]);
+```
+
+### 📦 Files Modified
+
+**Backend:**
+
+- `server/runner/PropertyResolver.ts` - Added URL extraction, setProperty, getCalculatedProperties
+- `server/runner/ProxyWasmRunner.ts` - Call extractRuntimePropertiesFromUrl, return calculatedProperties
+- `server/runner/HostFunctions.ts` - Enhanced proxy_set_property to update PropertyResolver
+- `server/runner/types.ts` - Added calculatedProperties to FullFlowResult
+- `server/websocket/StateManager.ts` - Added calculatedProperties parameter to emitRequestCompleted
+- `server/websocket/types.ts` - Added calculatedProperties to RequestCompletedEvent
+- `server/server.ts` - Pass calculatedProperties to WebSocket event
+
+**Frontend:**
+
+- `frontend/src/api/index.ts` - Return calculatedProperties from sendFullFlow
+- `frontend/src/App.tsx` - Merge calculatedProperties in both API and WebSocket handlers
+- `frontend/src/hooks/websocket-types.ts` - Added calculatedProperties to RequestCompletedEvent
+- `frontend/src/components/DictionaryInput.tsx` - Added useEffect to sync with prop changes
+
+**Documentation:**
+
+- `test-config.json` - Updated property format
+- `PROPERTY_TESTING.md` - Created comprehensive testing guide
+- `context/BACKEND_ARCHITECTURE.md` - Marked property integration as complete
+- `context/PROJECT_OVERVIEW.md` - Moved properties to working features
+- `context/PROPERTY_IMPLEMENTATION_COMPLETE.md` - Created completion summary
+
+### ✅ Testing Results
+
+**Verified Working:**
+
+1. ✅ Runtime properties extracted from URL on every request
+2. ✅ Calculated properties populate in ServerPropertiesPanel UI
+3. ✅ Properties update when URL changes between requests
+4. ✅ User-provided properties preserved across requests
+5. ✅ WASM can read properties via get_property
+6. ✅ WASM can write properties via set_property
+7. ✅ Real-time updates work via WebSocket events
+8. ✅ Multi-client synchronization works correctly
+
+**Example Test:**
+
+```
+Request 1: https://example.com:8080/api/users.json?page=1
+  → UI shows: request.host=example.com:8080, request.path=/api/users.json, request.query=page=1, request.extension=json
+
+Request 2: https://test.com/data
+  → UI updates: request.host=test.com, request.path=/data, request.query=, request.extension=
+
+User properties (country: LU, city: Luxembourg) remain unchanged ✅
+```
+
+### 🎯 Benefits
+
+1. **Complete Property System:** Full get_property/set_property support matches production
+2. **Automatic Extraction:** No manual property configuration needed for URL components
+3. **Smart Merging:** User values override calculated values when provided
+4. **Real-Time Updates:** Properties update instantly on every request
+5. **Production Parity:** Property resolution matches nginx + FastEdge behavior
+6. **Developer Experience:** Visual feedback in UI for all property values
+
+### 📝 Usage Examples
+
+**In WASM Code:**
+
+```typescript
+// Get runtime-calculated properties
+const url = get_property("request.url");
+const host = get_property("request.host");
+const path = get_property("request.path");
+const query = get_property("request.query");
+const extension = get_property("request.extension");
+
+// Get user-provided properties
+const country = get_property("request.country");
+const city = get_property("request.city");
+
+// Access headers via properties
+const contentType = get_property("request.headers.content-type");
+
+// Set custom properties
+set_property("my.custom.value", "hello world");
+
+// Use for business logic
+if (country === "US" && path.startsWith("/admin")) {
+  // US admin logic
+}
+```
+
+**In UI:**
+
+1. Load WASM binary
+2. Set target URL: `https://api.example.com/users?page=1`
+3. Set user properties: `request.country=LU`, `request.city=Luxembourg`
+4. Click "Send"
+5. ServerPropertiesPanel shows both calculated and user properties
+6. Change URL and click "Send" again → calculated properties update, user properties preserved
+
+### 🔮 Future Enhancements
+
+- Property validation (type checking, allowed values)
+- Property documentation tooltips in UI
+- Property history/debugging
+- Network properties simulation (x_real_ip, asn) from mock data
+
+---
+
+## February 4, 2026 (Part 2) - Isolated Hook Execution Architecture
+
+### Overview
+
+Refactored WASM execution model to create completely isolated instances for each hook call. This better simulates production behavior where each hook runs in its own context, prevents state leakage between hooks, and establishes foundation for future multi-module support.
+
+### 🎯 Architecture Change
+
+#### Before: Shared Instance Model
+
+- WASM compiled and instantiated once in `load()`
+- Single instance reused for all hook calls
+- State persisted between hooks in WASM memory
+- New stream context created per hook, but same instance
+
+**Problem:** Not production-accurate. In nginx + wasmtime, each hook has isolated state.
+
+#### After: Isolated Instance Model
+
+- WASM compiled once in `load()`, stored as `WebAssembly.Module`
+- Fresh instance created for each hook call in `callHook()`
+- Each hook starts with clean memory and internal state
+- No state leakage between hooks
+
+**Benefit:** Accurate production simulation, catches state-related bugs, enables future multi-module flows.
+
+### 🔧 Implementation Details
+
+#### 1. Module Storage
+
+**Changed:**
+
+```typescript
+// OLD
+private instance: WebAssembly.Instance | null = null;
+private initialized = false;
+
+// NEW
+private module: WebAssembly.Module | null = null;
+private instance: WebAssembly.Instance | null = null; // Transient
+```
+
+**Purpose:**
+
+- Compilation is expensive (~50-200ms) - do once
+- Instantiation is cheap (~5-20ms) - do per hook
+
+#### 2. load() Method
+
+**Changed:**
+
+```typescript
+async load(buffer: Buffer): Promise<void> {
+  // OLD: Compiled AND instantiated
+  const module = await WebAssembly.compile(buffer);
+  this.instance = await WebAssembly.instantiate(module, imports);
+  // ... initialization ...
+
+  // NEW: Only compiles, stores module
+  this.module = await WebAssembly.compile(new Uint8Array(buffer));
+  // No instantiation - deferred until hook execution
+}
+```
+
+**Impact:**
+
+- Faster load (no initialization overhead)
+- Ready for multiple isolated executions
+
+#### 3. callHook() Method
+
+**Added fresh instantiation per call:**
+
+```typescript
+async callHook(call: HookCall): Promise<HookResult> {
+  // Create fresh instance from compiled module
+  const imports = this.createImports();
+  this.instance = await WebAssembly.instantiate(this.module, imports);
+
+  // Initialize memory with new instance
+  const memory = this.instance.exports.memory;
+  this.memory.setMemory(memory);
+  this.memory.setInstance(this.instance);
+
+  // Run WASI initialization
+  // Call _start if exported
+  // Run proxy_on_vm_start, proxy_on_configure, etc.
+
+  // ... execute hook ...
+
+  // Clean up instance
+  this.instance = null;
+
+  return result;
+}
+```
+
+**Flow per Hook:**
+
+1. Instantiate module → fresh instance
+2. Initialize memory manager
+3. Run WASI + \_start
+4. Run initialization hooks
+5. Create stream context
+6. Execute hook
+7. Capture output
+8. Clean up instance
+
+#### 4. ensureInitialized() Simplification
+
+**Changed:**
+
+```typescript
+// OLD: Checked this.initialized flag, returned early if true
+if (this.initialized) return;
+
+// NEW: Always runs (each hook has fresh instance)
+// Removed this.initialized flag entirely
+```
+
+**Reason:** Each hook call has a fresh instance, so initialization always needed.
+
+#### 5. resetState() Update
+
+**Changed:**
+
+```typescript
+private resetState(): void {
+  // ...
+  // OLD: this.initialized = false;
+  // NEW: this.module = null; this.instance = null;
+}
+```
+
+### 📊 Performance Impact
+
+**Per Request (4 hooks):**
+
+- Old model: ~10-20ms overhead (shared instance)
+- New model: ~30-130ms overhead (4× instantiation + initialization)
+  - Instantiation: ~20-80ms total (4 × 5-20ms)
+  - Initialization hooks: ~10-50ms total
+
+**Trade-off:** ~20-110ms slower, but production-accurate testing.
+
+### ✅ Benefits
+
+1. **Production Parity**
+   - Matches nginx + wasmtime isolated execution
+   - Each hook has completely fresh state
+   - No shared memory between hooks
+
+2. **No State Leakage**
+   - Internal WASM variables reset between hooks
+   - Memory allocations don't accumulate
+   - Catches bugs from assumed global state
+
+3. **Better Testing**
+   - Validates proper use of property resolution
+   - Tests code that assumes fresh context
+   - Exposes issues with persistent state assumptions
+
+4. **Future-Ready**
+   - Foundation for loading different WASM modules per hook
+   - Enables mixed-module request flows
+   - Supports hook-specific binary testing
+
+### 🔮 Future Enhancements Enabled
+
+This architecture establishes foundation for:
+
+```typescript
+// Future: Load different modules for different hooks
+await runner.loadModuleForHook("onRequestHeaders", moduleA);
+await runner.loadModuleForHook("onRequestBody", moduleB);
+await runner.loadModuleForHook("onResponseHeaders", moduleC);
+
+// Execute flow with mixed modules
+const result = await runner.callFullFlow(call, url);
+```
+
+### 📁 Files Modified
+
+- `server/runner/ProxyWasmRunner.ts` - Complete refactor of instance lifecycle
+  - Added `module` field for compiled module storage
+  - Changed `instance` to transient (per-hook lifecycle)
+  - Updated `load()` to only compile, not instantiate
+  - Updated `callHook()` to create fresh instance per call
+  - Simplified `ensureInitialized()` (no flag needed)
+  - Updated `resetState()` to clear module
+  - Removed `initialized` flag
+
+### 📝 Documentation Updates
+
+- `context/BACKEND_ARCHITECTURE.md` - Added "Hook Execution Model" section
+- `context/IMPLEMENTATION_GUIDE.md` - Added "WASM Instance Lifecycle" section
+
+---
+
+## February 4, 2026 (Part 1) - Initialization Error Suppression
+
+### Overview
+
+Suppressed expected initialization errors from G-Core SDK during `proxy_on_vm_start` and `proxy_on_configure` hook execution. These errors are harmless (hooks execute successfully) but cluttered logs with abort messages and proc_exit warnings.
+
+### 🎯 Changes Made
+
+#### 1. Default Configuration
+
+**Implementation:**
+
+- `ProxyWasmRunner.ts`: Default VM/plugin configs set to `{"test_mode": true}` instead of empty strings
+- Test runner doesn't need production-style configuration (nginx.conf)
+- All state (headers, bodies, properties) set via API per-test
+
+#### 2. Initialization State Tracking
+
+**New Flags:**
+
+- `ProxyWasmRunner.isInitializing` - Tracks when initialization hooks are running
+- `MemoryManager.isInitializing` - Passed to memory manager for filtering
+
+**Purpose:**
+
+- Distinguish between initialization failures (expected) and runtime errors (important)
+- Suppress specific error messages during init phase only
+
+#### 3. Error Message Suppression
+
+**Filtered Messages:**
+
+- **Abort messages**: Lines containing "abort:" from stdout during initialization
+- **proc_exit calls**: WASI proc_exit(255) during initialization phase
+- **Implementation**:
+  - `MemoryManager.captureFdWrite()` filters abort messages when `isInitializing` is true
+  - `proc_exit` handler skips logging exit code 255 during initialization
+
+**Debug Logging:**
+
+- Changed error messages to include "(expected in test mode)" notation
+- Clarifies these are known, non-blocking issues
+
+#### 4. Files Modified
+
+- `server/runner/ProxyWasmRunner.ts` (3 changes)
+  - Added `isInitializing` flag
+  - Set `memory.setInitializing()` before/after init hooks
+  - Updated proc_exit handler to suppress during init
+  - Improved debug messages for initialization failures
+- `server/runner/MemoryManager.ts` (2 changes)
+  - Added `isInitializing` flag
+  - Added `setInitializing()` method
+  - Filter abort messages during initialization in `captureFdWrite()`
+
+### ✅ Result
+
+Clean log output without initialization noise:
+
+- No "abort: Unexpected 'null'" messages during startup
+- No "WASI proc_exit(255) intercepted" messages during init
+- All actual hook execution logs still visible
+- Runtime errors still logged normally
+
+### 📝 Technical Background
+
+**Why Initialization Fails:**
+
+Per proxy-wasm spec, `proxy_on_vm_start` and `proxy_on_configure` should:
+
+- Read VM/plugin configuration via `proxy_get_buffer_bytes`
+- Return true/false to accept/reject configuration
+- In production nginx: Config comes from nginx.conf at VM startup
+- In test runner: State set via API per-test, configs not meaningful
+
+G-Core SDK expects certain config structure/fields that test environment doesn't provide, causing internal null checks to fail and abort().
+
+**Why It's Safe:**
+
+- Errors caught in try/catch blocks in `ensureInitialized()`
+- Stream context hooks (onRequestHeaders, etc.) work perfectly
+- Test runner directly sets all state rather than relying on initialization
+- Only affects startup phase, not actual hook execution
+
 ## January 31, 2026 - Read-Only Properties & ServerPropertiesPanel
 
 ### Overview

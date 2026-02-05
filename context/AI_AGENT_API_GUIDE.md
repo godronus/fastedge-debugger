@@ -68,7 +68,7 @@ Send a complete HTTP request through all proxy-wasm hooks.
 
 ```json
 {
-  "url": "http://localhost:8181",
+  "url": "https://cdn-origin-4732724.fastedge.cdn.gc.onl/",
   "request": {
     "method": "POST",
     "headers": {
@@ -92,7 +92,7 @@ Send a complete HTTP request through all proxy-wasm hooks.
 - `request.headers` (optional): Request headers object
 - `request.body` (optional): Request body string
 - `properties` (optional): Proxy-wasm properties for `get_property()` calls
-- `logLevel` (optional): 0=Trace, 1=Debug, 2=Info (default), 3=Warn, 4=Error, 5=Critical
+- `logLevel` (deprecated): Ignored by server - all logs are always returned at Trace level. UI handles filtering client-side.
 
 **Response:**
 
@@ -102,7 +102,10 @@ Send a complete HTTP request through all proxy-wasm hooks.
   "hookResults": {
     "onRequestHeaders": {
       "returnCode": 0,
-      "logs": [...],
+      "logs": [
+        {"level": 1, "message": "onRequestHeaders >> injecting header..."},
+        {"level": 0, "message": "Debug output..."}
+      ],
       "input": { "request": {...}, "response": {...} },
       "output": { "request": {...}, "response": {...} }
     },
@@ -128,7 +131,7 @@ curl -X POST http://localhost:5179/api/send \
   -H "Content-Type: application/json" \
   -H "X-Source: ai_agent" \
   -d '{
-    "url": "http://localhost:8181",
+    "url": "https://cdn-origin-4732724.fastedge.cdn.gc.onl/",
     "request": {
       "method": "POST",
       "headers": {
@@ -140,7 +143,56 @@ curl -X POST http://localhost:5179/api/send \
   }'
 ```
 
-### 3. Execute Single Hook (Advanced)
+### 3. Load Test Configuration (February 2026)
+
+Read the current test configuration that the developer has set up.
+
+**Endpoint:** `GET /api/config`
+
+**Response:**
+
+```json
+{
+  "ok": true,
+  "config": {
+    "description": "Test configuration for proxy-wasm debugging",
+    "wasm": {
+      "path": "wasm/cdn_header_change.wasm",
+      "description": "Header modification test"
+    },
+    "request": {
+      "method": "POST",
+      "url": "https://cdn-origin-4732724.fastedge.cdn.gc.onl/",
+      "headers": {...},
+      "body": "{...}"
+    },
+    "properties": {...},
+    "logLevel": 0
+  }
+}
+```
+
+**Purpose**: Get baseline test settings configured by the developer. Use these as defaults and override specific values as needed.
+
+**Example:**
+
+```bash
+# Read developer's test configuration
+curl http://127.0.0.1:5179/api/config
+
+# Use config with overrides
+CONFIG=$(curl -s http://127.0.0.1:5179/api/config)
+URL=$(echo $CONFIG | python3 -c "import sys, json; print(json.load(sys.stdin)['config']['request']['url'])")
+
+# Now use that URL in your test
+curl -X POST http://127.0.0.1:5179/api/send \
+  -H "Content-Type: application/json" \
+  -d "{\"url\": \"$URL\", ...}"
+```
+
+**See also**: [CONFIG_SHARING.md](./CONFIG_SHARING.md) for complete workflow documentation.
+
+### 4. Execute Single Hook (Advanced)
 
 Execute a single proxy-wasm hook for testing.
 
@@ -176,6 +228,27 @@ Execute a single proxy-wasm hook for testing.
     "output": {...}
   }
 }
+```
+
+## Log Levels and Filtering
+
+**Server Behavior (February 2026)**: The server **always** returns all logs at Trace level (0). This ensures no log data is lost.
+
+**Log Structure**: Each log entry has:
+
+- `level`: 0=Trace, 1=Debug, 2=Info, 3=Warn, 4=Error, 5=Critical
+- `message`: The actual log message
+
+**Client-Side Filtering**: The UI filters logs based on the selected log level. If you're processing logs programmatically, you can filter them yourself:
+
+```javascript
+// Filter logs to only show Info level and above
+const filteredLogs = hookResult.logs.filter((log) => log.level >= 2);
+
+// Get all error messages
+const errors = hookResult.logs
+  .filter((log) => log.level >= 4)
+  .map((log) => log.message);
 ```
 
 ## Real-Time UI Updates

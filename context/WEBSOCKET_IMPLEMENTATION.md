@@ -65,17 +65,41 @@ interface BaseEvent {
 
 ### Optimal Configuration
 
-**Access URL**: `http://127.0.0.1:5179` (not `http://localhost:5179`)
+**Access URL**: `http://127.0.0.1:5179` (production) or `http://127.0.0.1:5173` (development)
 
-**Why**: The frontend WebSocket hook is configured to use `127.0.0.1` for the WebSocket connection to avoid IPv6 resolution delays. When the page is accessed via `127.0.0.1`, both the HTTP request and WebSocket use IPv4 directly, resulting in instant connection (<100ms).
+**Why**: The frontend WebSocket hook is configured to use `127.0.0.1` for the WebSocket connection to avoid IPv6 resolution delays. Both HTTP and WebSocket use IPv4 directly, resulting in instant connection (<100ms).
 
-**Implementation**: The `useWebSocket` hook automatically converts `localhost` hostname to `127.0.0.1` in the WebSocket URL:
+**Development Mode (February 2026)**: Vite dev server (port 5173) proxies WebSocket connections to backend (port 5179):
+
+```typescript
+// vite.config.ts
+export default defineConfig({
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5179",
+        changeOrigin: true,
+      },
+      "/ws": {
+        target: "ws://localhost:5179",
+        ws: true, // Enable WebSocket proxying
+        changeOrigin: true,
+      },
+    },
+  },
+});
+```
+
+**Implementation**: The `useWebSocket` hook automatically uses the current port:
 
 ```typescript
 const hostname =
   window.location.hostname === "localhost"
     ? "127.0.0.1"
     : window.location.hostname;
+// Uses current port - 5173 in dev (proxied), 5179 in production (direct)
+const port = window.location.port ? `:${window.location.port}` : ":5179";
 ```
 
 ### Reconnection Strategy
@@ -430,7 +454,7 @@ Clients automatically attempt reconnection when server restarts.
    curl -X POST http://localhost:5179/api/send \
      -H "Content-Type: application/json" \
      -H "X-Source: ai_agent" \
-     -d '{"url":"http://localhost:8181","request":{"method":"GET","headers":{},"body":""}}'
+     -d '{"url":"https://cdn-origin-4732724.fastedge.cdn.gc.onl/","request":{"method":"GET","headers":{},"body":""}}'
    ```
 
    - Both browser tabs should show the request

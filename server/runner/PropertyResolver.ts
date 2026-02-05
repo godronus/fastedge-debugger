@@ -6,6 +6,10 @@ export class PropertyResolver {
   private requestMethod = "GET";
   private requestPath = "/";
   private requestScheme = "https";
+  private requestUrl = "";
+  private requestHost = "";
+  private requestQuery = "";
+  private requestExtension = "";
   private responseHeaders: HeaderMap = {};
   private responseStatus = 200;
   private responseStatusText = "OK";
@@ -14,16 +18,94 @@ export class PropertyResolver {
     this.properties = properties;
   }
 
+  /**
+   * Set a single property (called by proxy_set_property)
+   * Allows WASM code to set custom properties at runtime
+   */
+  setProperty(path: string, value: unknown): void {
+    // Normalize path
+    const normalizedPath = path.replace(/\0/g, ".");
+    this.properties[normalizedPath] = value;
+  }
+
+  /**
+   * Get all calculated runtime properties
+   * These are the properties extracted from the URL and runtime context
+   */
+  getCalculatedProperties(): Record<string, unknown> {
+    return {
+      "request.url": this.requestUrl,
+      "request.host": this.requestHost,
+      "request.path": this.requestPath,
+      "request.query": this.requestQuery,
+      "request.scheme": this.requestScheme,
+      "request.extension": this.requestExtension,
+      "request.method": this.requestMethod,
+    };
+  }
+
+  /**
+   * Get all properties merged (user properties + calculated properties)
+   * User properties take precedence over calculated ones
+   */
+  getAllProperties(): Record<string, unknown> {
+    const calculated = this.getCalculatedProperties();
+    // User properties override calculated ones
+    return { ...calculated, ...this.properties };
+  }
+
   setRequestMetadata(
     headers: HeaderMap,
     method: string,
-    path: string,
-    scheme: string,
+    path?: string,
+    scheme?: string,
   ): void {
     this.requestHeaders = headers;
     this.requestMethod = method;
-    this.requestPath = path;
-    this.requestScheme = scheme;
+    // Only update path/scheme if explicitly provided (don't overwrite URL-extracted values)
+    if (path !== undefined && path !== "/") {
+      this.requestPath = path;
+    }
+    if (scheme !== undefined) {
+      this.requestScheme = scheme;
+    }
+  }
+
+  /**
+   * Extract runtime properties from target URL
+   * This parses the URL to populate request.url, request.host, request.path, etc.
+   */
+  extractRuntimePropertiesFromUrl(targetUrl: string): void {
+    try {
+      const url = new URL(targetUrl);
+
+      // Extract URL components
+      this.requestUrl = targetUrl;
+      this.requestHost = url.hostname + (url.port ? `:${url.port}` : "");
+      this.requestPath = url.pathname || "/";
+      this.requestQuery = url.search.startsWith("?")
+        ? url.search.substring(1)
+        : url.search;
+      this.requestScheme = url.protocol.replace(":", "");
+
+      // Extract file extension from path
+      const pathParts = this.requestPath.split("/");
+      const lastPart = pathParts[pathParts.length - 1];
+      const dotIndex = lastPart.lastIndexOf(".");
+      if (dotIndex > 0 && dotIndex < lastPart.length - 1) {
+        this.requestExtension = lastPart.substring(dotIndex + 1);
+      } else {
+        this.requestExtension = "";
+      }
+    } catch (error) {
+      // If URL parsing fails, use fallback values
+      console.error("Failed to parse target URL:", error);
+      this.requestUrl = targetUrl;
+      this.requestHost = "localhost";
+      this.requestPath = "/";
+      this.requestQuery = "";
+      this.requestExtension = "";
+    }
   }
 
   setResponseMetadata(
@@ -37,13 +119,21 @@ export class PropertyResolver {
   }
 
   resolve(path: string): unknown {
-    // Check custom properties first
+    // Normalize path first
+    const normalizedPath = path.replace(/\0/g, ".");
+
+    // Check custom properties first (user-provided values override calculated ones)
+    if (Object.prototype.hasOwnProperty.call(this.properties, normalizedPath)) {
+      return this.properties[normalizedPath];
+    }
+
+    // Also check with original path format
     if (Object.prototype.hasOwnProperty.call(this.properties, path)) {
       return this.properties[path];
     }
 
-    // Check standard request/response properties
-    const standardValue = this.resolveStandard(path);
+    // Check standard request/response properties (calculated/runtime values)
+    const standardValue = this.resolveStandard(normalizedPath);
     if (standardValue !== undefined) {
       return standardValue;
     }
@@ -89,34 +179,47 @@ export class PropertyResolver {
   }
 
   private resolveStandard(path: string): unknown {
-    // Normalize path separators (handle both \0 and .)
-    const normalizedPath = path.replace(/\0/g, ".");
-
-    // Request properties
-    if (normalizedPath === "request.method") return this.requestMethod;
-    if (normalizedPath === "request.path") return this.requestPath;
-    if (normalizedPath === "request.url") {
-      const host = this.requestHeaders["host"] || "localhost";
-      return `${this.requestScheme}://${host}${this.requestPath}`;
-    }
-    if (normalizedPath === "request.host") {
-      return this.requestHeaders["host"] || "localhost";
-    }
-    if (normalizedPath === "request.scheme") return this.requestScheme;
-    if (normalizedPath === "request.protocol") return this.requestScheme;
-    if (normalizedPath === "request.content_type") {
+    // Request properties (runtime-calculated from URL)
+    if (path === "request.method") return this.requestMethod;
+    if (path === "request.path") return this.requestPath;
+    if (path === "request.url")
+      return (
+        this.requestUrl ||
+        `${this.requestScheme}://${this.requestHost}${this.requestPath}`
+      );
+    if (path === "request.host")
+      return this.requestHost || this.requestHeaders["host"] || "localhost";
+    if (path === "request.scheme") return this.requestScheme;
+    if (path === "request.protocol") return this.requestScheme;
+    if (path === "request.query") return this.requestQuery;
+    if (path === "request.extension") return this.requestExtension;
+    if (path === "request.content_type") {
       return this.requestHeaders["content-type"] || "";
     }
 
-    // Response properties
-    if (normalizedPath === "response.code") return this.responseStatus;
-    if (normalizedPath === "response.status") return this.responseStatus;
-    if (normalizedPath === "response.status_code") return this.responseStatus;
-    if (normalizedPath === "response.code_details") {
-      return this.responseStatusText;
+    // Individual header access (e.g., request.headers.content-type)
+    if (path.startsWith("request.headers.")) {
+      const headerName = path
+        .substring("request.headers.".length)
+        .toLowerCase();
+      return this.requestHeaders[headerName] || "";
     }
-    if (normalizedPath === "response.content_type") {
+
+    // Response properties
+    if (path === "response.code") return this.responseStatus;
+    if (path === "response.status") return this.responseStatus;
+    if (path === "response.status_code") return this.responseStatus;
+    if (path === "response.code_details") return this.responseStatusText;
+    if (path === "response.content_type") {
       return this.responseHeaders["content-type"] || "";
+    }
+
+    // Individual response header access (e.g., response.headers.content-type)
+    if (path.startsWith("response.headers.")) {
+      const headerName = path
+        .substring("response.headers.".length)
+        .toLowerCase();
+      return this.responseHeaders[headerName] || "";
     }
 
     return undefined;

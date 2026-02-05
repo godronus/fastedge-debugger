@@ -151,8 +151,9 @@ export class HostFunctions {
         );
         const path = this.memory.readString(pathPtr, pathLen);
         const value = this.memory.readString(valuePtr, valueLen);
-        // Update via property resolver would require exposing setter
-        // For now, log it
+
+        // Update the property in the resolver
+        this.propertyResolver.setProperty(path, value);
         this.logDebug(`set_property: ${path} = ${value}`);
         return ProxyStatus.Ok;
       },

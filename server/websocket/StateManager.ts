@@ -122,12 +122,13 @@ export class StateManager {
       contentType: string;
       isBase64?: boolean;
     },
+    calculatedProperties?: Record<string, unknown>,
     source: EventSource = "system",
   ): void {
     const event = createEvent<RequestCompletedEvent>(
       "request_completed",
       source,
-      { hookResults, finalResponse },
+      { hookResults, finalResponse, calculatedProperties },
     );
 
     this.broadcast(event);

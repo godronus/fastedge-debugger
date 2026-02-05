@@ -37,54 +37,73 @@ server/
 
 ## Core Components
 
+### WASM Initialization (February 2026)
+
+**Initialization Lifecycle:**
+
+The proxy-wasm spec defines initialization hooks called when the VM and plugin start:
+
+1. `proxy_on_vm_start(root_context_id, vm_config_size)` - VM-level initialization
+2. `proxy_on_plugin_start(root_context_id, plugin_config_size)` - Plugin instance initialization
+3. `proxy_on_configure(root_context_id, plugin_config_size)` - Plugin configuration
+4. `proxy_on_context_create(context_id, parent_context_id)` - Context creation
+
+**Test Runner Behavior:**
+
+- **Configuration**: Provides default `{"test_mode": true}` for VM and plugin configs
+- **Error Suppression**: G-Core SDK initialization hooks fail in test environment (expected)
+  - Abort messages containing "abort:" filtered during initialization
+  - proc_exit(255) calls suppressed during initialization phase
+  - Errors logged at DEBUG level with "(expected in test mode)" notation
+- **Why This Works**: Test runner sets all state (headers, bodies, properties) via API per-test
+  - Production nginx: Configuration comes from nginx.conf at startup
+  - Test environment: Configuration comes from HTTP request payload per-call
+  - Hook execution (onRequestHeaders, etc.) works perfectly regardless of init failures
+
+**Implementation Details:**
+
+- `ProxyWasmRunner.ensureInitialized()` wraps initialization in try/catch blocks
+- `MemoryManager.setInitializing()` tracks initialization state for filtering
+- `isInitializing` flag prevents abort/proc_exit messages during init phase
+- Initialization only runs once per WASM load, subsequent hooks reuse context
+
 ### PropertyResolver.ts (Property Path Resolution)
 
-**⚠️ Outstanding Work: Full Integration Needed**
+**✅ COMPLETED (February 5, 2026)**: Full property integration with runtime URL extraction, chaining, and request reconstruction.
 
-The PropertyResolver currently provides basic property resolution, but needs significant enhancement to properly integrate with the ServerPropertiesPanel UI and runtime request data.
+The PropertyResolver resolves property paths for `get_property` and `set_property` calls.
 
-**Current Implementation:**
-
-- Resolves common property paths (request.path, request.method, response.code, etc.)
-- Uses user-provided properties from UI (passed via `properties` parameter)
-- Basic path parsing with `.`, `/`, and `\0` separators
-
-**Required Enhancements:**
+**Features:**
 
 1. **Runtime Property Extraction:**
-   - Parse `request.url` from actual target URL in callFullFlow
-   - Extract `request.host` from URL or Host header
-   - Calculate `request.path`, `request.query`, `request.scheme` from URL
-   - Determine `request.extension` from path
-   - Set `request.method` from HTTP request method
+   - Parses target URL to extract `request.url`, `request.host`, `request.path`, `request.query`, `request.scheme`, `request.extension`
+   - Automatically called in `callFullFlow` before hook execution
+   - URL parsing with error handling and fallback values
 
 2. **Property Merge Strategy:**
-   - User-provided properties from ServerPropertiesPanel (geo-location, country, etc.)
-   - Runtime-calculated properties from actual HTTP request
-   - User values should override calculated values when provided
-   - Read-only calculated properties (`<Calculated>` placeholders) filled at runtime
+   - User-provided properties (from ServerPropertiesPanel or API) take precedence
+   - Runtime-calculated properties used as fallback
+   - Allows overriding any calculated property with custom values
+   - `getAllProperties()` returns merged view with proper priority
 
-3. **SDK Integration:**
-   - Review `get_property` implementation in HostFunctions.ts
-   - Review `set_property` implementation in HostFunctions.ts
-   - Ensure compatibility with G-Core proxy-wasm AssemblyScript SDK
-   - Reference: https://github.com/G-Core/proxy-wasm-sdk-as
+3. **Property Chaining:**
+   - Properties modified in one hook flow to subsequent hooks
+   - Captured in input/output states for UI visibility
+   - Modifications affect actual HTTP requests via URL reconstruction
 
-4. **Testing:**
-   - Test that WASM code can successfully call get_property for all paths
-   - Verify property values are correct in hook execution
-   - Test set_property behavior (if supported)
+4. **SDK Integration:**
+   - `get_property` in HostFunctions.ts retrieves values via PropertyResolver
+   - `set_property` in HostFunctions.ts updates PropertyResolver (allows WASM to set custom properties)
+   - Full compatibility with G-Core proxy-wasm AssemblyScript SDK
 
-**Current Limitations:**
-
-- Properties are passed through but not fully populated from request
-- Calculated properties show `<Calculated>` but aren't actually calculated
-- No automatic URL parsing into property components
-- get_property may not return correct values for all paths
+5. **Request Reconstruction:**
+   - Modified properties (`request.scheme`, `request.host`, `request.path`, `request.query`) reconstruct target URL
+   - HTTP fetch uses reconstructed URL instead of original
+   - Enables WASM to redirect requests, switch backends, rewrite paths
 
 ### server.ts (Express Server)
 
-Main HTTP server with three endpoints:
+Main HTTP server with five endpoints:
 
 #### POST /api/load
 
@@ -105,13 +124,15 @@ Executes a single hook (for manual testing):
 
 ```typescript
 app.post("/api/call", async (req, res) => {
-  const { hook, request, response, properties, logLevel } = req.body;
+  const { hook, request, response, properties } = req.body;
+  // Note: logLevel is ignored - server always returns all logs (trace level)
+  // Frontend filters logs client-side based on user selection
   const result = await runner.callHook({
     hook,
     request: request ?? { headers: {}, body: "" },
     response: response ?? { headers: {}, body: "" },
     properties: properties ?? {},
-    logLevel: logLevel ?? 2,
+    logLevel: 0, // Always capture all logs (Trace)
   });
   res.json({ ok: true, result });
 });
@@ -123,14 +144,16 @@ Executes full flow (all hooks + HTTP fetch):
 
 ```typescript
 app.post("/api/send", async (req, res) => {
-  const { url, request, response, properties, logLevel } = req.body;
+  const { url, request, response, properties } = req.body;
+  // Note: logLevel is ignored - server always returns all logs (trace level)
+  // Frontend filters logs client-side based on user selection
   const fullFlowResult = await runner.callFullFlow(
     {
       hook: "",
       request: request ?? { headers: {}, body: "", method: "GET" },
       response: response ?? { headers: {}, body: "" },
       properties: properties ?? {},
-      logLevel: logLevel ?? 2,
+      logLevel: 0, // Always capture all logs (Trace)
     },
     url,
   );
@@ -138,18 +161,60 @@ app.post("/api/send", async (req, res) => {
 });
 ```
 
+#### GET /api/config (February 2026)
+
+Reads test configuration from `test-config.json`:
+
+```typescript
+app.get("/api/config", async (req, res) => {
+  const configPath = path.join(__dirname, "..", "test-config.json");
+  const configData = await fs.readFile(configPath, "utf-8");
+  const config = JSON.parse(configData);
+  res.json({ ok: true, config });
+});
+```
+
+**Purpose**: Allows AI agents to read developer's test configuration
+
+#### POST /api/config (February 2026)
+
+Saves test configuration to `test-config.json`:
+
+```typescript
+app.post("/api/config", async (req, res) => {
+  const { config } = req.body;
+  const configPath = path.join(__dirname, "..", "test-config.json");
+  await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
+
+  // Emit properties updated event if properties changed
+  if (config.properties) {
+    const source = (req.headers["x-source"] as any) || "ui";
+    stateManager.emitPropertiesUpdated(config.properties, source);
+  }
+
+  res.json({ ok: true });
+});
+```
+
 ### ProxyWasmRunner.ts (Core Logic)
 
 Main class orchestrating WASM execution with input/output tracking.
+
+**Architecture (February 2026):** Each hook executes in a completely isolated WASM instance to simulate production behavior:
+
+- **Compilation**: Happens once in `load()`, stored as `WebAssembly.Module`
+- **Instantiation**: Fresh instance created for each hook call
+- **Isolation**: No state sharing between hooks (matches production nginx + wasmtime)
+- **Performance**: Compilation is expensive (once), instantiation is cheap (per hook)
 
 #### Key Methods
 
 **load(buffer: Buffer): Promise<void>**
 
-- Compiles WASM module
-- Instantiates with host functions
-- Initializes memory manager
-- Calls `_start` if exported
+- Compiles WASM module and stores it
+- Does NOT instantiate (deferred until hook execution)
+- Validates imports/exports if debug mode enabled
+- Ready for multiple isolated hook executions
 
 **callFullFlow(call: HookCall, targetUrl: string): Promise<FullFlowResult>**
 
@@ -159,23 +224,36 @@ Main class orchestrating WASM execution with input/output tracking.
   3. **Phase 3**: Response hooks (onResponseHeaders → onResponseBody)
 - Returns hook results and final response
 
-**Flow with Input/Output Tracking:**
+**Flow with Input/Output and Property Tracking (February 5, 2026):**
 
 ```typescript
 // Phase 1: Request Hooks
 results.onRequestHeaders = await this.callHook({ hook: "onRequestHeaders", ... });
-// Use output from onRequestHeaders as input to onRequestBody
+
+// Chain modified headers AND properties to next hook
 const headersAfterRequestHeaders = results.onRequestHeaders.output.request.headers;
+const propertiesAfterRequestHeaders = results.onRequestHeaders.properties;
 
 results.onRequestBody = await this.callHook({
   hook: "onRequestBody",
-  request: { headers: headersAfterRequestHeaders, ... }
+  request: { headers: headersAfterRequestHeaders, ... },
+  properties: propertiesAfterRequestHeaders,  // ✅ Properties chain
 });
 
-// Phase 2: HTTP Fetch
+// Phase 2: HTTP Fetch with URL Reconstruction
 const modifiedRequestHeaders = results.onRequestBody.output.request.headers;
 const modifiedRequestBody = results.onRequestBody.output.request.body;
-const response = await fetch(targetUrl, {
+const propertiesAfterRequestBody = results.onRequestBody.properties;
+
+// Reconstruct URL from modified properties
+const modifiedScheme = propertiesAfterRequestBody["request.scheme"] || "https";
+const modifiedHost = propertiesAfterRequestBody["request.host"] || "localhost";
+const modifiedPath = propertiesAfterRequestBody["request.path"] || "/";
+const modifiedQuery = propertiesAfterRequestBody["request.query"] || "";
+const actualTargetUrl = `${modifiedScheme}://${modifiedHost}${modifiedPath}${modifiedQuery ? "?" + modifiedQuery : ""}`;
+
+// Fetch uses reconstructed URL (WASM can redirect requests!)
+const response = await fetch(actualTargetUrl, {
   method: requestMethod,
   headers: modifiedRequestHeaders,
   body: modifiedRequestBody,
@@ -238,16 +316,20 @@ The current implementation does not support streaming responses. It uses `await 
 
 **callHook(call: HookCall): Promise<HookResult>**
 
-- Initializes WASM context
-- **Captures input state** (before hook execution)
+- **Creates fresh WASM instance** from compiled module (isolated context)
+- Initializes memory manager with new instance
+- Runs WASI initialization and `_start` if exported
+- Runs initialization hooks (`proxy_on_vm_start`, `proxy_on_configure`)
+- **Captures input state** (before hook execution) including all properties
 - Executes specific hook function
-- **Captures output state** (after hook execution)
-- Returns both input and output along with logs
+- **Captures output state** (after hook execution) including modified properties
+- **Cleans up instance** (ready for next hook)
+- Returns both input and output along with logs and properties
 
-**Input/Output Capture:**
+**Input/Output Capture (February 5, 2026):**
 
 ```typescript
-// Before hook execution
+// Before hook execution - capture all state including properties
 const inputState = {
   request: {
     headers: { ...requestHeaders },
@@ -257,12 +339,13 @@ const inputState = {
     headers: { ...responseHeaders },
     body: responseBody,
   },
+  properties: this.propertyResolver.getAllProperties(), // ✅ Merged user + calculated
 };
 
 // Execute hook
 const returnCode = this.callIfExported(exportName, ...args);
 
-// After hook execution
+// After hook execution - capture modified state
 const outputState = {
   request: {
     headers: { ...this.hostFunctions.getRequestHeaders() },
@@ -272,6 +355,7 @@ const outputState = {
     headers: { ...this.hostFunctions.getResponseHeaders() },
     body: this.hostFunctions.getResponseBody(),
   },
+  properties: this.propertyResolver.getAllProperties(), // ✅ Includes WASM modifications
 };
 
 return {
@@ -279,7 +363,7 @@ return {
   logs: filteredLogs,
   input: inputState,
   output: outputState,
-  properties: call.properties,
+  properties: this.propertyResolver.getAllProperties(),
 };
 ```
 
@@ -470,6 +554,40 @@ export enum BufferType {
   PluginConfiguration = 7,
 }
 ```
+
+## Hook Execution Model (February 2026)
+
+### Isolated Instance per Hook
+
+Each hook call creates a completely fresh WASM instance:
+
+```typescript
+// In callHook():
+1. Instantiate fresh WebAssembly.Instance from compiled module
+2. Initialize memory manager (fresh memory space)
+3. Run WASI initialization
+4. Call _start for runtime init
+5. Run proxy_on_vm_start, proxy_on_plugin_start, proxy_on_configure
+6. Create stream context
+7. Execute hook (onRequestHeaders, onRequestBody, etc.)
+8. Capture output state
+9. Clean up instance (set to null)
+```
+
+**Why Isolated Instances?**
+
+- **Production parity**: Matches nginx + wasmtime behavior where each hook has isolated state
+- **No state leakage**: Internal WASM variables don't persist between hooks
+- **Future-ready**: Enables loading different WASM modules for different hooks
+- **Proper testing**: Catches bugs related to assumed fresh state
+
+**State Chaining:**
+
+Even though instances are isolated, hook outputs chain correctly:
+
+- `onRequestHeaders` output → `onRequestBody` input
+- `onResponseHeaders` output → `onResponseBody` input
+- Modifications flow through via explicit data passing, not shared memory
 
 ## Hook Execution Flow
 

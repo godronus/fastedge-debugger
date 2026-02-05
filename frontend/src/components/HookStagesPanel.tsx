@@ -1,5 +1,5 @@
 import { useState, ChangeEvent } from "react";
-import { HookCall, HookResult } from "../types";
+import { HookCall, HookResult, LogEntry } from "../types";
 import { CollapsiblePanel } from "./CollapsiblePanel";
 import { JsonDisplay } from "./JsonDisplay";
 
@@ -172,11 +172,15 @@ export function HookStagesPanel({
           </div>
         )}
 
-        {result?.properties && Object.keys(result.properties).length > 0 && (
-          <div>
-            <JsonDisplay data={result.properties} title="Properties" />
-          </div>
-        )}
+        {result?.input?.properties &&
+          Object.keys(result.input.properties).length > 0 && (
+            <div>
+              <JsonDisplay
+                data={result.input.properties}
+                title="Properties (Before Hook Execution)"
+              />
+            </div>
+          )}
       </div>
     );
   };
@@ -260,8 +264,35 @@ export function HookStagesPanel({
             )}
           </>
         )}
+
+        {result?.output?.properties &&
+          Object.keys(result.output.properties).length > 0 && (
+            <div style={{ marginBottom: "20px" }}>
+              <JsonDisplay
+                data={result.output.properties}
+                compareWith={result.input?.properties}
+                title="Properties (After Hook Execution)"
+              />
+            </div>
+          )}
       </div>
     );
+  };
+
+  /**
+   * Filter logs by selected log level
+   * Only show logs with level >= selected level
+   */
+  const filterLogs = (logs: LogEntry[], minLevel: number): LogEntry[] => {
+    return logs.filter((log) => log.level >= minLevel);
+  };
+
+  /**
+   * Get log level name for display
+   */
+  const getLogLevelName = (level: number): string => {
+    const levels = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"];
+    return levels[level] || "UNKNOWN";
   };
 
   const renderLogs = (hook: string) => {
@@ -274,6 +305,15 @@ export function HookStagesPanel({
         </div>
       );
     }
+
+    // Filter logs based on selected log level
+    const filteredLogs =
+      result.logs && result.logs.length > 0
+        ? filterLogs(result.logs, logLevel)
+        : [];
+
+    const totalLogs = result.logs?.length || 0;
+    const displayedLogs = filteredLogs.length;
 
     return (
       <div className="hook-logs">
@@ -291,17 +331,32 @@ export function HookStagesPanel({
           </div>
         )}
 
-        {result.logs ? (
+        {totalLogs > 0 ? (
           <div>
-            <h4
+            <div
               style={{
-                color: "#e0e0e0",
-                fontSize: "13px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
                 marginBottom: "8px",
               }}
             >
-              Output
-            </h4>
+              <h4
+                style={{
+                  color: "#e0e0e0",
+                  fontSize: "13px",
+                  margin: 0,
+                }}
+              >
+                Output
+              </h4>
+              {displayedLogs < totalLogs && (
+                <span style={{ color: "#888", fontSize: "11px" }}>
+                  Showing {displayedLogs} of {totalLogs} logs (filtered by
+                  level)
+                </span>
+              )}
+            </div>
             <pre
               style={{
                 background: "#1e1e1e",
@@ -312,7 +367,20 @@ export function HookStagesPanel({
                 overflow: "auto",
               }}
             >
-              {result.logs}
+              {filteredLogs.length > 0 ? (
+                filteredLogs.map((log, idx) => (
+                  <div key={idx} style={{ marginBottom: "4px" }}>
+                    <span style={{ color: "#666", marginRight: "8px" }}>
+                      [{getLogLevelName(log.level)}]
+                    </span>
+                    {log.message}
+                  </div>
+                ))
+              ) : (
+                <div style={{ color: "#888", fontStyle: "italic" }}>
+                  No logs at this level. Lower the log level to see more output.
+                </div>
+              )}
             </pre>
           </div>
         ) : (

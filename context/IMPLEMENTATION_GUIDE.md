@@ -12,9 +12,8 @@ React UI (browser)
 Server (Express)
   ↓ Buffer.from(wasmBase64, 'base64')
 ProxyWasmRunner.load()
-  ↓ WebAssembly.compile()
-  ↓ WebAssembly.instantiate(imports)
-  ↓ instance._start()
+  ↓ WebAssembly.compile() → stores compiled module
+  ↓ NO instantiation yet (deferred until hook execution)
 Ready for requests
 
 React UI (browser)
@@ -24,13 +23,19 @@ React UI (browser)
 Server (Express) → ProxyWasmRunner.callFullFlow()
 
   ↓ PHASE 1: Request Hooks
-  ↓ Run onRequestHeaders hook
+  ↓ Run onRequestHeaders hook:
+  ↓   → Create fresh WASM instance from compiled module
+  ↓   → Initialize memory, run _start, run initialization hooks
   ↓   → WASM can modify headers via proxy_add_header_map_value, proxy_replace_header_map_value
   ↓   → HostFunctions captures modified headers
-  ↓ Chain modified headers to next hook (CRITICAL FIX: Jan 29, 2026)
-  ↓ Run onRequestBody hook with modified headers from onRequestHeaders
+  ↓   → Clean up instance (isolated execution complete)
+  ↓ Chain modified headers to next hook (CRITICAL: via data passing, not shared memory)
+  ↓ Run onRequestBody hook with modified headers from onRequestHeaders:
+  ↓   → Create NEW fresh WASM instance (isolated from previous hook)
+  ↓   → Initialize memory, run _start, run initialization hooks
   ↓   → WASM can modify body via set_buffer_bytes
   ↓   → WASM can further modify headers
+  ↓   → Clean up instance
   ↓ Capture modified headers and body from onRequestBody result
 
   ↓ PHASE 2: Real HTTP Fetch
@@ -43,10 +48,16 @@ Server (Express) → ProxyWasmRunner.callFullFlow()
   ↓ Extract response headers, status, contentType
 
   ↓ PHASE 3: Response Hooks
-  ↓ Run onResponseHeaders with real response headers
+  ↓ Run onResponseHeaders with real response headers:
+  ↓   → Create fresh WASM instance (isolated from request hooks)
+  ↓   → Initialize memory, run _start, run initialization hooks
   ↓   → WASM can inspect/modify response headers
-  ↓ Run onResponseBody with real response body
+  ↓   → Clean up instance
+  ↓ Run onResponseBody with real response body:
+  ↓   → Create NEW fresh WASM instance (isolated from all previous hooks)
+  ↓   → Initialize memory, run _start, run initialization hooks
   ↓   → WASM can inspect/modify response body
+  ↓   → Clean up instance
   ↓ Capture final headers and body after WASM processing
 
   ↓ Return FullFlowResult:
@@ -73,8 +84,112 @@ React UI
   ↓ API: callHook("onRequestHeaders", {request_headers, ...})
   ↓ POST /api/call with {hook, request, response, properties, logLevel}
 Server (Express) → ProxyWasmRunner.callHook()
+  ↓ Create fresh WASM instance from compiled module
+  ↓ Initialize memory manager with new instance
   ↓ Setup: normalize headers, resolve properties, set log level
-  ↓ Initialize: proxy_on_vm_start, proxy_on_configure, proxy_on_context_create
+  ↓ Initialize: proxy_on_vm_start, proxy_on_configure (errors suppressed)
+  ↓ Create context: proxy_on_context_create
+  ↓ Execute single hook: proxy_on_request_headers(context_id, header_count, end_of_stream)
+  ↓ Clean up instance (set to null)
+  ↓ Return {returnCode, logs, input, output, properties}
+React UI
+  ↓ Display in HookStagesPanel for that specific hook
+```
+
+## WASM Instance Lifecycle (February 2026)
+
+**Key Architecture Change:** Each hook executes in a completely isolated WASM instance.
+
+### Compilation vs Instantiation
+
+**Compilation (Expensive - Once per Load):**
+
+```typescript
+// In load():
+this.module = await WebAssembly.compile(buffer);
+// Validates code, optimizes, prepares for execution
+// Takes ~50-200ms depending on binary size
+```
+
+**Instantiation (Cheap - Per Hook):**
+
+```typescript
+// In callHook() - happens 4 times per request:
+this.instance = await WebAssembly.instantiate(this.module, imports);
+// Creates fresh memory, links imports, ready to run
+// Takes ~5-20ms per instantiation
+```
+
+### Why Isolated Instances?
+
+1. **Production Parity**: Matches nginx + wasmtime behavior
+   - Each hook runs in isolated context
+   - No shared memory between hooks
+   - State only passes via explicit data (headers, bodies)
+
+2. **No State Leakage**:
+   - Internal WASM variables reset between hooks
+   - Memory allocations don't accumulate
+   - Each hook starts with clean slate
+
+3. **Catches Bugs**:
+   - Tests code that assumes fresh state
+   - Exposes issues with global variable assumptions
+   - Validates proper use of property resolution
+
+4. **Future-Ready**:
+   - Foundation for loading different WASM modules per hook
+   - Enables mixing multiple binaries in single request flow
+   - Supports testing hook-specific implementations
+
+### Instance Lifecycle per Hook
+
+```typescript
+1. callHook() invoked
+2. Create imports object (host functions)
+3. Instantiate module → fresh instance
+4. Set memory manager with new memory
+5. Initialize WASI
+6. Call _start if exported
+7. Run initialization hooks:
+   - proxy_on_vm_start(root_context_id, vm_config_size)
+   - proxy_on_plugin_start(root_context_id, plugin_config_size)
+   - proxy_on_configure(root_context_id, plugin_config_size)
+   - proxy_on_context_create(root_context_id, 0)
+8. Create stream context:
+   - proxy_on_context_create(stream_context_id, root_context_id)
+9. Execute hook (onRequestHeaders, onRequestBody, etc.)
+10. Capture output state
+11. Clean up: this.instance = null
+12. Return results
+```
+
+### Performance Characteristics
+
+**Per Request (4 hooks):**
+
+- Compilation: 0ms (already done in load())
+- Instantiation: ~20-80ms total (4 × 5-20ms)
+- Hook execution: ~10-50ms total
+- **Total overhead: ~30-130ms for isolated execution**
+
+**Trade-off:**
+
+- Slower than shared instance (~10-20ms overhead)
+- But: Accurate production simulation
+- Worth it for: Catching state-related bugs
+
+### Individual Hook Execution (Manual Testing)
+
+```
+React UI
+  ↓ User clicks individual hook button (e.g., "onRequestHeaders")
+  ↓ API: callHook("onRequestHeaders", {request_headers, ...})
+  ↓ POST /api/call with {hook, request, response, properties, logLevel}
+Server (Express) → ProxyWasmRunner.callHook()
+  ↓ Setup: normalize headers, resolve properties, set log level
+  ↓ Initialize (if first run): proxy_on_vm_start, proxy_on_configure (errors suppressed)
+  ↓ Create context: proxy_on_context_create
   ↓ Execute single hook: proxy_on_request_headers(context_id, header_count, end_of_stream)
   ↓ Return {returnCode, logs, request, response, properties}
 React UI
@@ -204,12 +319,41 @@ function deserializeHeaders(headers: ArrayBuffer): Headers {
 
 ### Property Resolution
 
-**Resolution Order:**
+**Resolution Order (Priority):**
 
-1. Check custom properties set by user
-2. Check standard properties (request._, response._)
-3. Try path segment resolution (nested objects)
-4. Return undefined if not found
+1. Check user-provided properties (highest priority - from ServerPropertiesPanel or API)
+2. Check runtime-calculated properties (from URL extraction)
+3. Check standard properties (request._, response._)
+4. Try path segment resolution (nested objects)
+5. Return undefined if not found
+
+**Property Chaining Between Hooks:**
+
+Properties flow through the pipeline just like headers and bodies:
+
+```
+1. Extract runtime properties from target URL (before any hooks)
+2. Merge with user properties (user overrides calculated)
+3. onRequestHeaders modifies properties → pass to onRequestBody
+4. onRequestBody modifies properties → pass to response hooks
+5. onResponseHeaders modifies properties → pass to onResponseBody
+6. All properties visible in UI Inputs/Outputs tabs with diffs
+```
+
+**URL Reconstruction:**
+
+Modified properties affect actual HTTP requests:
+
+```typescript
+// WASM can redirect by modifying properties
+Host.setProperty("request.path", "/400"); // Changes /200 to /400
+Host.setProperty("request.host", "example.com");
+Host.setProperty("request.scheme", "http");
+
+// Server reconstructs URL from modified properties
+const actualUrl = `${scheme}://${host}${path}${query ? "?" + query : ""}`;
+// HTTP fetch goes to reconstructed URL
+```
 
 **Path Normalization:**
 
@@ -224,17 +368,39 @@ All resolve to the same property.
 **Standard Properties:**
 
 ```typescript
-// Request
-"request.method"      → HTTP method from UI
-"request.path"        → Path from UI
-"request.url"         → Computed: scheme://host/path
-"request.host"        → From headers["host"]
-"request.scheme"      → From UI (http/https)
+// Request (runtime-calculated from URL)
+"request.url"         → Full URL
+"request.host"        → Hostname with port (from URL or headers)
+"request.path"        → Path from URL (e.g., "/200")
+"request.query"       → Query string (e.g., "param=value")
+"request.scheme"      → Protocol (http/https)
+"request.extension"   → File extension from path
+"request.method"      → HTTP method
 
-// Response
-"response.code"       → Status code from UI
+// Request (user-provided, can override calculated)
+"request.country"     → Custom geo property
+"request.city"        → Custom geo property
+... any custom properties ...
+
+// Response (available after HTTP fetch)
+"response.code"       → Status code
 "response.status"     → Same as response.code
-"response.code_details" → Status text from UI
+"response.code_details" → Status text
+
+// Header access via properties
+"request.headers.content-type"  → Request header value
+"response.headers.server"       → Response header value
+```
+
+**getAllProperties() Method:**
+
+Returns merged view respecting priority:
+
+```typescript
+getAllProperties(): Record<string, unknown> {
+  const calculated = this.getCalculatedProperties();
+  return { ...calculated, ...this.properties };  // User overrides
+}
 ```
 
 ### WASI Integration

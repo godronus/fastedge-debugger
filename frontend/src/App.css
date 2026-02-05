@@ -293,6 +293,17 @@ button.secondary:hover:not(:disabled) {
   background: #4d4d4d;
 }
 
+button.secondary-button {
+  background: #3d3d3d;
+  color: #e0e0e0;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+button.secondary-button:hover:not(:disabled) {
+  background: #4d4d4d;
+}
+
 .hooks-grid {
   display: flex;
   flex-wrap: wrap;

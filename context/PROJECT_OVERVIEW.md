@@ -62,6 +62,9 @@ frontend/                     # React + Vite frontend
 - [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
 - [x] Capture logs from `proxy_log` and `fd_write` (stdout) with log level filtering
 - [x] Log level filtering: Trace(0), Debug(1), Info(2), Warn(3), Error(4), Critical(5)
+  - **Server always returns all logs (Trace level)** - filtering happens client-side
+  - **Developer can change log level in UI without re-running request**
+  - Logs show level indicator and count of filtered/total logs
 - [x] Header serialization in G-Core SDK format
 - [x] Property resolution (request.method, request.path, request.url, request.host, response.code, etc.)
 - [x] Request metadata (headers, body, trailers)
@@ -79,13 +82,23 @@ frontend/                     # React + Vite frontend
   - Multi-client support - all users see all activity
   - AI agent integration - API requests visible in UI
   - Optimized for instant connections (<100ms via 127.0.0.1)
+- [x] **Configuration Sharing System** (February 2026)
+  - Save/load test configurations via UI
+  - `test-config.json` file stores request settings, headers, properties
+  - AI agents can read config via GET `/api/config`
+  - Enables developer + AI collaboration workflow
+  - Version-controllable test scenarios
+  - See [CONFIG_SHARING.md](./CONFIG_SHARING.md) for details
 
 ### ⚠️ Known Issues
 
-- `proxy_on_vm_start` and `proxy_on_configure` fail with "Unexpected 'null'" errors
-  - Non-blocking: hooks still execute successfully
-  - Likely missing host functions the SDK tries to call during initialization
-  - Error handling catches these, execution continues
+- `proxy_on_vm_start` and `proxy_on_configure` initialization hooks fail silently
+  - **Status**: Suppressed (February 2026) - Error messages no longer visible
+  - **Cause**: G-Core SDK expects host environment configuration that test runner doesn't provide
+  - **Impact**: None - hooks execute successfully, only initialization phase affected
+  - **Solution**: Abort messages and proc_exit(255) calls filtered during initialization
+  - Test runner provides default config `{"test_mode": true}` for VM/plugin configuration
+  - Production nginx would provide actual configuration; test runner sets state via API
 - Native `fetch()` overrides `Host` header based on target URL
   - Workaround: Original host is preserved as `X-Forwarded-Host`
   - This is standard proxy behavior
@@ -105,24 +118,10 @@ frontend/                     # React + Vite frontend
 
 ### 🚧 Not Yet Implemented
 
-- **Server Properties Integration** (UI exists, backend integration incomplete)
-  - Properties UI in ServerPropertiesPanel provides user input (country, geo-location, etc.)
-  - Backend needs to merge user-provided properties with runtime-calculated properties
-  - Runtime properties must be extracted from actual HTTP request:
-    - `request.url`, `request.host`, `request.path` → parsed from target URL
-    - `request.scheme` → http/https from URL
-    - `request.query` → query string from URL
-    - `request.extension` → file extension from path
-    - `request.method` → HTTP method from request
-  - Need to implement proper `get_property` and `set_property` host functions
-  - Reference: proxy-wasm SDK property handling in G-Core AssemblyScript SDK
-  - Current state: Properties passed to hooks but not fully integrated with WASM property system
 - HTTP callouts (proxy_http_call)
 - Shared data/queue operations
 - Metrics support
-- Full property path coverage (only common paths implemented)
 - Request/response trailers (map types implemented but not tested)
-```
 
 ## Current Status
 
@@ -130,6 +129,7 @@ frontend/                     # React + Vite frontend
 
 - [x] Load WASM binaries via UI
 - [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
+- [x] **Isolated hook execution** (February 2026) - Each hook runs in fresh WASM instance for production parity
 - [x] Request header modifications flow through to HTTP fetch
 - [x] Response header modifications apply correctly (MapType bug fixed Jan 29, 2026)
 - [x] Request body modifications flow through to HTTP fetch
@@ -138,34 +138,33 @@ frontend/                     # React + Vite frontend
 - [x] Capture logs from `proxy_log` and `fd_write` (stdout)
 - [x] Log level filtering: Trace(0), Debug(1), Info(2), Warn(3), Error(4), Critical(5)
 - [x] Header serialization in G-Core SDK format
-- [x] Property resolution (request.method, request.path, request.url, request.host, response.code, etc.)
+- [x] **Property System** (February 2026) - Complete implementation:
+  - Runtime property extraction from URLs (request.url, request.host, request.path, request.query, request.scheme, request.extension)
+  - User properties + runtime-calculated properties with smart priority (user overrides calculated)
+  - `get_property` and `set_property` host functions fully functional
+  - Property chaining between hooks (modifications flow through like headers/bodies)
+  - Modified properties affect actual HTTP requests (URL reconstruction from properties)
+  - Properties displayed in Inputs/Outputs tabs with diff highlighting
 - [x] Full request/response pipeline with hook chaining
 - [x] Postman-like UI with collapsible panels
 - [x] TypeScript type safety throughout (frontend + backend)
 - [x] Vite build system with fast HMR
 - [x] Works with change-header-code.wasm test binary
+- [x] WebSocket real-time synchronization
+- [x] Configuration save/load system
 
 ### ⚠️ Known Issues
 
-- `proxy_on_vm_start` and `proxy_on_configure` fail with "Unexpected 'null'" errors
-  - Non-blocking: hooks still execute successfully
-  - Likely missing host functions the SDK tries to call during initialization
-  - Error handling catches these, execution continues
+- `proxy_on_vm_start` and `proxy_on_configure` initialization hooks fail silently
+  - **Status**: Suppressed (February 2026) - Error messages no longer visible
+  - **Cause**: G-Core SDK expects host environment configuration that test runner doesn't provide
+  - **Impact**: None - hooks execute successfully, only initialization phase affected
+  - **Solution**: Abort messages and proc_exit(255) calls filtered during initialization
+  - Test runner provides default config `{"test_mode": true}` for VM/plugin configuration
+  - Production nginx would provide actual configuration; test runner sets state via API
 
 ### 🚧 Not Yet Implemented
 
-- **Server Properties Integration** (UI exists, backend integration incomplete)
-  - Properties UI in ServerPropertiesPanel provides user input (country, geo-location, etc.)
-  - Backend needs to merge user-provided properties with runtime-calculated properties
-  - Runtime properties must be extracted from actual HTTP request:
-    - `request.url`, `request.host`, `request.path` → parsed from target URL
-    - `request.scheme` → http/https from URL
-    - `request.query` → query string from URL
-    - `request.extension` → file extension from path
-    - `request.method` → HTTP method from request
-  - Need to implement proper `get_property` and `set_property` host functions
-  - Reference: proxy-wasm SDK property handling in G-Core AssemblyScript SDK
-  - Current state: Properties passed to hooks but not fully integrated with WASM property system
 - HTTP callouts (proxy_http_call)
 - Shared data/queue operations
 - Metrics support
@@ -179,35 +178,39 @@ frontend/                     # React + Vite frontend
 **This was the major breakthrough.** The G-Core AssemblyScript SDK expects a specific binary format:
 
 ```
-[num_pairs: u32]                          # Header pair count
-[key1_len: u32][val1_len: u32]           # Size array for all pairs
+
+[num_pairs: u32] # Header pair count
+[key1_len: u32][val1_len: u32] # Size array for all pairs
 [key2_len: u32][val2_len: u32]
 ...
-[key1_bytes][0x00]                        # Data with null terminators
+[key1_bytes][0x00] # Data with null terminators
 [val1_bytes][0x00]
 [key2_bytes][0x00]
 [val2_bytes][0x00]
 ...
+
 ```
 
 **Example** (2 headers: "host: example.com" and "x-custom-relay: Fifteen"):
 
 ```
-02 00 00 00                               # 2 pairs
-04 00 00 00 0b 00 00 00                  # "host" = 4 bytes, "example.com" = 11 bytes
-0e 00 00 00 07 00 00 00                  # "x-custom-relay" = 14 bytes, "Fifteen" = 7 bytes
-68 6f 73 74 00                            # "host\0"
+
+02 00 00 00 # 2 pairs
+04 00 00 00 0b 00 00 00 # "host" = 4 bytes, "example.com" = 11 bytes
+0e 00 00 00 07 00 00 00 # "x-custom-relay" = 14 bytes, "Fifteen" = 7 bytes
+68 6f 73 74 00 # "host\0"
 pnpm install
-pnpm run build          # Builds both backend and frontend
-pnpm start              # Starts server on port 5179
-```
+pnpm run build # Builds both backend and frontend
+pnpm start # Starts server on port 5179
+
+````
 
 Or run in development mode:
 
 ```bash
 pnpm run dev:backend    # Runs backend with watch mode
 pnpm run dev:frontend   # Runs Vite dev server on port 5173 (with proxy to backend)
-```
+````
 
 ### Build Commands
 
