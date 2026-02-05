@@ -10,13 +10,13 @@ export function useWasm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadWasm = async (file: File) => {
+  const loadWasm = async (file: File, dotenvEnabled: boolean = true) => {
     setLoading(true);
     setError(null);
 
     try {
       const buffer = await file.arrayBuffer();
-      const path = await uploadWasm(file);
+      const path = await uploadWasm(file, dotenvEnabled);
 
       setWasmState({
         wasmPath: path,

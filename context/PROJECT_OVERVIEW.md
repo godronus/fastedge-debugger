@@ -43,6 +43,12 @@ server/                       # Backend code (formerly src/)
     StateManager.ts           # Event coordination and broadcasting (153 lines)
     types.ts                  # Event type definitions
     index.ts                  # Module exports
+  fastedge-host/              # FastEdge-specific extensions (Feb 2026)
+    types.ts                  # FastEdge type definitions
+    SecretStore.ts            # Time-based secret rotation
+    Dictionary.ts             # Key-value configuration store
+    hostFunctions.ts          # Factory for FastEdge WASM host functions
+    index.ts                  # Module exports
 
 frontend/                     # React + Vite frontend
   src/
@@ -97,6 +103,13 @@ frontend/                     # React + Vite frontend
   - Test-specific headers (x-inject-req-body, x-inject-res-body) moved to config files only
   - Closer simulation of production CDN environment
   - See [PRODUCTION_PARITY_HEADERS.md](./PRODUCTION_PARITY_HEADERS.md) for details
+- [x] **FastEdge Host Functions** (February 2026)
+  - Secret management with time-based rotation (`proxy_get_secret`, `proxy_get_effective_at_secret`)
+  - Dictionary/configuration store (`proxy_dictionary_get`)
+  - Production parity with G-Core FastEdge CDN runtime
+  - Dotenv file support (.env, .env.secrets, .env.variables)
+  - Prepared for wasi-http component model integration
+  - See [DOTENV.md](./DOTENV.md) for configuration details
 
 ### ⚠️ Known Issues
 

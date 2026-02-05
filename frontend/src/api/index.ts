@@ -2,7 +2,10 @@ import { HookCall, HookResult } from "../types";
 
 const API_BASE = "/api";
 
-export async function uploadWasm(file: File): Promise<string> {
+export async function uploadWasm(
+  file: File,
+  dotenvEnabled: boolean = true,
+): Promise<string> {
   // Read file as ArrayBuffer and convert to base64
   const buffer = await file.arrayBuffer();
   const base64 = btoa(
@@ -17,7 +20,7 @@ export async function uploadWasm(file: File): Promise<string> {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ wasmBase64: base64 }),
+    body: JSON.stringify({ wasmBase64: base64, dotenvEnabled }),
   });
 
   if (!response.ok) {

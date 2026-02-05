@@ -3,6 +3,11 @@ import { ProxyStatus, BufferType, MapType } from "./types";
 import { MemoryManager } from "./MemoryManager";
 import { HeaderManager } from "./HeaderManager";
 import { PropertyResolver } from "./PropertyResolver";
+import {
+  SecretStore,
+  Dictionary,
+  createFastEdgeHostFunctions,
+} from "../fastedge-host";
 
 const textEncoder = new TextEncoder();
 
@@ -31,14 +36,22 @@ export class HostFunctions {
   private debug = false;
   private currentLogLevel: number = LogLevel.Trace; // Default to show all logs
 
+  // FastEdge extensions
+  private secretStore: SecretStore;
+  private dictionary: Dictionary;
+
   constructor(
     memory: MemoryManager,
     propertyResolver: PropertyResolver,
     debug = false,
+    secretStore?: SecretStore,
+    dictionary?: Dictionary,
   ) {
     this.memory = memory;
     this.propertyResolver = propertyResolver;
     this.debug = debug;
+    this.secretStore = secretStore ?? new SecretStore();
+    this.dictionary = dictionary ?? new Dictionary();
   }
 
   setLogs(logs: LogEntry[]): void {
@@ -92,6 +105,15 @@ export class HostFunctions {
 
   getResponseBody(): string {
     return this.responseBody;
+  }
+
+  // FastEdge store accessors
+  getSecretStore(): SecretStore {
+    return this.secretStore;
+  }
+
+  getDictionary(): Dictionary {
+    return this.dictionary;
   }
 
   createImports(): Record<string, WebAssembly.ImportValue> {
@@ -391,6 +413,14 @@ export class HostFunctions {
         const message = this.memory.readOptionalString(messagePtr) ?? "<trace>";
         this.logs.push({ level: 0, message: `trace: ${message}` });
       },
+
+      // FastEdge host functions
+      ...createFastEdgeHostFunctions(
+        this.memory,
+        this.secretStore,
+        this.dictionary,
+        (msg: string) => this.logs.push({ level: 0, message: msg }),
+      ),
     };
   }
 

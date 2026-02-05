@@ -7,12 +7,14 @@ import { WebSocketManager, StateManager } from "./websocket/index.js";
 
 const app = express();
 const httpServer = createServer(app);
-const runner = new ProxyWasmRunner();
 
 // Initialize WebSocket infrastructure
 const debug = process.env.PROXY_RUNNER_DEBUG === "1";
 const wsManager = new WebSocketManager(httpServer, debug);
 const stateManager = new StateManager(wsManager, debug);
+
+// Initialize runner with dotenv enabled by default
+let runner = new ProxyWasmRunner(undefined, true);
 
 // Make state manager available to runner
 runner.setStateManager(stateManager);
@@ -21,13 +23,17 @@ app.use(express.json({ limit: "20mb" }));
 app.use(express.static(path.join(__dirname, "frontend")));
 
 app.post("/api/load", async (req: Request, res: Response) => {
-  const { wasmBase64 } = req.body ?? {};
+  const { wasmBase64, dotenvEnabled = true } = req.body ?? {};
   if (!wasmBase64 || typeof wasmBase64 !== "string") {
     res.status(400).json({ error: "Missing wasmBase64" });
     return;
   }
 
   try {
+    // Recreate runner with dotenvEnabled setting
+    runner = new ProxyWasmRunner(undefined, dotenvEnabled);
+    runner.setStateManager(stateManager);
+
     const buffer = Buffer.from(wasmBase64, "base64");
     await runner.load(buffer);
 

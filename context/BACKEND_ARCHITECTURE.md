@@ -28,10 +28,16 @@ server/
 │   ├── HeaderManager.ts      # HTTP header serialization
 │   ├── PropertyResolver.ts   # Property/metadata resolution
 │   └── types.ts              # Shared type definitions
-└── websocket/            # Real-time synchronization (Jan 2026)
-    ├── WebSocketManager.ts   # Connection management (314 lines)
-    ├── StateManager.ts       # Event coordination (153 lines)
-    ├── types.ts              # Event type definitions
+├── websocket/            # Real-time synchronization (Jan 2026)
+│   ├── WebSocketManager.ts   # Connection management (314 lines)
+│   ├── StateManager.ts       # Event coordination (153 lines)
+│   ├── types.ts              # Event type definitions
+│   └── index.ts              # Module exports
+└── fastedge-host/        # FastEdge-specific host functions (Feb 2026)
+    ├── types.ts              # FastEdge type definitions (FastEdgeConfig, ISecretStore, IDictionary)
+    ├── SecretStore.ts        # Time-based secret rotation with effectiveAt support
+    ├── Dictionary.ts         # Key-value configuration store
+    ├── hostFunctions.ts      # Factory for FastEdge WASM host functions
     └── index.ts              # Module exports
 ```
 
@@ -415,7 +421,7 @@ catch (error) {
 
 Implements proxy-wasm ABI host functions that WASM code calls:
 
-**Key Functions:**
+**Standard Proxy-WASM Functions:**
 
 - `proxy_log`: Logging from WASM
 - `proxy_get_header_map_value`: Read headers
@@ -424,6 +430,13 @@ Implements proxy-wasm ABI host functions that WASM code calls:
 - `proxy_get_buffer_bytes`: Read request/response bodies
 - `proxy_set_buffer_bytes`: Modify request/response bodies
 - `proxy_get_property`: Read properties (metadata, headers, etc.)
+
+**FastEdge Extensions (February 2026):**
+
+- `proxy_get_secret(key_ptr, key_len, value_ptr_ptr, value_len_ptr)`: Retrieve secrets
+- `proxy_get_effective_at_secret(key_ptr, key_len, timestamp, value_ptr_ptr, value_len_ptr)`: Time-based secret retrieval
+- `proxy_secret_get`: Alias for proxy_get_secret (SDK compatibility)
+- `proxy_dictionary_get(key_ptr, key_len, value_ptr_ptr, value_len_ptr)`: Retrieve dictionary/config values
 
 **Header Management:**
 
@@ -435,6 +448,13 @@ Implements proxy-wasm ABI host functions that WASM code calls:
 
 - Maintains separate strings for request/response bodies
 - Supports BufferType enum (RequestBody=0, ResponseBody=1, etc.)
+
+**FastEdge Integration:**
+
+- Uses SecretStore for time-based secret rotation
+- Uses Dictionary for configuration key-value pairs
+- Supports dotenv file loading (see [DOTENV.md](./DOTENV.md))
+- Production parity with G-Core FastEdge CDN runtime
 
 ### MemoryManager.ts
 
@@ -488,6 +508,111 @@ Resolves property paths for `proxy_get_property`:
 propertyResolver.getProperty("request.headers.content-type");
 // Returns: "application/json"
 ```
+
+### FastEdge Host Functions (February 2026)
+
+**Purpose:** Extends proxy-wasm ABI with G-Core FastEdge production runtime functions for secrets management and configuration.
+
+**Location:** `server/fastedge-host/`
+
+#### SecretStore.ts
+
+Manages encrypted configuration values with time-based rotation:
+
+**Features:**
+
+- `get(key)`: Returns current secret value
+- `getEffectiveAt(key, timestamp)`: Returns secret value at specific time (for rotation)
+- Supports simple string values or timestamped arrays
+- Format: `[{value: "secret1", effectiveAt: 1609459200}, {value: "secret2", effectiveAt: 1640995200}]`
+- Automatically selects correct value based on timestamp
+
+**Example:**
+
+```typescript
+const secretStore = new SecretStore({
+  JWT_SECRET: "current-secret",
+  API_KEY: [
+    { value: "old-key", effectiveAt: 1609459200 },
+    { value: "new-key", effectiveAt: 1640995200 },
+  ],
+});
+```
+
+#### Dictionary.ts
+
+Simple key-value configuration store:
+
+**Features:**
+
+- `get(key)`: Retrieve config value
+- `set(key, value)`: Update config value
+- `has(key)`: Check if key exists
+- `clear()`: Remove all entries
+- `load(data)`: Bulk load from object
+
+**Example:**
+
+```typescript
+const dictionary = new Dictionary({
+  API_URL: "https://api.example.com",
+  LOG_LEVEL: "debug",
+  FEATURE_FLAG_NEW_UI: "true",
+});
+```
+
+#### hostFunctions.ts
+
+Factory function creating WASM-compatible host functions:
+
+**Functions:**
+
+- `proxy_get_secret`: Standard secret retrieval
+- `proxy_get_effective_at_secret`: Time-based secret retrieval
+- `proxy_secret_get`: Alias for SDK compatibility
+- `proxy_dictionary_get`: Dictionary value retrieval
+
+**Memory Management:**
+
+- Uses MemoryManager for proper WASM memory allocation
+- Pointer-to-pointer pattern for returning values
+- Returns ProxyStatus codes (Ok=0, NotFound=1, Error=2)
+
+**Integration:**
+
+```typescript
+// In HostFunctions.ts createImports()
+return {
+  proxy_log: () => {...},
+  proxy_get_property: () => {...},
+  // ... standard functions
+
+  // FastEdge extensions
+  ...createFastEdgeHostFunctions(
+    this.memory,
+    this.secretStore,
+    this.dictionary,
+    (msg) => this.logs.push({ level: 0, message: msg })
+  ),
+};
+```
+
+#### Dotenv Support
+
+See [DOTENV.md](./DOTENV.md) for complete documentation.
+
+**File Patterns:**
+
+- `.env` with prefixes: `FASTEDGE_VAR_SECRET_`, `FASTEDGE_VAR_ENV_`
+- `.env.secrets`: Secrets only (no prefix)
+- `.env.variables`: Dictionary values (no prefix)
+
+**Future Implementation:**
+
+- Dotenv parsing and loading
+- CLI `--dotenv` flag support
+- API integration for dotenv path
+- Frontend UI for secrets/dictionary configuration
 
 ## Type System
 

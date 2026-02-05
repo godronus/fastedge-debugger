@@ -44,6 +44,7 @@ function App() {
   const [responseBody, setResponseBody] = useState('{"response": "OK"}');
 
   const [properties, setProperties] = useState<Record<string, string>>({});
+  const [dotenvEnabled, setDotenvEnabled] = useState(true); // Dotenv enabled by default
 
   const [logLevel, setLogLevel] = useState(0); // Trace
   const [results, setResults] = useState<Record<string, HookResult>>({});
@@ -217,7 +218,7 @@ function App() {
       {error && <div className="error">{error}</div>}
 
       <WasmLoader
-        onFileLoad={loadWasm}
+        onFileLoad={(file) => loadWasm(file, dotenvEnabled)}
         loading={loading}
         onLoadConfig={handleLoadConfig}
         onSaveConfig={handleSaveConfig}
@@ -340,6 +341,8 @@ function App() {
       <ServerPropertiesPanel
         properties={properties}
         onPropertiesChange={setProperties}
+        dotenvEnabled={dotenvEnabled}
+        onDotenvToggle={setDotenvEnabled}
       />
 
       <HookStagesPanel

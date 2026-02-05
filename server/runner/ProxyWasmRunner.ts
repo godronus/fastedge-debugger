@@ -5,6 +5,12 @@ import { HeaderManager } from "./HeaderManager";
 import { PropertyResolver } from "./PropertyResolver";
 import { HostFunctions } from "./HostFunctions";
 import type { StateManager } from "../websocket/StateManager.js";
+import {
+  SecretStore,
+  Dictionary,
+  type FastEdgeConfig,
+} from "../fastedge-host/index.js";
+import { loadDotenvFiles } from "../utils/dotenv-loader.js";
 
 const textEncoder = new TextEncoder();
 
@@ -21,14 +27,25 @@ export class ProxyWasmRunner {
   private isInitializing = false;
   private debug = process.env.PROXY_RUNNER_DEBUG === "1";
   private stateManager: StateManager | null = null;
+  private secretStore: SecretStore;
+  private dictionary: Dictionary;
+  private dotenvEnabled: boolean = true; // Default to enabled
 
-  constructor() {
+  constructor(fastEdgeConfig?: FastEdgeConfig, dotenvEnabled: boolean = true) {
     this.memory = new MemoryManager();
     this.propertyResolver = new PropertyResolver();
+    this.dotenvEnabled = dotenvEnabled;
+
+    // Initialize FastEdge stores
+    this.secretStore = new SecretStore(fastEdgeConfig?.secrets);
+    this.dictionary = new Dictionary(fastEdgeConfig?.dictionary);
+
     this.hostFunctions = new HostFunctions(
       this.memory,
       this.propertyResolver,
       this.debug,
+      this.secretStore,
+      this.dictionary,
     );
 
     // Set up memory manager to log to our logs array
@@ -42,6 +59,60 @@ export class ProxyWasmRunner {
    */
   setStateManager(stateManager: StateManager): void {
     this.stateManager = stateManager;
+  }
+
+  /**
+   * Load dotenv files if enabled and merge with existing FastEdge config
+   */
+  private async loadDotenvIfEnabled(): Promise<void> {
+    if (!this.dotenvEnabled) {
+      this.logDebug("Dotenv disabled, skipping file loading");
+      return;
+    }
+
+    try {
+      const dotenvConfig = await loadDotenvFiles(".");
+
+      // Merge dotenv secrets with existing secrets
+      if (
+        dotenvConfig.secrets &&
+        Object.keys(dotenvConfig.secrets).length > 0
+      ) {
+        const existingSecrets = this.secretStore.getAll();
+        this.secretStore = new SecretStore({
+          ...existingSecrets,
+          ...dotenvConfig.secrets,
+        });
+        this.logDebug(
+          `Loaded ${Object.keys(dotenvConfig.secrets).length} secrets from dotenv files`,
+        );
+      }
+
+      // Merge dotenv dictionary with existing dictionary
+      if (
+        dotenvConfig.dictionary &&
+        Object.keys(dotenvConfig.dictionary).length > 0
+      ) {
+        for (const [key, value] of Object.entries(dotenvConfig.dictionary)) {
+          this.dictionary.set(key, value);
+        }
+        this.logDebug(
+          `Loaded ${Object.keys(dotenvConfig.dictionary).length} dictionary entries from dotenv files`,
+        );
+      }
+
+      // Recreate host functions with updated stores
+      this.hostFunctions = new HostFunctions(
+        this.memory,
+        this.propertyResolver,
+        this.debug,
+        this.secretStore,
+        this.dictionary,
+      );
+    } catch (error) {
+      console.error("Failed to load dotenv files:", error);
+      // Don't throw - continue with empty secrets/dictionary
+    }
   }
 
   async load(buffer: Buffer): Promise<void> {
@@ -62,6 +133,9 @@ export class ProxyWasmRunner {
     }
 
     this.logDebug("WASM module compiled and ready for hook execution");
+
+    // Load dotenv files if enabled
+    await this.loadDotenvIfEnabled();
   }
 
   async callFullFlow(
