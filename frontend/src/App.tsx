@@ -29,10 +29,9 @@ function App() {
     "https://cdn-origin-4732724.fastedge.cdn.gc.onl/", // Initial test url - updated from http://localhost:8181 to make development easier
   );
 
-  const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>({
-    "x-inject-req-body": "Injected WASM value onRequestBody",
-    "x-inject-res-body": "Injected WASM value onResponseBody",
-  });
+  const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>(
+    {},
+  );
 
   const [requestBody, setRequestBody] = useState('{"message": "Hello"}');
 
@@ -298,11 +297,37 @@ function App() {
         onHeadersChange={setRequestHeaders}
         onBodyChange={setRequestBody}
         defaultHeaders={{
-          host: "example.com",
+          "user-agent": {
+            value:
+              "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0",
+            enabled: false,
+            placeholder: "Browser user agent",
+          },
+          accept: {
+            value:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            enabled: false,
+            placeholder: "Browser accept types",
+          },
+          "accept-language": {
+            value: "en-US,en;q=0.9",
+            enabled: false,
+            placeholder: "Browser languages",
+          },
+          "accept-encoding": {
+            value: "gzip, deflate, br, zstd",
+            enabled: false,
+            placeholder: "Browser encodings",
+          },
+          host: {
+            value: "",
+            enabled: false,
+            placeholder: "<Calculated from URL>",
+          },
           "content-type": {
             value: "",
             enabled: false,
-            placeholder: "<Calculated>",
+            placeholder: "<Calculated from body>",
           },
           Authorization: {
             value: "",

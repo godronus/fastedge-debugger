@@ -1,5 +1,152 @@
 # Proxy-WASM Runner - Changelog
 
+## February 5, 2026 - Production Parity Headers
+
+### Overview
+
+Enhanced test runner to better simulate production CDN environment with browser-like default headers, automatic Host header injection, and proxy header auto-injection. Removed test-specific defaults to keep configuration clean.
+
+### 🎯 What Was Completed
+
+#### 1. Browser Default Headers
+
+**Frontend Enhancement:**
+
+Added realistic browser headers as opt-in defaults in `App.tsx`:
+
+- **user-agent**: `Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0`
+- **accept**: `text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8`
+- **accept-language**: `en-US,en;q=0.9`
+- **accept-encoding**: `gzip, deflate, br, zstd`
+
+All disabled by default - developers enable as needed for testing.
+
+**Files Modified:**
+
+- `frontend/src/App.tsx` - Updated `defaultHeaders` prop in HeadersEditor
+
+#### 2. Host Header Auto-Injection
+
+**Backend Enhancement:**
+
+Automatically inject `Host` header from target URL before hooks execute:
+
+- Extracted from URL: `hostname` or `hostname:port` (non-standard ports only)
+- Only injected if not already present in request headers
+- Matches browser behavior for proper host-based routing
+
+**Frontend Enhancement:**
+
+Changed Host header default in UI:
+
+- Removed hardcoded `host: "example.com"`
+- Changed to calculated with placeholder `<Calculated from URL>`
+- Developers can still override if needed
+
+**Files Modified:**
+
+- `server/runner/ProxyWasmRunner.ts` - Auto-inject Host header in `callFullFlow`
+- `frontend/src/App.tsx` - Updated Host header default
+
+#### 3. Proxy Headers Auto-Injection
+
+**Backend Enhancement:**
+
+Automatically inject standard proxy headers before HTTP fetch:
+
+- **x-forwarded-proto**: Extracted from URL scheme (http/https)
+- **x-forwarded-port**: 443 for https, 80 for http
+- **x-real-ip**: From `request.x_real_ip` property (if set)
+- **x-forwarded-for**: Same as `request.x_real_ip` (if set)
+
+These headers are added to the actual HTTP fetch request, simulating production proxy behavior.
+
+**Files Modified:**
+
+- `server/runner/ProxyWasmRunner.ts` - Auto-inject proxy headers before fetch
+
+#### 4. Client IP Property
+
+**Frontend Enhancement:**
+
+Made `request.x_real_ip` property editable with default value:
+
+- Default value: `203.0.113.42` (TEST-NET-3 documentation IP)
+- Developers can change to test different client IPs
+- Flows into x-real-ip and x-forwarded-for headers
+
+**Files Modified:**
+
+- `frontend/src/components/PropertiesEditor.tsx` - Made x_real_ip editable
+
+#### 5. Test-Specific Headers Cleanup
+
+**Frontend Cleanup:**
+
+Removed test-specific headers from default state:
+
+- Removed `x-inject-req-body` and `x-inject-res-body` from initial `requestHeaders`
+- These headers now only come from `test-config.json` when needed
+- Keeps UI clean for normal testing scenarios
+
+**Files Modified:**
+
+- `frontend/src/App.tsx` - Changed initial `requestHeaders` from hardcoded test headers to `{}`
+
+#### 6. Documentation
+
+**New Documentation File:**
+
+Created comprehensive documentation explaining all production parity enhancements:
+
+- Implementation details for each feature
+- Code examples and test results
+- Use cases and design decisions
+- Testing guide
+
+**Files Created:**
+
+- `context/PRODUCTION_PARITY_HEADERS.md` - Complete documentation
+
+### 💡 Motivation
+
+Developers comparing test runner vs production environment noticed missing headers:
+
+**Production Environment:**
+
+```
+host, user-agent, accept, accept-language, accept-encoding, content-type,
+x-forwarded-host, x-forwarded-proto, x-forwarded-port, x-real-ip, x-forwarded-for
+```
+
+**Test Runner (Before):**
+
+```
+content-type, x-inject-req-body, x-inject-res-body
+```
+
+This gap made it harder to test binaries that depend on these headers (e.g., user-agent detection, client IP logic, host-based routing).
+
+### 🎉 Result
+
+Test runner now provides much closer production parity:
+
+```
+[INFO]: #header -> host: cdn-origin-4732724.fastedge.cdn.gc.onl
+[INFO]: #header -> user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0
+[INFO]: #header -> accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+[INFO]: #header -> accept-language: en-US,en;q=0.9
+[INFO]: #header -> accept-encoding: gzip, deflate, br, zstd
+[INFO]: #header -> content-type: application/json
+[INFO]: #header -> x-forwarded-host: cdn-origin-4732724.fastedge.cdn.gc.onl
+[INFO]: #header -> x-forwarded-proto: https
+[INFO]: #header -> x-forwarded-port: 443
+[INFO]: #header -> x-real-ip: 203.0.113.42
+[INFO]: #header -> x-forwarded-for: 203.0.113.42
+```
+
+---
+
 ## February 5, 2026 - Property System UI Integration & Request Flow
 
 ### Overview

@@ -78,6 +78,26 @@ export class ProxyWasmRunner {
     this.propertyResolver.extractRuntimePropertiesFromUrl(targetUrl);
     this.logDebug(`Extracted runtime properties from URL: ${targetUrl}`);
 
+    // Auto-inject Host header from URL if not already present
+    // This matches browser behavior where Host is automatically set
+    const hasHost = Object.keys(call.request.headers ?? {}).some(
+      (key) => key.toLowerCase() === "host",
+    );
+    if (!hasHost) {
+      try {
+        const urlObj = new URL(targetUrl);
+        const hostValue =
+          urlObj.port && urlObj.port !== "80" && urlObj.port !== "443"
+            ? `${urlObj.hostname}:${urlObj.port}`
+            : urlObj.hostname;
+        call.request.headers = call.request.headers ?? {};
+        call.request.headers["host"] = hostValue;
+        this.logDebug(`Auto-injected Host header: ${hostValue}`);
+      } catch (error) {
+        this.logDebug(`Failed to extract host from URL: ${String(error)}`);
+      }
+    }
+
     // Emit request started event
     if (this.stateManager) {
       const requestMethod = call.request.method ?? "GET";
@@ -179,6 +199,24 @@ export class ProxyWasmRunner {
       if (hostHeader) {
         fetchHeaders["x-forwarded-host"] = hostHeader[1];
         this.logDebug(`Adding x-forwarded-host: ${hostHeader[1]}`);
+      }
+
+      // Auto-inject standard proxy headers based on URL and properties
+      fetchHeaders["x-forwarded-proto"] = modifiedScheme;
+      this.logDebug(`Adding x-forwarded-proto: ${modifiedScheme}`);
+
+      fetchHeaders["x-forwarded-port"] =
+        modifiedScheme === "https" ? "443" : "80";
+      this.logDebug(
+        `Adding x-forwarded-port: ${fetchHeaders["x-forwarded-port"]}`,
+      );
+
+      // Add X-Real-IP and X-Forwarded-For if set in properties
+      const realIp = this.propertyResolver.getProperty("request.x_real_ip");
+      if (realIp && realIp !== "") {
+        fetchHeaders["x-real-ip"] = String(realIp);
+        fetchHeaders["x-forwarded-for"] = String(realIp);
+        this.logDebug(`Adding x-real-ip and x-forwarded-for: ${realIp}`);
       }
 
       const fetchOptions: RequestInit = {

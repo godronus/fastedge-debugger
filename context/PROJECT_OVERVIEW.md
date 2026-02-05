@@ -89,6 +89,14 @@ frontend/                     # React + Vite frontend
   - Enables developer + AI collaboration workflow
   - Version-controllable test scenarios
   - See [CONFIG_SHARING.md](./CONFIG_SHARING.md) for details
+- [x] **Production Parity Headers** (February 2026)
+  - Browser default headers (user-agent, accept, accept-language, accept-encoding) as opt-in defaults
+  - Auto-injection of Host header from target URL (hostname or hostname:port)
+  - Auto-injection of proxy headers (x-forwarded-proto, x-forwarded-port, x-real-ip, x-forwarded-for)
+  - Editable request.x_real_ip property (default: 203.0.113.42 TEST-NET-3)
+  - Test-specific headers (x-inject-req-body, x-inject-res-body) moved to config files only
+  - Closer simulation of production CDN environment
+  - See [PRODUCTION_PARITY_HEADERS.md](./PRODUCTION_PARITY_HEADERS.md) for details
 
 ### ⚠️ Known Issues
 
@@ -99,9 +107,11 @@ frontend/                     # React + Vite frontend
   - **Solution**: Abort messages and proc_exit(255) calls filtered during initialization
   - Test runner provides default config `{"test_mode": true}` for VM/plugin configuration
   - Production nginx would provide actual configuration; test runner sets state via API
-- Native `fetch()` overrides `Host` header based on target URL
-  - Workaround: Original host is preserved as `X-Forwarded-Host`
-  - This is standard proxy behavior
+- Host header auto-injection (February 2026)
+  - Test runner automatically injects Host header from target URL before hooks execute
+  - Format: `hostname` or `hostname:port` (non-standard ports only)
+  - Native `fetch()` may override, but WASM hooks see correct value
+  - Original host preserved as `X-Forwarded-Host` during HTTP fetch
 
 ### ⚠️ Known Limitations
 

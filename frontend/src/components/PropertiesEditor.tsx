@@ -95,10 +95,9 @@ const getPropertiesForCountry = (countryKey: string) => {
       readOnly: true,
     },
     "request.x_real_ip": {
-      value: "",
-      placeholder: "<Calculated>",
-      enabled: true,
-      readOnly: true,
+      value: "203.0.113.42",
+      placeholder: "Client IP address",
+      enabled: false,
     },
     "request.asn": {
       value: "",

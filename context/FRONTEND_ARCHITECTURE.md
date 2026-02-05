@@ -64,12 +64,22 @@ frontend/
 
 Manages global state and orchestrates all components:
 
+**Production Parity Headers (February 2026):**
+
+- **Browser Default Headers**: Opt-in defaults for user-agent, accept, accept-language, accept-encoding
+  - Disabled by default, developers enable as needed for testing
+  - Realistic browser values matching Firefox 147.0 on Linux
+- **Host Header**: Auto-calculated from target URL, shown as `<Calculated from URL>` placeholder
+  - Test-specific headers (x-inject-req-body, x-inject-res-body) removed from defaults
+  - Now only come from test-config.json when needed for specific tests
+- See [PRODUCTION_PARITY_HEADERS.md](./PRODUCTION_PARITY_HEADERS.md) for details
+
 ```typescript
 const App = () => {
   const { wasmState, loading, error, loadWasm } = useWasm();
   const [method, setMethod] = useState("POST");
   const [url, setUrl] = useState("https://cdn-origin-4732724.fastedge.cdn.gc.onl/");
-  const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>(...);
+  const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>({});
   const [requestBody, setRequestBody] = useState(...);
   const [properties, setProperties] = useState<Record<string, string>>(...);
   const [logLevel, setLogLevel] = useState(0); // Trace

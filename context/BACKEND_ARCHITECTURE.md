@@ -207,6 +207,19 @@ Main class orchestrating WASM execution with input/output tracking.
 - **Isolation**: No state sharing between hooks (matches production nginx + wasmtime)
 - **Performance**: Compilation is expensive (once), instantiation is cheap (per hook)
 
+**Production Parity Headers (February 2026):**
+
+- **Host Header Auto-Injection**: Before hooks execute, automatically injects `Host` header from target URL if not present
+  - Format: `hostname` for standard ports, `hostname:port` for non-standard ports
+  - Example: `https://example.com/` → `host: example.com`
+  - Example: `http://localhost:8080/` → `host: localhost:8080`
+- **Proxy Headers Auto-Injection**: Before HTTP fetch, automatically injects proxy headers:
+  - `x-forwarded-proto`: Extracted from URL scheme (http/https)
+  - `x-forwarded-port`: 443 for https, 80 for http
+  - `x-real-ip`: From `request.x_real_ip` property (if set)
+  - `x-forwarded-for`: Same as `x-real-ip` (if set)
+- See [PRODUCTION_PARITY_HEADERS.md](./PRODUCTION_PARITY_HEADERS.md) for details
+
 #### Key Methods
 
 **load(buffer: Buffer): Promise<void>**
