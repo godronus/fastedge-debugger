@@ -156,7 +156,7 @@ export class MemoryManager {
         level = levelMap[levelName] ?? 1;
       }
 
-      this.logCallback(level, `stdout(fd=${fd}): ${cleanMessage}`);
+      this.logCallback(level, cleanMessage);
     }
     if (nwritten) {
       this.writeU32(nwritten, total);

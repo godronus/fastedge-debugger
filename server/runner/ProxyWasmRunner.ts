@@ -212,7 +212,7 @@ export class ProxyWasmRunner {
       );
 
       // Add X-Real-IP and X-Forwarded-For if set in properties
-      const realIp = this.propertyResolver.getProperty("request.x_real_ip");
+      const realIp = this.propertyResolver.resolve("request.x_real_ip");
       if (realIp && realIp !== "") {
         fetchHeaders["x-real-ip"] = String(realIp);
         fetchHeaders["x-forwarded-for"] = String(realIp);

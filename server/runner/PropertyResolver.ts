@@ -258,7 +258,8 @@ export class PropertyResolver {
       "contextName",
     ];
     for (const key of candidates) {
-      const value = this.resolve(key);
+      // Access properties directly to avoid infinite recursion
+      const value = this.properties[key];
       if (typeof value === "string" && value.length > 0) {
         return value;
       }
