@@ -576,19 +576,48 @@ results.onResponseBody = await this.callHook({
 });
 ```
 
+## Environment Variables and Configuration (February 2026)
+
+### DotEnv Integration
+
+The runner supports loading secrets and dictionary values from `.env` files:
+
+**Files Supported:**
+- `.env` - Combined file with `FASTEDGE_VAR_SECRET_` and `FASTEDGE_VAR_ENV_` prefixes
+- `.env.secrets` - Secrets only (no prefix needed)
+- `.env.variables` - Dictionary values only (no prefix needed)
+
+**Architecture:**
+- `server/utils/dotenv-loader.ts` - File parsing and loading
+- `server/fastedge-host/SecretStore.ts` - Secret storage with time-based rotation
+- `server/fastedge-host/Dictionary.ts` - Key-value configuration store
+- `server/runner/ProxyWasmRunner.ts` - Integration point (loadDotenvIfEnabled)
+
+**WASM Access:**
+- Secrets: `proxy_get_secret("SECRET_NAME")` host function
+- Dictionary: `proxy_dictionary_get("KEY_NAME")` host function
+
+**Default Behavior:**
+- Dotenv loading is enabled by default when loading WASM
+- Can be disabled via `POST /api/load` with `{"dotenvEnabled": false}`
+- Missing files are silently ignored (no errors)
+- Values merge with any programmatically configured FastEdge config
+
+See [DOTENV.md](./DOTENV.md) for complete usage guide.
+
 ## Module Dependencies
 
 ### ProxyWasmRunner.ts
 
-- Imports: MemoryManager, HeaderManager, PropertyResolver, HostFunctions
+- Imports: MemoryManager, HeaderManager, PropertyResolver, HostFunctions, SecretStore, Dictionary, dotenv-loader
 - Exports: ProxyWasmRunner class
-- Role: Orchestrates the entire lifecycle
+- Role: Orchestrates the entire lifecycle including dotenv loading
 
 ### HostFunctions.ts
 
-- Imports: MemoryManager, HeaderManager, PropertyResolver, types
+- Imports: MemoryManager, HeaderManager, PropertyResolver, SecretStore, Dictionary, types
 - Exports: HostFunctions class
-- Role: Implements proxy-wasm ABI host functions
+- Role: Implements proxy-wasm ABI host functions including FastEdge extensions
 
 ### HeaderManager.ts
 
@@ -759,7 +788,7 @@ this.propertyResolver.setYourValue(call.yourValue ?? "default");
 
 ### Current Security
 
-- Runs locally only (localhost:5180)
+- Runs locally only (localhost:5179 or 127.0.0.1:5179)
 - No authentication/authorization
 - No rate limiting
 - No input validation on file upload
@@ -949,6 +978,91 @@ results.onResponseBody = await this.callHook({
 - Look for pointer arithmetic errors
 - Ensure proper little-endian byte order
 
+## Testing
+
+### When to Write Tests
+
+Tests should be written for:
+
+1. **New Features**: Write tests alongside feature implementation
+   - Define test cases before writing code (TDD approach recommended)
+   - Cover happy path, edge cases, and error scenarios
+   - Ensure all exported functions/components have tests
+
+2. **Bug Fixes**: Write a failing test first, then fix the bug
+   - The test should fail before the fix
+   - The test should pass after the fix
+   - Prevents regression of the same bug
+
+3. **Refactoring**: Ensure existing tests pass after refactoring
+   - Run tests before refactoring (establish baseline)
+   - Tests should pass without modification after refactoring
+   - Add new tests if behavior changes
+
+4. **Public APIs**: All exported functions, classes, and components must have tests
+   - Backend: Exported functions from server/runner/, server/utils/
+   - Frontend: All components, hooks, and utility functions
+
+### What to Test
+
+**Must Test**:
+- Public APIs and exported functions
+- User interactions (clicks, typing, form submission)
+- State changes and side effects
+- Error handling and validation
+- Edge cases (empty input, null, undefined, large values)
+- Async operations (loading states, success, failure)
+
+**Optional**:
+- Internal helper functions (if complex)
+- Performance-critical paths (benchmarks)
+- Integration between modules
+
+**Don't Test**:
+- Type definitions alone
+- Third-party libraries
+- Trivial getters/setters
+- Framework internals
+
+### Testing Workflow
+
+1. **Before Implementation**:
+   ```bash
+   # Create test file alongside implementation
+   touch server/utils/my-feature.ts
+   touch server/utils/my-feature.test.ts
+   ```
+
+2. **During Implementation**:
+   ```bash
+   # Run tests in watch mode
+   vitest watch server/utils/my-feature.test.ts
+   ```
+
+3. **Before Committing**:
+   ```bash
+   # Run all tests
+   pnpm test
+
+   # Check coverage
+   vitest run --coverage
+   ```
+
+### Test Coverage Goals
+
+- **Utilities**: 90%+ coverage (pure functions are straightforward to test)
+- **Components**: 80%+ coverage (focus on user interactions)
+- **Hooks**: 85%+ coverage (test all state transitions)
+- **Integration**: 70%+ coverage (focus on critical flows)
+
+### Testing Resources
+
+- **Patterns and Examples**: See [TEST_PATTERNS.md](./TEST_PATTERNS.md)
+- **Running Tests**: See [TESTING_GUIDE.md](./TESTING_GUIDE.md)
+- **Current Test Suite**: 388 tests across backend and frontend
+  - Backend: 198 tests (dotenv-loader, HeaderManager, PropertyResolver)
+  - Frontend: 190 tests (components, hooks, utilities)
+
 ## Extension Points
 
 ### Custom Header Formats
@@ -985,4 +1099,4 @@ To load properties from external sources:
 2. Call during initialization in ProxyWasmRunner
 3. Cache results for performance
 
-Last Updated: January 27, 2026
+Last Updated: February 6, 2026

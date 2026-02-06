@@ -1,0 +1,79 @@
+.requestBar {
+  padding: 16px 20px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #3d3d3d;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.urlInputContainer {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  background: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.urlInputContainer:focus-within {
+  border-color: #ff6c37;
+  box-shadow: 0 0 0 1px #ff6c37;
+}
+
+.methodSelect {
+  padding: 8px 12px;
+  background: #2d2d2d;
+  color: #e0e0e0;
+  border: none;
+  border-right: 1px solid #3d3d3d;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.methodSelect:focus {
+  outline: none;
+  box-shadow: none;
+  border: none;
+  border-right: 1px solid #3d3d3d;
+  border-color: transparent;
+}
+
+.methodSelect:hover {
+  background: #3d3d3d;
+}
+
+.urlInput {
+  flex: 1;
+  padding: 8px 12px;
+  background: #1e1e1e;
+  color: #e0e0e0;
+  border: none;
+  border-radius: 0;
+  font-size: 13px;
+  outline: none;
+}
+
+.urlInput:focus {
+  outline: none;
+  box-shadow: none;
+  border: none;
+  border-color: transparent;
+}
+
+.urlInput::placeholder {
+  color: #6d6d6d;
+}
+
+.sendButton {
+  width: 100px;
+  flex-shrink: 0;
+  font-weight: 600;
+}

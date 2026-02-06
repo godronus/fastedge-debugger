@@ -44,6 +44,7 @@ export interface HookResult {
 export interface WasmState {
   wasmPath: string | null;
   wasmBuffer: ArrayBuffer | null;
+  wasmFile: File | null;
 }
 
 export interface FinalResponse {

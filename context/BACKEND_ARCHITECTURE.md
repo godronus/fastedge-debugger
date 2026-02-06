@@ -33,12 +33,14 @@ server/
 │   ├── StateManager.ts       # Event coordination (153 lines)
 │   ├── types.ts              # Event type definitions
 │   └── index.ts              # Module exports
-└── fastedge-host/        # FastEdge-specific host functions (Feb 2026)
-    ├── types.ts              # FastEdge type definitions (FastEdgeConfig, ISecretStore, IDictionary)
-    ├── SecretStore.ts        # Time-based secret rotation with effectiveAt support
-    ├── Dictionary.ts         # Key-value configuration store
-    ├── hostFunctions.ts      # Factory for FastEdge WASM host functions
-    └── index.ts              # Module exports
+├── fastedge-host/        # FastEdge-specific host functions (Feb 2026)
+│   ├── types.ts              # FastEdge type definitions (FastEdgeConfig, ISecretStore, IDictionary)
+│   ├── SecretStore.ts        # Time-based secret rotation with effectiveAt support
+│   ├── Dictionary.ts         # Key-value configuration store
+│   ├── hostFunctions.ts      # Factory for FastEdge WASM host functions
+│   └── index.ts              # Module exports
+└── utils/                # Utility modules (Feb 2026)
+    └── dotenv-loader.ts      # Dotenv file parser and loader
 ```
 
 ## Core Components
@@ -113,16 +115,35 @@ Main HTTP server with five endpoints:
 
 #### POST /api/load
 
-Loads WASM binary into memory:
+Loads WASM binary into memory and recreates runner with dotenv settings:
 
 ```typescript
 app.post("/api/load", async (req, res) => {
-  const { wasmBase64 } = req.body;
+  const { wasmBase64, dotenvEnabled = true } = req.body;
+
+  // Recreate runner with dotenvEnabled setting
+  runner = new ProxyWasmRunner(undefined, dotenvEnabled);
+  runner.setStateManager(stateManager);
+
   const buffer = Buffer.from(wasmBase64, "base64");
   await runner.load(buffer);
+
+  // Emit WASM loaded event
+  stateManager.emitWasmLoaded("binary.wasm", buffer.length, source);
+
   res.json({ ok: true });
 });
 ```
+
+**Parameters:**
+- `wasmBase64` (required): Base64-encoded WASM binary
+- `dotenvEnabled` (optional, default: `true`): Enable/disable dotenv file loading
+
+**Behavior:**
+- Creates new `ProxyWasmRunner` instance with `dotenvEnabled` flag
+- When `dotenvEnabled=true`, loads secrets/dictionary from `.env*` files
+- When `dotenvEnabled=false`, uses only programmatically-provided FastEdge config
+- WASM reload required when toggling dotenv flag
 
 #### POST /api/call
 
@@ -163,9 +184,23 @@ app.post("/api/send", async (req, res) => {
     },
     url,
   );
+
+  // Emit request completed event
+  stateManager.emitRequestCompleted(
+    fullFlowResult.hookResults,
+    fullFlowResult.finalResponse,
+    fullFlowResult.calculatedProperties,
+    source,
+  );
+
   res.json({ ok: true, ...fullFlowResult });
 });
 ```
+
+**Response includes:**
+- `hookResults`: Results from all four hooks (onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody)
+- `finalResponse`: Final HTTP response after WASM modifications
+- `calculatedProperties`: Runtime-calculated properties (request.url, request.host, request.path, etc.)
 
 #### GET /api/config (February 2026)
 
@@ -206,6 +241,20 @@ app.post("/api/config", async (req, res) => {
 
 Main class orchestrating WASM execution with input/output tracking.
 
+**Constructor Parameters:**
+```typescript
+constructor(fastEdgeConfig?: FastEdgeConfig, dotenvEnabled: boolean = true)
+```
+
+- `fastEdgeConfig` (optional): Programmatic secrets/dictionary configuration
+- `dotenvEnabled` (default: `true`): Enable/disable loading from `.env*` files
+
+**Dotenv Integration:**
+- When `dotenvEnabled=true`: Loads `.env`, `.env.secrets`, `.env.variables` files
+- Merges with programmatic `fastEdgeConfig` (dotenv values take precedence)
+- Recreates `SecretStore` and `Dictionary` with merged configuration
+- See [DOTENV.md](./DOTENV.md) for complete details
+
 **Architecture (February 2026):** Each hook executes in a completely isolated WASM instance to simulate production behavior:
 
 - **Compilation**: Happens once in `load()`, stored as `WebAssembly.Module`
@@ -233,6 +282,9 @@ Main class orchestrating WASM execution with input/output tracking.
 - Compiles WASM module and stores it
 - Does NOT instantiate (deferred until hook execution)
 - Validates imports/exports if debug mode enabled
+- Loads dotenv files if `dotenvEnabled=true` (via `loadDotenvIfEnabled()`)
+- Merges dotenv secrets/dictionary with existing FastEdge config
+- Recreates `HostFunctions` with updated stores
 - Ready for multiple isolated hook executions
 
 **callFullFlow(call: HookCall, targetUrl: string): Promise<FullFlowResult>**
@@ -561,6 +613,60 @@ const dictionary = new Dictionary({
 });
 ```
 
+### Dotenv Loader (February 2026)
+
+**Location:** `server/utils/dotenv-loader.ts`
+
+Parses and loads environment variables from `.env*` files for FastEdge configuration.
+
+**Functions:**
+
+`loadDotenvFiles(dotenvPath: string = "."): Promise<FastEdgeConfig>`
+
+- Loads and parses multiple dotenv file formats
+- Returns `{ secrets, dictionary }` object
+- Silently skips missing files (not an error)
+
+**Supported Files:**
+
+1. `.env` - G-Core FastEdge format with prefixes:
+   - `FASTEDGE_VAR_SECRET_*` → secrets
+   - `FASTEDGE_VAR_ENV_*` → dictionary
+2. `.env.secrets` - Secrets without prefix
+3. `.env.variables` - Dictionary values without prefix
+
+**Parser Features:**
+
+- Handles `KEY=VALUE` format
+- Strips leading/trailing whitespace
+- Removes surrounding quotes (`"value"` or `'value'`)
+- Skips empty lines and `#` comments
+- Graceful error handling (continues on parse errors)
+
+**Example Usage:**
+
+```typescript
+// In ProxyWasmRunner.load()
+const dotenvConfig = await loadDotenvFiles(".");
+
+// Merge with existing config
+this.secretStore = new SecretStore({
+  ...existingSecrets,
+  ...dotenvConfig.secrets,
+});
+
+for (const [key, value] of Object.entries(dotenvConfig.dictionary)) {
+  this.dictionary.set(key, value);
+}
+```
+
+**Helper Functions:**
+
+`hasDotenvFiles(dotenvPath: string = "."): Promise<boolean>`
+
+- Checks if any dotenv files exist in specified directory
+- Useful for detecting dotenv configuration presence
+
 #### hostFunctions.ts
 
 Factory function creating WASM-compatible host functions:
@@ -597,22 +703,42 @@ return {
 };
 ```
 
-#### Dotenv Support
+#### Dotenv Support (February 2026)
 
-See [DOTENV.md](./DOTENV.md) for complete documentation.
+**✅ COMPLETED**: Full dotenv integration with toggle support. See [DOTENV.md](./DOTENV.md) for complete documentation.
+
+**Implementation:**
+
+Located in `server/utils/dotenv-loader.ts`:
+- `loadDotenvFiles(dotenvPath)`: Loads and parses dotenv files
+- `hasDotenvFiles(dotenvPath)`: Checks if any dotenv files exist
+- `parseDotenv(content)`: Parses KEY=VALUE format with quote handling
 
 **File Patterns:**
 
-- `.env` with prefixes: `FASTEDGE_VAR_SECRET_`, `FASTEDGE_VAR_ENV_`
-- `.env.secrets`: Secrets only (no prefix)
-- `.env.variables`: Dictionary values (no prefix)
+- `.env` with prefixes: `FASTEDGE_VAR_SECRET_*` (secrets), `FASTEDGE_VAR_ENV_*` (dictionary)
+- `.env.secrets`: Secrets only (no prefix required)
+- `.env.variables`: Dictionary values (no prefix required)
 
-**Future Implementation:**
+**Integration:**
 
-- Dotenv parsing and loading
-- CLI `--dotenv` flag support
-- API integration for dotenv path
-- Frontend UI for secrets/dictionary configuration
+- `ProxyWasmRunner` constructor accepts `dotenvEnabled` boolean (default: `true`)
+- `load()` method calls `loadDotenvIfEnabled()` to merge dotenv with FastEdge config
+- Runner recreated on `/api/load` when `dotenvEnabled` flag changes
+- Frontend UI provides toggle in settings panel
+
+**Behavior:**
+
+When `dotenvEnabled=true`:
+1. Reads `.env`, `.env.secrets`, `.env.variables` from working directory
+2. Parses files and extracts secrets/dictionary entries
+3. Merges with programmatic `FastEdgeConfig` (dotenv takes precedence)
+4. Recreates `SecretStore` and `Dictionary` instances
+5. Updates `HostFunctions` with merged configuration
+
+When `dotenvEnabled=false`:
+- Skips file loading entirely
+- Uses only programmatic FastEdge config
 
 ## Type System
 
@@ -637,7 +763,7 @@ export type HookCall = {
     statusText?: string;
   };
   properties: Record<string, unknown>;
-  logLevel?: number;
+  logLevel?: number; // Optional log level filter (0=trace to 5=critical)
 };
 ```
 
@@ -650,12 +776,14 @@ export type HookResult = {
   input: {
     request: { headers: HeaderMap; body: string };
     response: { headers: HeaderMap; body: string };
+    properties?: Record<string, unknown>; // State before hook execution
   };
   output: {
     request: { headers: HeaderMap; body: string };
     response: { headers: HeaderMap; body: string };
+    properties?: Record<string, unknown>; // State after hook execution
   };
-  properties: Record<string, unknown>;
+  properties: Record<string, unknown>; // Final merged properties
 };
 ```
 
@@ -672,8 +800,21 @@ export type FullFlowResult = {
     contentType: string;
     isBase64?: boolean;
   };
+  calculatedProperties?: Record<string, unknown>; // Runtime-extracted properties
 };
 ```
+
+**Calculated Properties (February 2026):**
+
+The `calculatedProperties` field contains runtime-extracted properties from the target URL:
+- `request.url`: Full URL
+- `request.host`: Hostname from URL
+- `request.path`: Path component
+- `request.query`: Query string (without leading `?`)
+- `request.scheme`: Protocol (http/https)
+- `request.extension`: File extension from path
+
+These are extracted by `PropertyResolver.extractRuntimePropertiesFromUrl()` before hook execution and returned to the frontend for display in the properties panel.
 
 **Enums:**
 
@@ -691,7 +832,17 @@ export enum BufferType {
   VmConfiguration = 6,
   PluginConfiguration = 7,
 }
+
+export enum ProxyStatus {
+  Ok = 0,
+  NotFound = 1,
+  BadArgument = 2,
+}
 ```
+
+**ProxyStatus Usage:**
+
+Used by FastEdge host functions (`proxy_get_secret`, `proxy_dictionary_get`, etc.) to indicate operation success/failure.
 
 ## Hook Execution Model (February 2026)
 
@@ -840,4 +991,4 @@ pnpm start              # Run compiled dist/server.js
 - Host header preserved via `x-forwarded-host`
 - Input/output capture enables complete execution visibility
 
-Last Updated: January 30, 2026
+Last Updated: February 6, 2026

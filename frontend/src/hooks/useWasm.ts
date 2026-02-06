@@ -6,6 +6,7 @@ export function useWasm() {
   const [wasmState, setWasmState] = useState<WasmState>({
     wasmPath: null,
     wasmBuffer: null,
+    wasmFile: null,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,7 @@ export function useWasm() {
       setWasmState({
         wasmPath: path,
         wasmBuffer: buffer,
+        wasmFile: file, // Store the file for reloading
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load WASM");
@@ -29,5 +31,13 @@ export function useWasm() {
     }
   };
 
-  return { wasmState, loading, error, loadWasm };
+  const reloadWasm = async (dotenvEnabled: boolean = true) => {
+    if (!wasmState.wasmFile) {
+      setError("No WASM file loaded to reload");
+      return;
+    }
+    await loadWasm(wasmState.wasmFile, dotenvEnabled);
+  };
+
+  return { wasmState, loading, error, loadWasm, reloadWasm };
 }

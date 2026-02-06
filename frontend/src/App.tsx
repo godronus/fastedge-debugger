@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useWasm } from "./hooks/useWasm";
+import { useEffect, useRef } from "react";
+import { useAppStore } from "./stores";
 import { useWebSocket } from "./hooks/useWebSocket";
 import type { ServerEvent } from "./hooks/websocket-types";
 import { WasmLoader } from "./components/WasmLoader";
@@ -9,52 +9,85 @@ import { RequestTabs } from "./components/RequestTabs";
 import { ServerPropertiesPanel } from "./components/ServerPropertiesPanel";
 import { HookStagesPanel } from "./components/HookStagesPanel";
 import { ResponseViewer } from "./components/ResponseViewer";
-import { HookResult, FinalResponse } from "./types";
 import { applyDefaultContentType } from "./utils/contentType";
-import { loadConfig, saveConfig, type TestConfig } from "./api";
+import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI } from "./api";
 import "./App.css";
 
 function App() {
-  const { wasmState, loading, error, loadWasm } = useWasm();
+  // Get state and actions from stores
+  const {
+    // Request state
+    method,
+    url,
+    requestHeaders,
+    requestBody,
+    responseHeaders,
+    responseBody,
+    setMethod,
+    setUrl,
+    setRequestHeaders,
+    setRequestBody,
+
+    // WASM state
+    wasmPath,
+    wasmFile,
+    loading,
+    error,
+    loadWasm,
+    reloadWasm,
+
+    // Results state
+    hookResults,
+    finalResponse,
+    setHookResults,
+    setFinalResponse,
+
+    // Config state
+    properties,
+    dotenvEnabled,
+    logLevel,
+    setProperties,
+    mergeProperties,
+    setDotenvEnabled,
+    setLogLevel,
+    loadFromConfig,
+    exportConfig,
+
+    // UI state
+    wsStatus,
+    setWsStatus,
+  } = useAppStore();
 
   // WebSocket connection for real-time updates
-  const { status: wsStatus, lastEvent } = useWebSocket({
+  const { status, lastEvent } = useWebSocket({
     autoConnect: true,
     debug: true, // Enable debug logging to console
     onEvent: handleServerEvent,
   });
 
-  const [method, setMethod] = useState("POST");
-  const [url, setUrl] = useState(
-    "https://cdn-origin-4732724.fastedge.cdn.gc.onl/", // Initial test url - updated from http://localhost:8181 to make development easier
-  );
+  // Sync WebSocket status to store
+  useEffect(() => {
+    setWsStatus(status);
+  }, [status, setWsStatus]);
 
-  const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>(
-    {},
-  );
+  // Track if this is the initial mount to avoid reloading WASM on mount
+  const isInitialMount = useRef(true);
 
-  const [requestBody, setRequestBody] = useState('{"message": "Hello"}');
+  // Reload WASM when dotenv toggle changes (only if WASM is already loaded)
+  useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
 
-  const [responseHeaders, setResponseHeaders] = useState<
-    Record<string, string>
-  >({
-    "content-type": "application/json",
-  });
-
-  const [responseBody, setResponseBody] = useState('{"response": "OK"}');
-
-  const [properties, setProperties] = useState<Record<string, string>>({});
-  const [dotenvEnabled, setDotenvEnabled] = useState(true); // Dotenv enabled by default
-
-  const [logLevel, setLogLevel] = useState(0); // Trace
-  const [results, setResults] = useState<Record<string, HookResult>>({});
-  const [finalResponse, setFinalResponse] = useState<FinalResponse | null>(
-    null,
-  );
-
-  const handleResult = (hook: string, result: HookResult) => {
-    setResults((prev) => ({ ...prev, [hook]: result }));
-  };
+    if (wasmFile) {
+      console.log(
+        `[App] Dotenv toggle changed to ${dotenvEnabled}, reloading WASM...`,
+      );
+      reloadWasm(dotenvEnabled);
+    }
+  }, [dotenvEnabled, wasmFile, reloadWasm]);
 
   /**
    * Handle WebSocket events from server
@@ -77,27 +110,27 @@ function App() {
         setMethod(event.data.method);
         setRequestHeaders(event.data.headers);
         // Clear previous results
-        setResults({});
+        setHookResults({});
         setFinalResponse(null);
         break;
 
       case "hook_executed":
         // Individual hook executed - update hook results incrementally
         const hookName = event.data.hook;
-        setResults((prev) => ({
-          ...prev,
+        setHookResults({
+          ...hookResults,
           [hookName]: {
-            logs: "", // Will be populated by request_completed
+            logs: [], // Will be populated by request_completed
             returnValue: event.data.returnCode,
             input: event.data.input,
             output: event.data.output,
           },
-        }));
+        });
         break;
 
       case "request_completed":
         // Full request completed - update all results and final response
-        setResults(event.data.hookResults);
+        setHookResults(event.data.hookResults);
         setFinalResponse(event.data.finalResponse);
 
         // Update calculated properties from WebSocket event
@@ -106,28 +139,26 @@ function App() {
           event.data.calculatedProperties,
         );
         if (event.data.calculatedProperties) {
-          setProperties((prev) => {
-            console.log("[WebSocket] Updating properties. Previous:", prev);
-            const merged = { ...prev };
-            for (const [key, value] of Object.entries(
-              event.data.calculatedProperties!,
-            )) {
-              merged[key] = String(value);
-            }
-            console.log("[WebSocket] New merged properties:", merged);
-            return merged;
-          });
+          console.log("[WebSocket] Updating properties. Previous:", properties);
+          const propsToMerge: Record<string, string> = {};
+          for (const [key, value] of Object.entries(
+            event.data.calculatedProperties,
+          )) {
+            propsToMerge[key] = String(value);
+          }
+          console.log("[WebSocket] Merging properties:", propsToMerge);
+          mergeProperties(propsToMerge);
         }
         break;
 
       case "request_failed":
         // Request failed - show error
         const errorResult = {
-          logs: "",
+          logs: [],
           returnValue: undefined,
           error: event.data.error,
         };
-        setResults({
+        setHookResults({
           onRequestHeaders: errorResult,
           onRequestBody: errorResult,
           onResponseHeaders: errorResult,
@@ -138,7 +169,7 @@ function App() {
 
       case "properties_updated":
         // Properties updated externally
-        setProperties(event.data.properties);
+        mergeProperties(event.data.properties);
         break;
 
       case "connection_status":
@@ -152,15 +183,10 @@ function App() {
    */
   const handleLoadConfig = async () => {
     try {
-      const config = await loadConfig();
+      const config = await loadConfigAPI();
 
-      // Apply configuration to state
-      setMethod(config.request.method);
-      setUrl(config.request.url);
-      setRequestHeaders(config.request.headers);
-      setRequestBody(config.request.body);
-      setProperties(config.properties);
-      setLogLevel(config.logLevel);
+      // Load config into store
+      loadFromConfig(config);
 
       alert("✅ Configuration loaded successfully!");
     } catch (error) {
@@ -174,23 +200,8 @@ function App() {
    */
   const handleSaveConfig = async () => {
     try {
-      const config: TestConfig = {
-        description: "Test configuration for proxy-wasm debugging",
-        wasm: {
-          path: wasmState.wasmPath || "wasm/cdn_header_change.wasm",
-          description: "Current loaded WASM binary",
-        },
-        request: {
-          method,
-          url,
-          headers: requestHeaders,
-          body: requestBody,
-        },
-        properties,
-        logLevel,
-      };
-
-      await saveConfig(config);
+      const config = exportConfig();
+      await saveConfigAPI(config);
       alert("✅ Configuration saved to test-config.json!");
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
@@ -227,7 +238,7 @@ function App() {
       <RequestBar
         method={method}
         url={url}
-        wasmLoaded={wasmState.wasmPath !== null}
+        wasmLoaded={wasmPath !== null}
         onMethodChange={setMethod}
         onUrlChange={setUrl}
         onSend={async () => {
@@ -239,7 +250,7 @@ function App() {
 
             const { sendFullFlow } = await import("./api");
             const {
-              hookResults,
+              hookResults: newHookResults,
               finalResponse: response,
               calculatedProperties,
             } = await sendFullFlow(url, method, {
@@ -247,41 +258,36 @@ function App() {
               request_headers: finalHeaders,
               logLevel,
             });
+
             // Update hook results and final response
-            setResults(hookResults);
+            setHookResults(newHookResults);
             setFinalResponse(response);
 
             // Merge calculated properties into the UI
-            // Always update calculated properties since they're runtime values
-            // User-provided properties (country, city, etc.) aren't in calculatedProperties so they're preserved
             console.log(
               "[API] Received calculatedProperties:",
               calculatedProperties,
             );
             if (calculatedProperties) {
-              setProperties((prev) => {
-                console.log("[API] Updating properties. Previous:", prev);
-                const merged = { ...prev };
-                // Always update calculated properties - they change with each request
-                for (const [key, value] of Object.entries(
-                  calculatedProperties,
-                )) {
-                  merged[key] = String(value);
-                }
-                console.log("[API] New merged properties:", merged);
-                return merged;
-              });
+              console.log("[API] Updating properties. Previous:", properties);
+              const propsToMerge: Record<string, string> = {};
+              // Always update calculated properties - they change with each request
+              for (const [key, value] of Object.entries(calculatedProperties)) {
+                propsToMerge[key] = String(value);
+              }
+              console.log("[API] Merging properties:", propsToMerge);
+              mergeProperties(propsToMerge);
             }
           } catch (err) {
             // Show error in all hooks
             const errorMsg =
               err instanceof Error ? err.message : "Unknown error";
             const errorResult = {
-              logs: "",
+              logs: [],
               returnValue: undefined,
               error: errorMsg,
             };
-            setResults({
+            setHookResults({
               onRequestHeaders: errorResult,
               onRequestBody: errorResult,
               onResponseHeaders: errorResult,
@@ -346,7 +352,7 @@ function App() {
       />
 
       <HookStagesPanel
-        results={results}
+        results={hookResults}
         hookCall={hookCall}
         logLevel={logLevel}
         onLogLevelChange={setLogLevel}

@@ -56,22 +56,26 @@ FEATURE_FLAG_NEW_UI=true
 
 ## Implementation Status
 
-### ✅ Completed
+### ✅ Completed (February 2026)
 
 - FastEdge host function implementation (proxy_get_secret, proxy_dictionary_get)
 - SecretStore with time-based rotation support
 - Dictionary for configuration values
 - Type-safe TypeScript interfaces
 - Integration into HostFunctions.ts
+- Dotenv file parsing and loading (server/utils/dotenv-loader.ts)
+- API endpoint updates (/api/load with dotenvEnabled parameter)
+- Frontend UI for dotenv toggle (ServerPropertiesPanel component)
+- Support for .env, .env.secrets, and .env.variables files
+- Automatic loading on WASM load (default enabled)
 
-### 🚧 Pending
+### 📝 Notes
 
-- [ ] Dotenv file parsing and loading
-- [ ] CLI flag support (--dotenv path/to/dir)
-- [ ] API endpoint updates (/api/load, /api/send)
-- [ ] Frontend UI for secrets/dictionary configuration
-- [ ] Update test-config.json schema
-- [ ] Integration tests with WASM binaries
+- Dotenv is enabled by default when loading WASM binaries
+- Users can toggle dotenv loading via UI before loading WASM
+- Server loads files from current directory (project root)
+- Files are optional - missing files are silently ignored
+- Supports both single .env with prefixes and separate files
 
 ## WASM Usage Examples
 

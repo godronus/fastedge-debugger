@@ -20,9 +20,11 @@ Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run 
 
 ### Tech Stack
 
-- **Backend**: Node.js + Express + TypeScript
-- **Frontend**: React 19 + Vite + TypeScript
+- **Backend**: Node.js + Express + TypeScript 5.4.5
+- **Frontend**: React 19.2.3 + Vite 7.3.1 + TypeScript 5.4.5 + Zustand 5.0.11
 - **WASM Runtime**: Node's WebAssembly API with WASI preview1
+- **WebSocket**: ws 8.19.0 for real-time communication
+- **State Management**: Zustand 5.0.11 with Immer middleware and auto-save
 - **Port**: 5179 (configurable via PORT env var)
 
 ### Project Structure
@@ -52,19 +54,36 @@ server/                       # Backend code (formerly src/)
 
 frontend/                     # React + Vite frontend
   src/
-    components/               # React components
-      WasmLoader.tsx         # File upload component
-      HeadersEditor.tsx      # Headers input component
-      PropertiesEditor.tsx   # JSON properties editor
-      RequestBar.tsx         # Method selector, URL input, Send button
-      RequestTabs.tsx        # Request headers/body/properties tabs
-      HookStagesPanel.tsx    # Hook execution logs and inputs viewer
-      ResponseViewer.tsx     # Response display with Body/Preview/Headers tabs
-      CollapsiblePanel.tsx   # Reusable collapsible panel wrapper
+    components/               # React components (CSS Modules - Feb 2026)
+      CollapsiblePanel/       # Reusable collapsible panel wrapper
+      ConnectionStatus/       # WebSocket connection status indicator
+      DictionaryInput/        # Key-value input with enable/disable checkboxes
+      HeadersEditor/          # Headers input component
+      HookStagesPanel/        # Hook execution logs and inputs viewer
+      JsonDisplay/            # JSON rendering with diff support
+      PropertiesEditor/       # JSON properties editor with country presets
+      RequestBar/             # Method selector, URL input, Send button
+      RequestTabs/            # Request headers/body tabs
+      ResponseTabs/           # Response tabs component
+      ResponseViewer/         # Response display with Body/Preview/Headers tabs
+      ServerPropertiesPanel/  # Server properties with dotenv toggle
+      Toggle/                 # Reusable toggle switch component
+      WasmLoader/             # File upload component
     hooks/
-      useWasm.ts                # WASM loading and hook execution
-      useWebSocket.ts           # WebSocket connection with auto-reconnect (314 lines)
-      websocket-types.ts        # Frontend event type definitions
+      useWasm.ts              # WASM loading with dotenv support
+      useWebSocket.ts         # WebSocket connection with auto-reconnect
+      websocket-types.ts      # Frontend event type definitions
+    stores/                   # Zustand state management (Feb 2026)
+      index.ts                # Main store with 5 slices
+      slices/                 # Modular state slices
+        requestSlice.ts       # Request state (method, URL, headers, body)
+        wasmSlice.ts          # WASM state (loaded file, dotenv toggle)
+        resultsSlice.ts       # Results state (hook execution data, logs)
+        configSlice.ts        # Config state (server properties, dictionaries)
+        uiSlice.ts            # UI state (active tabs, collapsed panels)
+    utils/
+      contentType.ts          # Auto content-type detection
+      diff.ts                 # JSON diff algorithms
 - [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
 - [x] Capture logs from `proxy_log` and `fd_write` (stdout) with log level filtering
 - [x] Log level filtering: Trace(0), Debug(1), Info(2), Warn(3), Error(4), Critical(5)
@@ -108,8 +127,22 @@ frontend/                     # React + Vite frontend
   - Dictionary/configuration store (`proxy_dictionary_get`)
   - Production parity with G-Core FastEdge CDN runtime
   - Dotenv file support (.env, .env.secrets, .env.variables)
+  - UI toggle for enabling/disabling dotenv loading
+  - Dotenv toggle triggers WASM reload (February 6, 2026)
   - Prepared for wasi-http component model integration
   - See [DOTENV.md](./DOTENV.md) for configuration details
+- [x] **CSS Modules Migration** (February 6, 2026)
+  - All 14 React components migrated to CSS Modules
+  - Folder-per-component structure with scoped styles
+  - Improved maintainability and developer experience
+  - No global CSS conflicts
+- [x] **Zustand State Management** (February 6, 2026)
+  - Centralized state management with 5 modular slices
+  - Auto-save to localStorage with 500ms debounce
+  - 176 comprehensive tests (90%+ coverage)
+  - Redux DevTools integration for debugging
+  - Replaced 14 useState hooks with single store
+  - See [STATE_MANAGEMENT.md](./STATE_MANAGEMENT.md) for details
 
 ### ⚠️ Known Issues
 
@@ -144,6 +177,7 @@ frontend/                     # React + Vite frontend
 - HTTP callouts (proxy_http_call)
 - Shared data/queue operations
 - Metrics support
+- Full property path coverage (only common paths implemented)
 - Request/response trailers (map types implemented but not tested)
 
 ## Current Status
@@ -169,12 +203,13 @@ frontend/                     # React + Vite frontend
   - Modified properties affect actual HTTP requests (URL reconstruction from properties)
   - Properties displayed in Inputs/Outputs tabs with diff highlighting
 - [x] Full request/response pipeline with hook chaining
-- [x] Postman-like UI with collapsible panels
+- [x] Postman-like UI with collapsible panels and CSS Modules (February 6, 2026)
 - [x] TypeScript type safety throughout (frontend + backend)
 - [x] Vite build system with fast HMR
 - [x] Works with change-header-code.wasm test binary
 - [x] WebSocket real-time synchronization
 - [x] Configuration save/load system
+- [x] **Dotenv Toggle** (February 6, 2026) - UI toggle properly reloads WASM when dotenv setting changed
 
 ### ⚠️ Known Issues
 
@@ -185,14 +220,6 @@ frontend/                     # React + Vite frontend
   - **Solution**: Abort messages and proc_exit(255) calls filtered during initialization
   - Test runner provides default config `{"test_mode": true}` for VM/plugin configuration
   - Production nginx would provide actual configuration; test runner sets state via API
-
-### 🚧 Not Yet Implemented
-
-- HTTP callouts (proxy_http_call)
-- Shared data/queue operations
-- Metrics support
-- Full property path coverage (only common paths implemented)
-- Request/response trailers (map types implemented but not tested)
 
 ## Critical Technical Details
 
@@ -274,10 +301,12 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 ### Running the Server
 
 ```bash
-npm install
-npm run build
-PROXY_RUNNER_DEBUG=1 PORT=5180 npm start
+pnpm install
+pnpm build
+PROXY_RUNNER_DEBUG=1 PORT=5179 pnpm start
 ```
+
+**Note:** Use `pnpm` (not `npm`) as the project uses pnpm for package management.
 
 ### Debug Mode
 
@@ -290,7 +319,7 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 
 ### Loading a Binary
 
-1. Open http://localhost:5180
+1. Open http://localhost:5179
 2. Click "Choose File" and select a .wasm file
 3. Click "Load"
 4. Wait for "Loaded successfully"
@@ -348,6 +377,12 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
    - Real HTTP request with modifications
    - Response hooks process real server response
    - Binary content handling with base64 encoding
+7. **State Management Migration** (February 6, 2026):
+   - Migrated from useState to Zustand
+   - 5 modular slices: Request, WASM, Results, Config, UI
+   - Auto-save functionality with localStorage persistence
+   - 176 comprehensive tests for stores
+   - Improved maintainability and testability
 
 ### Test Binaries
 
@@ -445,5 +480,5 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 
 This test runner was built for FastEdge CDN binary development. The code runs in production on nginx with a custom wasmtime host, so exact format compatibility with the G-Core SDK is critical.
 
-Last Updated: January 29, 2026
-Status: Full request/response modification pipeline working, MapType bug fixed, response header modifications verified, UI refactored with reusable components
+Last Updated: February 6, 2026
+Status: Production-ready with CSS Modules, dotenv toggle with WASM reload, complete property system, real HTTP integration, and WebSocket synchronization

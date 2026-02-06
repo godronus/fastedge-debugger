@@ -1,0 +1,49 @@
+import { CollapsiblePanel } from "../CollapsiblePanel";
+import { PropertiesEditor } from "../PropertiesEditor";
+import { Toggle } from "../Toggle";
+import styles from "./ServerPropertiesPanel.module.css";
+
+interface ServerPropertiesPanelProps {
+  properties: Record<string, string>;
+  onPropertiesChange: (properties: Record<string, string>) => void;
+  dotenvEnabled: boolean;
+  onDotenvToggle: (enabled: boolean) => void;
+}
+
+export function ServerPropertiesPanel({
+  properties,
+  onPropertiesChange,
+  dotenvEnabled,
+  onDotenvToggle,
+}: ServerPropertiesPanelProps) {
+  return (
+    <CollapsiblePanel
+      title="Server Properties"
+      defaultExpanded={false}
+      headerExtra={
+        <div
+          className={styles.toggleContainer}
+          onClick={(e) => e.stopPropagation()} // Prevent collapse when clicking toggle
+        >
+          <Toggle
+            checked={dotenvEnabled}
+            onChange={onDotenvToggle}
+            label="Load .env files"
+            style={{
+              fontWeight: dotenvEnabled ? "600" : "normal",
+            }}
+          />
+        </div>
+      }
+    >
+      <PropertiesEditor value={properties} onChange={onPropertiesChange} />
+      {dotenvEnabled && (
+        <div className={styles.dotenvNotice}>
+          <strong>Dotenv enabled:</strong> Secrets from .env.secrets and
+          dictionary values from .env.variables will be loaded when WASM is
+          loaded.
+        </div>
+      )}
+    </CollapsiblePanel>
+  );
+}

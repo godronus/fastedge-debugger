@@ -1,0 +1,44 @@
+.wasmLoader {
+  padding: 16px 20px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h2 {
+  color: #e0e0e0;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.secondaryButton {
+  background: #3d3d3d;
+  color: #e0e0e0;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: #4d4d4d;
+}
+
+.wasmLoader input[type="file"] {
+  color: #e0e0e0;
+  font-size: 13px;
+}
+
+.loadingIndicator {
+  margin-left: 10px;
+  color: #ff6c37;
+}

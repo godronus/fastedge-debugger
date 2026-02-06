@@ -15,29 +15,82 @@ The frontend is a React 19 + TypeScript application built with Vite. It provides
 - **React 19.2.3**: UI framework with hooks
 - **TypeScript 5.4.5**: Type safety
 - **Vite 7.3.1**: Build tool and dev server
-- **CSS**: Vanilla CSS (no framework)
+- **Zustand 5.0.3**: State management with Immer middleware (migrated February 6, 2026)
+- **CSS Modules**: Component-scoped styling (migrated February 6, 2026)
 - **WebSocket**: Real-time server communication (ws protocol)
+- **Vitest**: Unit testing framework with 176 store tests
 
 ## Project Structure
 
 ```
 frontend/
 ├── src/
-│   ├── components/          # React components
-│   │   ├── WasmLoader.tsx   # File upload component
-│   │   ├── DictionaryInput.tsx # Postman-style key-value editor with defaults & read-only
-│   │   ├── HeadersEditor.tsx # Wrapper around DictionaryInput
-│   │   ├── PropertiesEditor.tsx # Properties editor with country presets
-│   │   ├── ServerPropertiesPanel.tsx # Collapsible server properties panel
-│   │   ├── RequestBar.tsx   # Method + URL + Send button
-│   │   ├── RequestTabs.tsx  # Collapsible request config (Headers/Body)
-│   │   ├── HookStagesPanel.tsx # Collapsible hook logs/inputs/outputs viewer
-│   │   ├── ResponseViewer.tsx # Collapsible response display
-│   │   ├── CollapsiblePanel.tsx # Reusable collapsible wrapper
-│   │   ├── ConnectionStatus.tsx # WebSocket connection indicator
-│   │   └── JsonDisplay.tsx  # Smart JSON renderer with diff capabilities
+│   ├── components/          # React components (all with CSS modules)
+│   │   ├── WasmLoader/
+│   │   │   ├── WasmLoader.tsx       # File upload component
+│   │   │   ├── WasmLoader.module.css
+│   │   │   └── index.tsx
+│   │   ├── DictionaryInput/
+│   │   │   ├── DictionaryInput.tsx  # Postman-style key-value editor
+│   │   │   ├── DictionaryInput.module.css
+│   │   │   └── index.tsx
+│   │   ├── HeadersEditor/
+│   │   │   ├── HeadersEditor.tsx    # Wrapper around DictionaryInput
+│   │   │   ├── HeadersEditor.module.css
+│   │   │   └── index.tsx
+│   │   ├── PropertiesEditor/
+│   │   │   ├── PropertiesEditor.tsx # Properties editor with country presets
+│   │   │   ├── PropertiesEditor.module.css
+│   │   │   └── index.tsx
+│   │   ├── ServerPropertiesPanel/
+│   │   │   ├── ServerPropertiesPanel.tsx # Collapsible server properties panel
+│   │   │   ├── ServerPropertiesPanel.module.css
+│   │   │   └── index.tsx
+│   │   ├── RequestBar/
+│   │   │   ├── RequestBar.tsx       # Method + URL + Send button
+│   │   │   ├── RequestBar.module.css
+│   │   │   └── index.tsx
+│   │   ├── RequestTabs/
+│   │   │   ├── RequestTabs.tsx      # Collapsible request config (Headers/Body)
+│   │   │   ├── RequestTabs.module.css
+│   │   │   └── index.tsx
+│   │   ├── ResponseTabs/
+│   │   │   ├── ResponseTabs.tsx     # Response tabs component
+│   │   │   ├── ResponseTabs.module.css
+│   │   │   └── index.tsx
+│   │   ├── HookStagesPanel/
+│   │   │   ├── HookStagesPanel.tsx  # Collapsible hook logs/inputs/outputs viewer
+│   │   │   ├── HookStagesPanel.module.css
+│   │   │   └── index.tsx
+│   │   ├── ResponseViewer/
+│   │   │   ├── ResponseViewer.tsx   # Collapsible response display
+│   │   │   ├── ResponseViewer.module.css
+│   │   │   └── index.tsx
+│   │   ├── CollapsiblePanel/
+│   │   │   ├── CollapsiblePanel.tsx # Reusable collapsible wrapper
+│   │   │   ├── CollapsiblePanel.module.css
+│   │   │   └── index.tsx
+│   │   ├── ConnectionStatus/
+│   │   │   ├── ConnectionStatus.tsx # WebSocket connection indicator
+│   │   │   ├── ConnectionStatus.module.css
+│   │   │   └── index.tsx
+│   │   ├── JsonDisplay/
+│   │   │   ├── JsonDisplay.tsx      # Smart JSON renderer with diff capabilities
+│   │   │   ├── JsonDisplay.module.css
+│   │   │   └── index.tsx
+│   │   └── Toggle/
+│   │       ├── Toggle.tsx           # Reusable toggle switch component
+│   │       ├── Toggle.module.css
+│   │       └── index.tsx
+│   ├── stores/              # Zustand state management (Feb 6, 2026)
+│   │   ├── index.ts         # Main store with middleware stack
+│   │   └── slices/
+│   │       ├── requestSlice.ts   # HTTP request/response state (persisted)
+│   │       ├── wasmSlice.ts      # WASM loading state (ephemeral)
+│   │       ├── resultsSlice.ts   # Hook execution results (ephemeral)
+│   │       ├── configSlice.ts    # Properties & settings (persisted)
+│   │       └── uiSlice.ts        # UI state & tabs (partially persisted)
 │   ├── hooks/
-│   │   ├── useWasm.ts       # WASM loading logic
 │   │   ├── useWebSocket.ts  # WebSocket connection with auto-reconnect (314 lines)
 │   │   └── websocket-types.ts # Event type definitions
 │   ├── api/
@@ -60,6 +113,29 @@ frontend/
 
 ## Component Architecture
 
+**CSS Modules Migration Complete** (February 6, 2026): All 14 components now use CSS modules with a consistent folder structure:
+- Each component in its own folder: `ComponentName/ComponentName.tsx`
+- Scoped styles: `ComponentName.module.css`
+- Clean exports: `index.tsx` re-exports the component
+- No global style pollution, improved maintainability
+
+### Component List
+
+1. **WasmLoader** - File upload and config management
+2. **DictionaryInput** - Postman-style key-value editor
+3. **HeadersEditor** - Headers editing wrapper
+4. **PropertiesEditor** - Server properties with country presets
+5. **ServerPropertiesPanel** - Collapsible properties panel
+6. **RequestBar** - Method, URL, and Send button
+7. **RequestTabs** - Request configuration tabs
+8. **ResponseTabs** - Response display tabs
+9. **HookStagesPanel** - Hook execution viewer
+10. **ResponseViewer** - Response display panel
+11. **CollapsiblePanel** - Reusable collapsible wrapper
+12. **ConnectionStatus** - WebSocket status indicator
+13. **JsonDisplay** - JSON renderer with diff support
+14. **Toggle** - Reusable toggle switch component
+
 ### App.tsx (Main Container)
 
 Manages global state and orchestrates all components:
@@ -76,23 +152,40 @@ Manages global state and orchestrates all components:
 
 ```typescript
 const App = () => {
-  const { wasmState, loading, error, loadWasm } = useWasm();
-  const [method, setMethod] = useState("POST");
-  const [url, setUrl] = useState("https://cdn-origin-4732724.fastedge.cdn.gc.onl/");
-  const [requestHeaders, setRequestHeaders] = useState<Record<string, string>>({});
-  const [requestBody, setRequestBody] = useState(...);
-  const [properties, setProperties] = useState<Record<string, string>>(...);
-  const [logLevel, setLogLevel] = useState(0); // Trace
-  const [results, setResults] = useState<Record<string, HookResult>>({});
-  const [finalResponse, setFinalResponse] = useState<FinalResponse | null>(null);
+  // Zustand store - all state centralized
+  const {
+    // Request state
+    method, url, requestHeaders, requestBody,
+    responseHeaders, responseBody,
+    setMethod, setUrl, setRequestHeaders, setRequestBody,
+
+    // WASM state
+    wasmPath, wasmFile, loading, error,
+    loadWasm, reloadWasm,
+
+    // Results state
+    hookResults, finalResponse,
+    setHookResults, setFinalResponse,
+
+    // Config state
+    properties, dotenvEnabled, logLevel,
+    setProperties, setDotenvEnabled, setLogLevel,
+    loadFromConfig, exportConfig,
+
+    // UI state
+    wsStatus, setWsStatus,
+  } = useAppStore();
+
+  // WebSocket connection
+  const { status } = useWebSocket({...});
 
   return (
     <div className="container">
-      <WasmLoader onFileLoad={loadWasm} loading={loading} />
+      <WasmLoader onFileLoad={(file) => loadWasm(file, dotenvEnabled)} />
       <RequestBar
         method={method}
         url={url}
-        wasmLoaded={wasmState.wasmPath !== null}
+        wasmLoaded={wasmPath !== null}
         onMethodChange={setMethod}
         onUrlChange={setUrl}
         onSend={async () => {
@@ -105,7 +198,7 @@ const App = () => {
             method,
             { ...hookCall, request_headers: finalHeaders, logLevel }
           );
-          setResults(hookResults);
+          setHookResults(hookResults);
           setFinalResponse(finalResponse);
         }}
       />
@@ -133,7 +226,7 @@ const App = () => {
         onPropertiesChange={setProperties}
       />
       <HookStagesPanel
-        results={results}
+        results={hookResults}
         hookCall={hookCall}
         logLevel={logLevel}
         onLogLevelChange={setLogLevel}
@@ -743,14 +836,131 @@ Top navigation bar with integrated styling:
 - Disabled when WASM not loaded
 - Custom styling removes orange focus borders
 
+## Custom Hooks
+
+### useWasm.ts
+
+WASM functionality is now integrated into the Zustand WASM store slice.
+
+Located at: `frontend/src/stores/slices/wasmSlice.ts`
+
+```typescript
+export const createWasmSlice: StateCreator<AppStore, [['zustand/immer', never]], [], WasmSlice> =
+  (set, get) => ({
+    wasmPath: null,
+    wasmBuffer: null,
+    wasmFile: null,
+    loading: false,
+    error: null,
+
+    loadWasm: async (file: File, dotenvEnabled: boolean = true) => {
+      set(state => { state.loading = true; state.error = null; });
+      try {
+        await uploadWasm(file, dotenvEnabled);
+        const buffer = await file.arrayBuffer();
+        set(state => {
+          state.wasmPath = file.name;
+          state.wasmBuffer = buffer;
+          state.wasmFile = file;
+          state.loading = false;
+        });
+      } catch (err) {
+        set(state => {
+          state.error = err instanceof Error ? err.message : "Failed to load WASM";
+          state.loading = false;
+        });
+      }
+    },
+
+    reloadWasm: async (dotenvEnabled: boolean = true) => {
+      const { wasmFile } = get();
+      if (!wasmFile) {
+        set(state => { state.error = "No WASM file loaded to reload"; });
+        return;
+      }
+      await get().loadWasm(wasmFile, dotenvEnabled);
+    },
+
+    clearWasm: () => set(state => {
+      state.wasmPath = null;
+      state.wasmBuffer = null;
+      state.wasmFile = null;
+      state.loading = false;
+      state.error = null;
+    }),
+  });
+```
+
+**Key Features:**
+- Stores original file for reloading
+- `reloadWasm()` function to re-upload without file picker
+- Support for dotenv toggle (environment variable injection)
+- Error handling and loading states
+- Integrated into centralized Zustand store
+
+### useWebSocket.ts
+
+WebSocket connection management with auto-reconnect (314 lines). See [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) for details.
+
 ## State Management
 
-State is managed using React hooks:
+State is managed using **Zustand** with a modular slices pattern:
 
-- **useState**: Local component state
-- **useWasm**: Custom hook for WASM file handling
+### Architecture
 
-No external state management library (Redux, Zustand, etc.) - kept simple with prop drilling.
+**5 Store Slices:**
+1. **Request Slice** - HTTP request/response configuration (persisted)
+2. **WASM Slice** - Binary loading and state (ephemeral)
+3. **Results Slice** - Hook execution results (ephemeral)
+4. **Config Slice** - Properties, settings, auto-save (persisted)
+5. **UI Slice** - UI state, tabs, panels (partially persisted)
+
+**Store Location:** `frontend/src/stores/`
+
+### Middleware Stack
+
+- **Immer**: Safe mutable updates with immutability guarantees
+- **Persist**: Auto-save to localStorage with 500ms debounce
+- **DevTools**: Redux DevTools integration for debugging
+
+### Auto-Save System
+
+Configuration automatically persists to localStorage:
+- **Persisted**: Request config, properties, settings, UI preferences
+- **Ephemeral**: WASM state, results, loading states, errors
+
+**Storage Key:** `proxy-runner-config`
+**Debounce:** 500ms delay to prevent excessive writes
+
+### Usage in Components
+
+```typescript
+// Selective subscription (optimal performance)
+const method = useAppStore(state => state.method);
+const setMethod = useAppStore(state => state.setMethod);
+
+// Multiple values
+const { method, url, setMethod, setUrl } = useAppStore();
+
+// Entire store (use sparingly)
+const store = useAppStore();
+```
+
+### Testing
+
+Store logic is fully tested with 176 tests:
+- All actions validated
+- Persistence behavior verified
+- Async operations tested
+- 90%+ coverage on all slices
+
+See [STATE_MANAGEMENT.md](./STATE_MANAGEMENT.md) for complete documentation.
+
+### Related Documentation
+
+- [STATE_MANAGEMENT.md](./STATE_MANAGEMENT.md) - Complete Zustand implementation guide
+- [TEST_PATTERNS.md](./TEST_PATTERNS.md) - Testing patterns including store tests
+- [CHANGELOG.md](./CHANGELOG.md) - Full migration details (Feb 6, 2026 entry)
 
 ## API Layer
 
@@ -1183,15 +1393,19 @@ await sendFullFlow(url, method, { ...hookCall, request_headers: finalHeaders });
 
 ## Styling
 
-Simple CSS in `App.css`:
+**CSS Modules Migration Complete** (February 6, 2026):
 
-- Container with max-width
-- Section spacing
-- Form elements styling
-- Button styles with hover states
-- Grid layout for hooks panel
-- Pre-formatted output display
-- Error messages in red
+- All 14 components migrated from global CSS to CSS modules
+- Component-scoped styling with `.module.css` files
+- No naming conflicts or global pollution
+- Consistent folder structure across all components
+- `App.css` retained for global layout and connection status styles
+
+**Benefits:**
+- Scoped class names prevent conflicts
+- Better maintainability and modularity
+- Type-safe imports: `import styles from "./Component.module.css"`
+- Clear ownership: styles live with their components
 
 No CSS framework (Bootstrap, Tailwind, etc.) - kept minimal and custom.
 
@@ -1258,12 +1472,12 @@ pnpm start
 
 ### Potential Improvements
 
-1. **State Management**: Add Zustand for complex state
-2. **Testing**: Add Vitest for unit tests
-3. **Styling**: Consider Tailwind CSS or styled-components
-4. **Validation**: Add Zod for runtime type validation
-5. **Error Handling**: Add React Error Boundaries
-6. **Persistence**: Save test configurations to localStorage
+1. ~~**State Management**: Add Zustand for complex state~~ ✅ **COMPLETED** (Feb 6, 2026)
+2. ~~**Testing**: Add Vitest for unit tests~~ ✅ **COMPLETED** (Feb 6, 2026)
+3. ~~**Persistence**: Save test configurations to localStorage~~ ✅ **COMPLETED** (Feb 6, 2026)
+4. **Styling**: Consider Tailwind CSS or styled-components
+5. **Validation**: Add Zod for runtime type validation
+6. **Error Handling**: Add React Error Boundaries
 7. **Import/Export**: Save/load test scenarios as JSON
 8. **Code Splitting**: Lazy load components
 9. **Accessibility**: Improve ARIA labels and keyboard navigation
@@ -1283,4 +1497,4 @@ pnpm start
 - **JSON prettification**: Automatic formatting for JSON bodies based on content-type header
 - **Three-tab interface**: Logs (execution output), Inputs (before WASM), Outputs (after WASM)
 
-Last Updated: January 30, 2026
+Last Updated: February 6, 2026 (Zustand state management implemented)

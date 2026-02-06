@@ -34,7 +34,8 @@ Load a WASM binary before testing.
 
 ```json
 {
-  "wasmBase64": "AGFzbQEAAAA..." // Base64-encoded WASM binary
+  "wasmBase64": "AGFzbQEAAAA...", // Base64-encoded WASM binary
+  "dotenvEnabled": true // Optional - default true. Load .env files for secrets/dictionary
 }
 ```
 
@@ -45,6 +46,8 @@ Load a WASM binary before testing.
   "ok": true
 }
 ```
+
+**Note:** When `dotenvEnabled` is true (default), the server automatically loads secrets from `.env.secrets` and dictionary values from `.env.variables` files in the project root. See [DOTENV.md](./DOTENV.md) for details.
 
 **Example:**
 
@@ -595,4 +598,4 @@ The API is simple:
 
 The UI automatically reflects your activity, making debugging and monitoring easy for human developers.
 
-Last Updated: January 31, 2026
+Last Updated: February 6, 2026

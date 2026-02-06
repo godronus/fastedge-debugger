@@ -1,6 +1,88 @@
-# Testing the Change-Header WASM - Quick Start Guide
+# Testing Guide
 
-## Current Setup
+## Automated Testing
+
+This project uses [Vitest](https://vitest.dev/) as the test framework along with [Testing Library](https://testing-library.com/) for component testing. The test suite is split between backend (Node.js) and frontend (React) tests with separate configurations and coverage tracking.
+
+### Test Infrastructure
+
+- **Test Framework**: Vitest
+- **Component Testing**: React Testing Library + jsdom
+- **Backend Testing**: Vitest with Node environment
+- **Mocking**: Vitest's built-in mocking system (`vi.mock()`, `vi.fn()`)
+- **Coverage**: V8 provider with text, JSON, and HTML reporters
+
+### Running Tests
+
+```bash
+# Run all tests (backend + frontend)
+pnpm test
+
+# Run backend tests only
+pnpm test:backend
+
+# Run frontend tests only
+pnpm test:frontend
+
+# Watch mode (re-run on file changes)
+vitest watch                    # All tests
+vitest watch server/**/*.test.ts  # Backend only
+cd frontend && vitest watch      # Frontend only
+
+# Coverage report
+vitest run --coverage           # All tests with coverage
+cd frontend && vitest run --coverage  # Frontend coverage only
+
+# UI mode (interactive test runner)
+vitest --ui                     # Visual test interface
+```
+
+### Test Organization
+
+```
+proxy-runner/
+├── server/                     # Backend tests
+│   ├── runner/
+│   │   ├── HeaderManager.test.ts      (39 tests)
+│   │   └── PropertyResolver.test.ts   (95 tests)
+│   └── utils/
+│       └── dotenv-loader.test.ts      (64 tests)
+├── frontend/
+│   └── src/
+│       ├── components/
+│       │   ├── Toggle/Toggle.test.tsx          (24 tests)
+│       │   ├── DictionaryInput/DictionaryInput.test.tsx  (51 tests)
+│       │   └── CollapsiblePanel/CollapsiblePanel.test.tsx (23 tests)
+│       ├── hooks/
+│       │   └── useWasm.test.ts        (29 tests)
+│       └── utils/
+│           ├── contentType.test.ts    (24 tests)
+│           └── diff.test.ts           (39 tests)
+└── vitest.config.ts           # Backend config
+    frontend/vitest.config.ts  # Frontend config
+```
+
+**Total: 388 tests across backend and frontend**
+
+### Test Patterns and Best Practices
+
+See [TEST_PATTERNS.md](./TEST_PATTERNS.md) for detailed testing patterns, examples, and best practices.
+
+### Test Coverage
+
+Coverage reports are generated in:
+- Backend: `coverage/` (root directory)
+- Frontend: `frontend/coverage/`
+
+View HTML reports by opening:
+- `coverage/index.html`
+- `frontend/coverage/index.html`
+
+---
+
+## Manual Testing - Change-Header WASM Quick Start
+
+### Current Setup
 
 You have the `cdn_header_change.wasm` binary in your `/wasm` folder and a test configuration system ready to use.
 
@@ -15,7 +97,8 @@ pnpm dev:backend
 # Terminal 2: Frontend dev server
 pnpm dev:frontend
 
-# Access at: http://localhost:5173
+# Access at: http://localhost:5173 (frontend dev server)
+# Backend runs on: http://localhost:5179
 ```
 
 ### Option B: Production Mode
@@ -39,14 +122,15 @@ pnpm start
 
 ### Configure Test Settings
 
-The default config in `test-config.json` is already set up for the change-header WASM:
+The default config in `test-config.json` is set up for the change-header WASM:
 
 - **Method**: POST
-- **URL**: https://cdn-origin-4732724.fastedge.cdn.gc.onl/
-- **Headers**:
+- **URL**: https://www.godronus.xyz/200
+- **Headers**: (commented out by default - uncomment to test body injection)
   - `x-inject-req-body`: Injected WASM value onRequestBody
   - `x-inject-res-body`: Injected WASM value onResponseBody
 - **Body**: `{"message": "Hello"}`
+- **Properties**: Includes geo properties (country: LU, city: Luxembourg, etc.)
 - **Log Level**: 0 (Trace - shows all logs)
 
 ### Load Configuration
@@ -166,10 +250,10 @@ In the Response Panel, look at the Body tab:
 
 ### 5. Check Final Response
 
-The target URL (https://cdn-origin-4732724.fastedge.cdn.gc.onl/) will echo back what it received:
+The target URL (https://www.godronus.xyz/200) returns status 200 responses:
 
 - Should show request headers including injected `x-custom-request`
-- Should show request body with injected field
+- Should show request body with injected field (if x-inject-req-body header was enabled)
 
 ## Common Issues
 
@@ -262,3 +346,5 @@ If something isn't working:
 3. Verify WebSocket connection status
 4. Use log level 0 (Trace) to see all debug output
 5. Check the Response Panel for actual vs expected results
+
+Last Updated: February 6, 2026

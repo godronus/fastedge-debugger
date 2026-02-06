@@ -8,8 +8,8 @@
     "method": "POST",
     "url": "https://www.godronus.xyz/200",
     "headers": {
-      "x-inject-req-body": "Injected WASM value onRequestBody",
-      "x-inject-res-body": "Injected WASM value onResponseBody"
+      // "x-inject-req-body": "Injected WASM value onRequestBody",
+      // "x-inject-res-body": "Injected WASM value onResponseBody"
     },
     "body": "{\"message\": \"Hello\"}"
   },
