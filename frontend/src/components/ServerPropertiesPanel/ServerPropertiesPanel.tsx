@@ -22,16 +22,14 @@ export function ServerPropertiesPanel({
       defaultExpanded={false}
       headerExtra={
         <div
-          className={styles.toggleContainer}
+          className={styles.toggleContainerRight}
           onClick={(e) => e.stopPropagation()} // Prevent collapse when clicking toggle
         >
           <Toggle
             checked={dotenvEnabled}
             onChange={onDotenvToggle}
             label="Load .env files"
-            style={{
-              fontWeight: dotenvEnabled ? "600" : "normal",
-            }}
+            compact={true}
           />
         </div>
       }

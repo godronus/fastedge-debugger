@@ -25,6 +25,12 @@
   color: #e0e0e0;
 }
 
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 60px; /* Gap between toggle and arrow */
+}
+
 .arrow {
   font-size: 12px;
   color: #b0b0b0;

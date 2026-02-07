@@ -7,6 +7,7 @@ interface ToggleProps {
   label?: string;
   disabled?: boolean;
   style?: CSSProperties;
+  compact?: boolean;
 }
 
 export function Toggle({
@@ -15,9 +16,10 @@ export function Toggle({
   label,
   disabled = false,
   style,
+  compact = false,
 }: ToggleProps) {
-  const toggleLabelClass = `${styles.toggleLabel} ${disabled ? styles.disabled : ""}`;
-  const toggleSwitchClass = `${styles.toggleSwitch} ${checked ? styles.checked : ""} ${disabled ? styles.disabled : ""}`;
+  const toggleLabelClass = `${styles.toggleLabel} ${disabled ? styles.disabled : ""} ${compact ? styles.compact : ""}`;
+  const toggleSwitchClass = `${styles.toggleSwitch} ${checked ? styles.checked : ""} ${disabled ? styles.disabled : ""} ${compact ? styles.compact : ""}`;
 
   return (
     <label className={toggleLabelClass} style={style}>

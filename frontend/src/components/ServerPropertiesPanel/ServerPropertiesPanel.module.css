@@ -5,6 +5,12 @@
   font-size: 14px;
 }
 
+.toggleContainerRight {
+  display: flex;
+  align-items: center;
+  padding-top: 2px; /* Fine-tune vertical alignment */
+}
+
 .activeIndicator {
   color: #4ade80;
   font-size: 12px;

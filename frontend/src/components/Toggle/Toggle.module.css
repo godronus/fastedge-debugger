@@ -48,3 +48,31 @@
 .toggleLabel span {
   font-size: 14px;
 }
+
+/* Compact variant for smaller toggle */
+.toggleLabel.compact {
+  gap: 6px;
+}
+
+.toggleLabel.compact span {
+  font-size: 11px;
+  color: #b0b0b0;
+  line-height: 1;
+}
+
+.toggleSwitch.compact {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+}
+
+.toggleSwitch.compact .toggleSlider {
+  width: 14px;
+  height: 14px;
+  top: 2px;
+  left: 2px;
+}
+
+.toggleSwitch.compact.checked .toggleSlider {
+  left: 16px;
+}

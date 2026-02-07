@@ -21,11 +21,11 @@ export function CollapsiblePanel({
   return (
     <div className={styles.panel}>
       <div className={styles.header} onClick={() => setIsExpanded(!isExpanded)}>
-        <div className={styles.titleContainer}>
-          <h3 className={styles.title}>{title}</h3>
+        <h3 className={styles.title}>{title}</h3>
+        <div className={styles.headerRight}>
           {headerExtra}
+          <span className={arrowClass}>▼</span>
         </div>
-        <span className={arrowClass}>▼</span>
       </div>
 
       {isExpanded && <div className={styles.content}>{children}</div>}
