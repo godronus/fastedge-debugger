@@ -1,5 +1,12 @@
 import { WASI } from "node:wasi";
 import type { HookCall, HookResult, HeaderMap, FullFlowResult } from "./types";
+import type {
+  IWasmRunner,
+  WasmType,
+  RunnerConfig,
+  HttpRequest,
+  HttpResponse,
+} from "./IWasmRunner.js";
 import { MemoryManager } from "./MemoryManager";
 import { HeaderManager } from "./HeaderManager";
 import { PropertyResolver } from "./PropertyResolver";
@@ -15,7 +22,7 @@ import { loadDotenvFiles } from "../utils/dotenv-loader.js";
 
 const textEncoder = new TextEncoder();
 
-export class ProxyWasmRunner {
+export class ProxyWasmRunner implements IWasmRunner {
   private module: WebAssembly.Module | null = null; // Compiled module (reused)
   private instance: WebAssembly.Instance | null = null; // Current instance (transient per hook)
   private memory: MemoryManager;
@@ -126,7 +133,12 @@ export class ProxyWasmRunner {
     }
   }
 
-  async load(buffer: Buffer): Promise<void> {
+  async load(buffer: Buffer, config?: RunnerConfig): Promise<void> {
+    // Update config if provided
+    if (config?.dotenvEnabled !== undefined) {
+      this.dotenvEnabled = config.dotenvEnabled;
+    }
+
     this.resetState();
 
     // Compile once and store the module (expensive operation)
@@ -149,7 +161,10 @@ export class ProxyWasmRunner {
     await this.loadDotenvIfEnabled();
   }
 
-  async callFullFlow(
+  /**
+   * Original callFullFlow signature for backward compatibility
+   */
+  async callFullFlowLegacy(
     call: HookCall,
     targetUrl: string,
   ): Promise<FullFlowResult> {
@@ -454,8 +469,8 @@ export class ProxyWasmRunner {
 
       if (error instanceof Error) {
         errorMessage = error.message;
-        if (error.cause) {
-          errorDetails = ` (cause: ${String(error.cause)})`;
+        if ((error as any).cause) {
+          errorDetails = ` (cause: ${String((error as any).cause)})`;
         }
       } else {
         errorMessage = String(error);
@@ -904,6 +919,66 @@ export class ProxyWasmRunner {
     const entry = { level: 0, message: `debug: ${message}` };
     this.logs.push(entry);
     console.warn(entry.message);
+  }
+
+  /**
+   * Interface-compliant callFullFlow method
+   */
+  async callFullFlow(
+    url: string,
+    method: string,
+    headers: Record<string, string>,
+    body: string,
+    responseHeaders: Record<string, string>,
+    responseBody: string,
+    responseStatus: number,
+    responseStatusText: string,
+    properties: Record<string, unknown>,
+    enforceProductionPropertyRules: boolean
+  ): Promise<FullFlowResult> {
+    // Convert to HookCall format and call legacy method
+    const call: HookCall = {
+      hook: "", // Not used in fullFlow
+      request: {
+        headers,
+        body,
+        method,
+      },
+      response: {
+        headers: responseHeaders,
+        body: responseBody,
+        status: responseStatus,
+        statusText: responseStatusText,
+      },
+      properties,
+      enforceProductionPropertyRules,
+    };
+
+    return this.callFullFlowLegacy(call, url);
+  }
+
+  /**
+   * Not supported for Proxy-WASM (HTTP WASM only)
+   */
+  async execute(request: HttpRequest): Promise<HttpResponse> {
+    throw new Error(
+      "execute() is not supported for Proxy-WASM. Use callHook() or callFullFlow() instead."
+    );
+  }
+
+  /**
+   * Clean up resources (no-op for Proxy-WASM, but required by interface)
+   */
+  async cleanup(): Promise<void> {
+    // Proxy-WASM doesn't maintain long-running processes
+    // State is reset on each load() call
+  }
+
+  /**
+   * Get runner type
+   */
+  getType(): WasmType {
+    return "proxy-wasm";
   }
 }
 

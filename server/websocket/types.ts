@@ -99,6 +99,24 @@ export interface PropertiesUpdatedEvent extends BaseEvent {
 }
 
 /**
+ * HTTP WASM request completed
+ */
+export interface HttpWasmRequestCompletedEvent extends BaseEvent {
+  type: "http_wasm_request_completed";
+  data: {
+    response: {
+      status: number;
+      statusText: string;
+      headers: Record<string, string>;
+      body: string;
+      contentType: string | null;
+      isBase64?: boolean;
+    };
+    logs: Array<{ level: number; message: string }>;
+  };
+}
+
+/**
  * Connection status
  */
 export interface ConnectionStatusEvent extends BaseEvent {
@@ -119,6 +137,7 @@ export type ServerEvent =
   | RequestCompletedEvent
   | RequestFailedEvent
   | PropertiesUpdatedEvent
+  | HttpWasmRequestCompletedEvent
   | ConnectionStatusEvent;
 
 /**

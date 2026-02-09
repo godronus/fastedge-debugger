@@ -16,6 +16,7 @@ import {
   RequestCompletedEvent,
   RequestFailedEvent,
   PropertiesUpdatedEvent,
+  HttpWasmRequestCompletedEvent,
 } from "./types.js";
 
 export class StateManager {
@@ -163,6 +164,30 @@ export class StateManager {
       "properties_updated",
       source,
       { properties },
+    );
+
+    this.broadcast(event);
+  }
+
+  /**
+   * Emit HTTP WASM request completed event
+   */
+  public emitHttpWasmRequestCompleted(
+    response: {
+      status: number;
+      statusText: string;
+      headers: Record<string, string>;
+      body: string;
+      contentType: string | null;
+      isBase64?: boolean;
+    },
+    logs: Array<{ level: number; message: string }>,
+    source: EventSource = "system",
+  ): void {
+    const event = createEvent<HttpWasmRequestCompletedEvent>(
+      "http_wasm_request_completed",
+      source,
+      { response, logs },
     );
 
     this.broadcast(event);

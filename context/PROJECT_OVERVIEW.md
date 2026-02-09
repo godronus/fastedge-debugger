@@ -6,10 +6,11 @@
 
 ## Project Goal
 
-Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run on FastEdge. The runner allows developers to:
+Build a Postman-like test runner for debugging WASM binaries that run on FastEdge. The runner supports both **Proxy-WASM (CDN apps)** and **HTTP WASM (component model)**, allowing developers to:
 
-- Load proxy-wasm WASM binaries compiled from AssemblyScript
-- Send simulated HTTP requests through the proxy-wasm hooks
+- Load proxy-wasm WASM binaries compiled from AssemblyScript (CDN apps)
+- Load HTTP WASM component model binaries with wasi-http interface
+- Send simulated HTTP requests through proxy-wasm hooks or directly to HTTP WASM
 - See debug output, logs, and state changes
 - Test binaries locally before deploying to production
 
@@ -39,15 +40,26 @@ Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run 
 
 ### ✅ Core Features Working
 
+**Proxy-WASM (CDN Apps):**
 - Load WASM binaries and execute all proxy-wasm hooks
 - Isolated hook execution (each hook gets fresh WASM instance)
 - Real HTTP requests with WASM-modified headers, body, and properties
 - Header serialization in G-Core SDK format
 - Complete property system with runtime calculation
+- FastEdge host functions (secrets, dictionaries, dotenv support)
+
+**HTTP WASM (Component Model):** ✨ NEW
+- Process-based runner using FastEdge-run CLI
+- Simple request/response execution (no hooks)
+- Port management (8100-8199 range)
+- Log capture from stdout/stderr
+- Dotenv support via FastEdge-run --dotenv flag
+
+**Shared Features:**
 - Log capture with client-side filtering (Trace/Debug/Info/Warn/Error/Critical)
 - WebSocket real-time synchronization across clients
 - Configuration save/load system (test-config.json)
-- FastEdge host functions (secrets, dictionaries, dotenv support)
+- Explicit WASM type selection (http-wasm vs proxy-wasm)
 - Postman-like UI with CSS Modules
 - Zustand state management with auto-save
 
@@ -113,6 +125,7 @@ PROXY_RUNNER_DEBUG=1 pnpm start
 - [STATE_MANAGEMENT.md](./architecture/STATE_MANAGEMENT.md) - Zustand patterns
 
 **Features:**
+- [HTTP_WASM_IMPLEMENTATION.md](./features/HTTP_WASM_IMPLEMENTATION.md) - HTTP WASM runner (NEW)
 - [WEBSOCKET_IMPLEMENTATION.md](./features/WEBSOCKET_IMPLEMENTATION.md) - Real-time sync
 - [FASTEDGE_IMPLEMENTATION.md](./features/FASTEDGE_IMPLEMENTATION.md) - FastEdge integration
 - [PROPERTY_IMPLEMENTATION_COMPLETE.md](./features/PROPERTY_IMPLEMENTATION_COMPLETE.md) - Property system

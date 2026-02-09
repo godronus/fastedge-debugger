@@ -7,10 +7,7 @@
     "moduleResolution": "Node",
     "noEmit": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": ["ES2020", "DOM"],
-    "types": ["@gcoredev/fastedge-sdk-js"]
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["./node_modules/@gcoredev/fastedge-sdk-js/types"],
   "exclude": ["node_modules"]
 }

@@ -34,6 +34,7 @@ This index helps you discover relevant documentation without reading thousands o
 
 **When to read**: Implementing, debugging, or modifying a specific feature
 
+- `features/HTTP_WASM_IMPLEMENTATION.md` (~400 lines) - ✅ HTTP WASM runner support, FastEdge-run CLI integration, process management
 - `WEBSOCKET_IMPLEMENTATION.md` (586 lines) - Real-time sync between clients, event broadcasting
 - `FASTEDGE_IMPLEMENTATION.md` (645 lines) - FastEdge CDN integration, secrets, env vars
 - `PROPERTY_IMPLEMENTATION_COMPLETE.md` (495 lines) - Property system, runtime calculation
@@ -115,6 +116,15 @@ This index helps you discover relevant documentation without reading thousands o
 2. Read `FASTEDGE_IMPLEMENTATION.md` (FastEdge context)
 3. Read `PRODUCTION_PARITY_HEADERS.md` if dealing with headers
 4. Grep for examples in codebase
+
+### Working with HTTP WASM (Component Model)
+1. Read `features/HTTP_WASM_IMPLEMENTATION.md` (HTTP WASM runner architecture)
+2. Read `BACKEND_ARCHITECTURE.md` (runner architecture section)
+3. Read `TESTING_GUIDE.md` if adding tests
+4. Run tests:
+   - `pnpm run test:integration` - All tests (CDN + HTTP in parallel)
+   - `pnpm run test:integration:http` - Only HTTP WASM tests (sequential)
+   - `pnpm run test:integration:cdn` - Only CDN tests (parallel)
 
 ### Testing Changes
 1. Read `TESTING_GUIDE.md` (how to test)

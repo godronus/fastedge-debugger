@@ -6,8 +6,9 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['server/__tests__/integration/**/*.test.ts'],
-    testTimeout: 10000, // Integration tests may take longer
-    hookTimeout: 10000,
+    fileParallelism: false, // Run test files sequentially (HTTP WASM tests spawn heavy processes with 12MB binaries)
+    testTimeout: 30000, // HTTP WASM tests spawn processes and need more time
+    hookTimeout: 30000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

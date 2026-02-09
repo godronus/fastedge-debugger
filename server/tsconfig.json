@@ -4,7 +4,8 @@
     "module": "CommonJS",
     "outDir": "../dist",
     "rootDir": ".",
-    "types": ["node"]
+    "types": ["node"],
+    "noEmit": false
   },
   "include": ["**/*.ts"],
   "exclude": ["**/*.test.ts", "**/__tests__/**"]

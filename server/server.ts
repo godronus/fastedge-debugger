@@ -2,7 +2,8 @@ import express, { type Request, type Response } from "express";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { createServer } from "node:http";
-import { ProxyWasmRunner } from "./runner/ProxyWasmRunner.js";
+import { WasmRunnerFactory } from "./runner/WasmRunnerFactory.js";
+import type { IWasmRunner } from "./runner/IWasmRunner.js";
 import { WebSocketManager, StateManager } from "./websocket/index.js";
 
 const app = express();
@@ -13,11 +14,9 @@ const debug = process.env.PROXY_RUNNER_DEBUG === "1";
 const wsManager = new WebSocketManager(httpServer, debug);
 const stateManager = new StateManager(wsManager, debug);
 
-// Initialize runner with dotenv enabled by default
-let runner = new ProxyWasmRunner(undefined, true);
-
-// Make state manager available to runner
-runner.setStateManager(stateManager);
+// Initialize runner factory
+const runnerFactory = new WasmRunnerFactory();
+let currentRunner: IWasmRunner | null = null;
 
 app.use(express.json({ limit: "20mb" }));
 app.use(express.static(path.join(__dirname, "frontend")));
@@ -26,27 +25,127 @@ app.post("/api/load", async (req: Request, res: Response) => {
   const {
     wasmBase64,
     dotenvEnabled = true,
+    wasmType,
   } = req.body ?? {};
+
+  // Validate required parameters
   if (!wasmBase64 || typeof wasmBase64 !== "string") {
     res.status(400).json({ error: "Missing wasmBase64" });
     return;
   }
+  if (!wasmType || !["http-wasm", "proxy-wasm"].includes(wasmType)) {
+    res.status(400).json({
+      error: "Invalid or missing wasmType (must be 'http-wasm' or 'proxy-wasm')",
+    });
+    return;
+  }
 
   try {
-    // Recreate runner with dotenvEnabled setting
-    // Production property rules are ALWAYS enforced for production parity
-    runner = new ProxyWasmRunner(undefined, dotenvEnabled);
-    runner.setStateManager(stateManager);
+    // Cleanup previous runner
+    if (currentRunner) {
+      await currentRunner.cleanup();
+    }
 
+    // Create appropriate runner
+    currentRunner = runnerFactory.createRunner(wasmType, dotenvEnabled);
+    currentRunner.setStateManager(stateManager);
+
+    // Load WASM
     const buffer = Buffer.from(wasmBase64, "base64");
-    await runner.load(buffer);
+    await currentRunner.load(buffer, { dotenvEnabled });
 
     // Emit WASM loaded event
     const source = (req.headers["x-source"] as any) || "ui";
     stateManager.emitWasmLoaded("binary.wasm", buffer.length, source);
 
-    res.json({ ok: true });
+    res.json({ ok: true, wasmType });
   } catch (error) {
+    res.status(500).json({ ok: false, error: String(error) });
+  }
+});
+
+app.post("/api/execute", async (req: Request, res: Response) => {
+  const { url, method, headers, body } = req.body ?? {};
+
+  if (!currentRunner) {
+    res.status(400).json({ error: "No WASM module loaded. Call /api/load first." });
+    return;
+  }
+
+  try {
+    if (currentRunner.getType() === "http-wasm") {
+      // HTTP WASM: Simple request/response
+      if (!url || typeof url !== "string") {
+        res.status(400).json({ error: "Missing url for HTTP WASM request" });
+        return;
+      }
+
+      const urlObj = new URL(url);
+      const result = await currentRunner.execute({
+        path: urlObj.pathname + urlObj.search,
+        method: method || "GET",
+        headers: headers || {},
+        body: body || "",
+      });
+
+      // Emit HTTP WASM request completed event
+      const source = (req.headers["x-source"] as any) || "ui";
+      stateManager.emitHttpWasmRequestCompleted(
+        {
+          status: result.status,
+          statusText: result.statusText,
+          headers: result.headers,
+          body: result.body,
+          contentType: result.contentType,
+          isBase64: result.isBase64,
+        },
+        result.logs,
+        source,
+      );
+
+      res.json({ ok: true, result });
+    } else {
+      // Proxy-wasm: Use existing callFullFlow
+      if (!url || typeof url !== "string") {
+        res.status(400).json({ error: "Missing url" });
+        return;
+      }
+
+      const { request, response, properties } = req.body ?? {};
+
+      const fullFlowResult = await currentRunner.callFullFlow(
+        url,
+        request?.method || "GET",
+        request?.headers || {},
+        request?.body || "",
+        response?.headers || {},
+        response?.body || "",
+        response?.status || 200,
+        response?.statusText || "OK",
+        properties || {},
+        true // enforceProductionPropertyRules
+      );
+
+      // Emit request completed event
+      const source = (req.headers["x-source"] as any) || "ui";
+      stateManager.emitRequestCompleted(
+        fullFlowResult.hookResults,
+        fullFlowResult.finalResponse,
+        fullFlowResult.calculatedProperties,
+        source,
+      );
+
+      res.json({ ok: true, ...fullFlowResult });
+    }
+  } catch (error) {
+    // Emit request failed event
+    const source = (req.headers["x-source"] as any) || "ui";
+    stateManager.emitRequestFailed(
+      "Request execution failed",
+      String(error),
+      source,
+    );
+
     res.status(500).json({ ok: false, error: String(error) });
   }
 });
@@ -58,9 +157,14 @@ app.post("/api/call", async (req: Request, res: Response) => {
     return;
   }
 
+  if (!currentRunner) {
+    res.status(400).json({ error: "No WASM module loaded. Call /api/load first." });
+    return;
+  }
+
   try {
     // Always capture all logs (trace level) - filtering happens client-side
-    const result = await runner.callHook({
+    const result = await currentRunner.callHook({
       hook,
       request: request ?? { headers: {}, body: "" },
       response: response ?? { headers: {}, body: "" },
@@ -81,17 +185,24 @@ app.post("/api/send", async (req: Request, res: Response) => {
     return;
   }
 
+  if (!currentRunner) {
+    res.status(400).json({ error: "No WASM module loaded. Call /api/load first." });
+    return;
+  }
+
   try {
     // Always capture all logs (trace level) - filtering happens client-side
-    const fullFlowResult = await runner.callFullFlow(
-      {
-        hook: "", // Not used in fullFlow
-        request: request ?? { headers: {}, body: "", method: "GET" },
-        response: response ?? { headers: {}, body: "" },
-        properties: properties ?? {},
-        logLevel: 0, // Always use Trace to capture all logs
-      },
+    const fullFlowResult = await currentRunner.callFullFlow(
       url,
+      request?.method || "GET",
+      request?.headers || {},
+      request?.body || "",
+      response?.headers || {},
+      response?.body || "",
+      response?.status || 200,
+      response?.statusText || "OK",
+      properties || {},
+      true // enforceProductionPropertyRules
     );
 
     // Emit request completed event
@@ -165,8 +276,11 @@ httpServer.listen(port, () => {
 });
 
 // Graceful shutdown
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
   console.log("SIGTERM received, closing server...");
+  if (currentRunner) {
+    await currentRunner.cleanup();
+  }
   wsManager.close();
   httpServer.close(() => {
     console.log("Server closed");
@@ -174,8 +288,11 @@ process.on("SIGTERM", () => {
   });
 });
 
-process.on("SIGINT", () => {
+process.on("SIGINT", async () => {
   console.log("SIGINT received, closing server...");
+  if (currentRunner) {
+    await currentRunner.cleanup();
+  }
   wsManager.close();
   httpServer.close(() => {
     console.log("Server closed");

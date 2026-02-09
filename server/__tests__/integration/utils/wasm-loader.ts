@@ -47,6 +47,20 @@ export async function loadCdnAppWasm(
 }
 
 /**
+ * Loads an HTTP app WASM binary from wasm/http-apps/{subCategory}/{filename}
+ *
+ * @param subCategory - The sub-category folder (e.g., 'sdk-examples')
+ * @param filename - The WASM filename (e.g., 'sdk-basic.wasm')
+ * @returns The WASM binary as a Uint8Array
+ */
+export async function loadHttpAppWasm(
+  subCategory: string,
+  filename: string
+): Promise<Uint8Array> {
+  return loadWasmBinary('http-apps', subCategory, filename);
+}
+
+/**
  * Paths to compiled test WASM binaries
  */
 export const WASM_TEST_BINARIES = {
@@ -62,6 +76,15 @@ export const WASM_TEST_BINARIES = {
       validResponseStatusRead: 'valid-response-status-read.wasm',
       invalidResponseStatusWrite: 'invalid-response-status-write.wasm',
       validNginxLogWrite: 'valid-nginx-log-write.wasm',
+    },
+  },
+  httpApps: {
+    sdkExamples: {
+      sdkBasic: 'sdk-basic.wasm',
+      sdkDownstreamFetch: 'sdk-downstream-fetch.wasm',
+      sdkDownstreamModifyResponse: 'sdk-downstream-modify-response.wasm',
+      sdkHeaders: 'sdk-headers.wasm',
+      sdkVariablesAndSecrets: 'sdk-variables-and-secrets.wasm',
     },
   },
 } as const;
