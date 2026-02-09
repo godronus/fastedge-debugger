@@ -339,14 +339,27 @@ export function HookStagesPanel({
             </div>
             <pre className={styles.logsContainer}>
               {filteredLogs.length > 0 ? (
-                filteredLogs.map((log, idx) => (
-                  <div key={idx} className={styles.logEntry}>
-                    <span className={styles.logLevel}>
-                      [{getLogLevelName(log.level)}]
-                    </span>
-                    {log.message}
-                  </div>
-                ))
+                filteredLogs.map((log, idx) => {
+                  // Detect property access violations
+                  const isAccessViolation = log.message.includes('[property access denied]');
+                  const logClasses = isAccessViolation
+                    ? `${styles.logEntry} ${styles.accessViolation}`
+                    : styles.logEntry;
+
+                  return (
+                    <div key={idx} className={logClasses}>
+                      {isAccessViolation && (
+                        <span className={styles.violationIcon} title="Property Access Violation">
+                          🚫
+                        </span>
+                      )}
+                      <span className={styles.logLevel}>
+                        [{getLogLevelName(log.level)}]
+                      </span>
+                      {log.message}
+                    </div>
+                  );
+                })
               ) : (
                 <div className={styles.noLogs}>
                   No logs at this level. Lower the log level to see more output.

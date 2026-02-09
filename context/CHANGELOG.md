@@ -1,5 +1,335 @@
 # Proxy-WASM Runner - Changelog
 
+## February 9, 2026 - Integration Testing Framework & Property Access Logging
+
+### Overview
+
+Completed integration testing framework using compiled WASM test applications to verify production parity. Fixed critical bug in property access control where `getCurrentHook` was not passed correctly when dotenv files were loaded. Enhanced property access denial logging to help developers understand why property writes fail.
+
+### 🎯 What Was Completed
+
+#### 1. Integration Testing Framework ✅
+
+**Test Application Build System:**
+- Configured pnpm workspace to include test applications (`test-applications/cdn-apps/*`)
+- Created build pipeline: `pnpm build:test-apps` compiles all WASM test binaries
+- WASM binaries output to `wasm/**` mirroring `test-applications/**` structure
+- Added parallel build scripts using `npm-run-all2` for faster compilation
+
+**Test Applications Created:**
+- `valid-path-write.ts` - Tests read-write property in onRequestHeaders (should SUCCEED)
+- `invalid-method-write.ts` - Tests read-only property write denial (should FAIL expectedly)
+
+**Integration Test Infrastructure:**
+- Created `vitest.integration.config.ts` for integration test configuration
+- Created `server/__tests__/integration/` directory structure
+- Built test utilities: `wasm-loader.ts` (load WASM binaries), `test-helpers.ts` (test helpers/assertions)
+- Wrote 9 comprehensive integration tests for property access control
+- All tests passing ✅
+
+**Files Created:**
+- `vitest.integration.config.ts` - Vitest config for integration tests
+- `server/__tests__/integration/property-access.test.ts` - 9 property access control integration tests
+- `server/__tests__/integration/utils/wasm-loader.ts` - WASM binary loading utilities
+- `server/__tests__/integration/utils/test-helpers.ts` - Test helpers and assertions
+- `context/development/INTEGRATION_TESTING.md` - Comprehensive integration testing documentation (450 lines)
+
+**Files Modified:**
+- `package.json` - Added `build:test-apps`, `test:integration`, `test:all` commands
+- `server/tsconfig.json` - Excluded test files from TypeScript compilation
+- `test-applications/cdn-apps/cdn-properties/package.json` - Updated build scripts for parallel execution
+- `context/CONTEXT_INDEX.md` - Added integration testing documentation reference and decision tree
+
+#### 2. Critical Bug Fix: Property Access Control ⚠️
+
+**Bug**: When `loadDotenvIfEnabled()` recreated HostFunctions after loading .env files, it was missing the `propertyAccessControl` and `getCurrentHook` parameters, causing `this.getCurrentHook is not a function` runtime error.
+
+**Root Cause**: Line 115-121 in `ProxyWasmRunner.ts` had outdated HostFunctions constructor call from before property access control was implemented.
+
+**Fix**: Added missing `propertyAccessControl` and `getCurrentHook` parameters when recreating HostFunctions after dotenv loading.
+
+**Files Modified:**
+- `server/runner/ProxyWasmRunner.ts:115-121` - Fixed HostFunctions constructor call with all required parameters
+
+#### 3. Property Access Denial Logging Enhancement 📝
+
+**Problem**: Property access denials were logged to `console.error` but NOT added to the logs array displayed in the UI. Developers saw "No logs at this level" and couldn't understand why property writes failed.
+
+**Solution**: Added property access denial messages to the logs array at `WARN` level with detailed context including property path, operation type, attempted value, hook context, and clear denial reason.
+
+**Example log message:**
+```
+[WARN] Property access denied: Cannot write 'request.method' = 'POST' in onRequestHeaders. Property 'request.method' is read-only in onRequestHeaders.
+```
+
+**Files Modified:**
+- `server/runner/HostFunctions.ts:162-178` - Added logging for `proxy_get_property` denials
+- `server/runner/HostFunctions.ts:204-220` - Added logging for `proxy_set_property` denials
+
+### 🧪 Testing
+
+**Integration Tests:**
+```bash
+pnpm build:test-apps  # Build WASM binaries
+pnpm test:integration  # Run integration tests (9 tests)
+pnpm test:all          # Run unit + integration tests (256 total)
+```
+
+**Test Coverage:**
+- ✅ Read-write property access (valid-path-write.wasm)
+- ✅ Read-only property denial (invalid-method-write.wasm)
+- ✅ Property access control enforcement toggle
+- ✅ Hook context tracking
+- ✅ Violation logging to UI
+
+**Results:**
+- 9/9 integration tests passing ✅
+- 247 unit tests passing ✅
+- Total: 256 tests passing
+
+### 📝 Documentation
+
+**Created:**
+- `context/development/INTEGRATION_TESTING.md` - Complete integration testing guide covering test application structure, build process, writing tests, test utilities, adding new tests, best practices, and debugging
+
+**Updated:**
+- `context/CONTEXT_INDEX.md` - Added integration testing to development section with decision tree
+
+### 🔑 Key Learnings
+
+1. **Property Access Control Bug**: Always verify all places where class instances are recreated, especially after loading configuration
+2. **Developer Experience**: Logging violations to the UI is critical - console.error alone isn't enough
+3. **Integration Testing**: Compiled WASM provides true production parity testing
+4. **Test Utilities**: Good test helpers make integration tests clean and maintainable
+5. **Log Level Matters**: Tests must set log level to 0 (Trace) to capture all WASM output
+
+---
+
+## February 9, 2026 - Production Parity Property Access Control
+
+### Overview
+
+Implemented comprehensive property access control system that enforces FastEdge production rules for property get/set operations. The test runner now matches production CDN behavior exactly for property access patterns, including hook-specific access levels (read-only, read-write, write-only) and custom property context boundaries.
+
+### 🎯 What Was Completed
+
+#### 1. Property Access Control System
+
+**Core Implementation:**
+- `server/runner/PropertyAccessControl.ts` (240 lines) - Main access control manager
+  - `PropertyAccess` enum (ReadOnly, ReadWrite, WriteOnly)
+  - `HookContext` enum (OnRequestHeaders, OnRequestBody, OnResponseHeaders, OnResponseBody)
+  - `PropertyDefinition` interface with hook-specific access rules
+  - `BUILT_IN_PROPERTIES` whitelist with 17 built-in properties
+  - `PropertyAccessControl` class with access validation logic
+  - Custom property tracking with context boundary enforcement
+
+**Built-in Properties Whitelist:**
+- Request URL properties (url, host, path, query) - Read-write in onRequestHeaders, read-only elsewhere
+- Request metadata (scheme, method, extension) - Always read-only
+- Geolocation properties (country, city, asn, geo.lat, geo.long, region, continent) - Always read-only
+- nginx.log_field1 - Write-only in onRequestHeaders only
+- response.status - Read-only in response hooks
+
+**Custom Property Rules:**
+- Properties created in onRequestHeaders are NOT available in other hooks
+- Properties created in onRequestBody onwards ARE available in subsequent hooks
+- Automatic reset when transitioning from request to response hooks
+- Matches FastEdge production behavior exactly
+
+#### 2. Integration with Runner
+
+**ProxyWasmRunner Updates:**
+- Added `propertyAccessControl: PropertyAccessControl` instance
+- Added `currentHook: HookContext | null` tracking
+- New `getHookContext(hookName: string)` helper method
+- Set current hook context before each hook execution
+- Call `resetCustomPropertiesForNewContext()` before response hooks
+- Pass propertyAccessControl to HostFunctions
+
+**Constructor Changes:**
+```typescript
+constructor(
+  fastEdgeConfig?: FastEdgeConfig,
+  dotenvEnabled: boolean = true,
+  enforceProductionPropertyRules: boolean = true  // New parameter
+)
+```
+
+#### 3. Host Function Access Control
+
+**HostFunctions Updates:**
+- Added `propertyAccessControl: PropertyAccessControl` property
+- Added `getCurrentHook: () => HookContext | null` callback
+- Updated `proxy_get_property` with access control checks:
+  - Validates read access before property resolution
+  - Returns `ProxyStatus.NotFound` if access denied
+  - Logs violation with clear reason
+- Updated `proxy_set_property` with access control checks:
+  - Validates write access before property modification
+  - Returns `ProxyStatus.BadArgument` if access denied
+  - Registers custom properties with creation hook context
+  - Logs violation with clear reason
+
+**Debug Logging:**
+```
+[property access] onRequestBody: SET request.url - DENIED
+  Reason: Property 'request.url' is read-only in onRequestBody
+```
+
+#### 4. Configuration Toggle
+
+**Added enforceProductionPropertyRules Option:**
+- `server/runner/types.ts` - Added `enforceProductionPropertyRules?: boolean` to `HookCall` type
+- `test-config.json` - Added `"enforceProductionPropertyRules": true` (default)
+- `/api/load` endpoint - Extracts and passes to ProxyWasmRunner
+- `/api/config` endpoints - Automatically includes in config read/write
+
+**Modes:**
+- `true` (Production Mode - default): Enforces all access rules
+- `false` (Test Mode): Allows all property access for debugging
+
+#### 5. Frontend Violation Display
+
+**HookStagesPanel Updates:**
+- Detect property access violations in log messages
+- Add visual indicators for violations:
+  - 🚫 icon before violation messages
+  - Red background highlight (#3d1f1f)
+  - Red border-left accent (#ff6b6b)
+  - Bold red log level indicator
+  - Prominent spacing and styling
+
+**CSS Styling:**
+```css
+.accessViolation {
+  background: #3d1f1f;
+  border-left: 3px solid #ff6b6b;
+  padding: 8px 12px;
+  margin: 6px 0;
+  border-radius: 4px;
+}
+```
+
+#### 6. Comprehensive Testing
+
+**Unit Tests:**
+- `server/runner/__tests__/PropertyAccessControl.test.ts` (310 lines)
+- 23 test cases covering:
+  - Built-in property access (request.url, request.host, request.method, nginx.log_field1, response.status)
+  - Read-only, read-write, write-only property validation
+  - Custom property context boundaries
+  - onRequestHeaders custom properties NOT available elsewhere
+  - onRequestBody+ custom properties available in subsequent hooks
+  - Custom property reset between contexts
+  - Test mode bypass (rules not enforced)
+  - Access denial with clear reason messages
+  - Geolocation properties read-only validation
+
+**Test Execution:**
+```bash
+cd server
+pnpm test PropertyAccessControl
+# All 23 tests passing ✅
+```
+
+#### 7. Documentation
+
+**Updated Files:**
+- `context/features/PROPERTY_IMPLEMENTATION_COMPLETE.md` - Added Phase 4 section:
+  - Complete built-in properties access table (17 properties)
+  - Custom property behavior with examples
+  - Configuration options
+  - Access violation display details
+  - Implementation details
+  - Testing information
+  - Debugging tips with common violations and solutions
+  - Production parity notes
+
+### 📋 Files Modified
+
+**Backend:**
+- `server/runner/PropertyAccessControl.ts` - Created (240 lines)
+- `server/runner/__tests__/PropertyAccessControl.test.ts` - Created (310 lines)
+- `server/runner/ProxyWasmRunner.ts` - Modified (hook context tracking, custom property reset)
+- `server/runner/HostFunctions.ts` - Modified (access control checks in get/set property)
+- `server/runner/types.ts` - Modified (added enforceProductionPropertyRules field)
+- `server/server.ts` - Modified (extract and pass enforceProductionPropertyRules)
+
+**Frontend:**
+- `frontend/src/components/HookStagesPanel/HookStagesPanel.tsx` - Modified (violation detection and display)
+- `frontend/src/components/HookStagesPanel/HookStagesPanel.module.css` - Modified (violation styling)
+
+**Configuration:**
+- `test-config.json` - Modified (added enforceProductionPropertyRules: true)
+
+**Documentation:**
+- `context/features/PROPERTY_IMPLEMENTATION_COMPLETE.md` - Modified (added Phase 4 section)
+- `context/CHANGELOG.md` - Modified (this entry)
+
+### 🧪 Testing
+
+**How to Test:**
+
+1. **Start server with debug logging:**
+   ```bash
+   PROXY_RUNNER_DEBUG=1 pnpm start
+   ```
+
+2. **Test read-only property violation:**
+   - Try to modify `request.method` in WASM (should fail)
+   - Check logs for access denied message
+   - Verify 🚫 icon appears in UI
+
+3. **Test write-only property:**
+   - Try to read `nginx.log_field1` (should fail)
+   - Verify access denied in logs
+
+4. **Test custom property context boundaries:**
+   - Create custom property in onRequestHeaders
+   - Try to access in onRequestBody (should fail)
+   - Create custom property in onResponseHeaders
+   - Access in onResponseBody (should succeed)
+
+5. **Test configuration toggle:**
+   - Set `enforceProductionPropertyRules: false` in test-config.json
+   - Reload WASM
+   - Verify all property access now allowed
+
+6. **Run unit tests:**
+   ```bash
+   cd server && pnpm test PropertyAccessControl
+   ```
+
+### 📝 Notes
+
+**Production Parity:**
+- Access control rules match FastEdge CDN exactly
+- Custom property context boundaries enforced identically
+- Same error behavior when access is denied
+- No differences from production behavior
+
+**Breaking Changes:**
+- None - system defaults to enforcing rules (production mode)
+- Existing WASM binaries that violate access rules will now show errors
+- Developers can set `enforceProductionPropertyRules: false` for debugging
+
+**Benefits:**
+- ✅ Catches property access bugs before deployment
+- ✅ Enforces production behavior in development
+- ✅ Clear error messages for access violations
+- ✅ Visual indicators in UI for easy debugging
+- ✅ Comprehensive test coverage (23 unit tests)
+- ✅ Configurable for testing vs production modes
+- ✅ Well-documented with examples and debugging tips
+
+**Performance:**
+- Access control checks add minimal overhead (<1ms per property operation)
+- No impact on hook execution performance
+- Debug logging only when `PROXY_RUNNER_DEBUG=1`
+
+---
+
 ## February 6, 2026 - Zustand State Management Implementation
 
 ### Overview

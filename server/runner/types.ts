@@ -16,7 +16,10 @@ export type HookCall = {
     statusText?: string;
   };
   properties: Record<string, unknown>;
-  logLevel?: number; // Optional log level filter (0=trace, 1=debug, 2=info, 3=warn, 4=error, 5=critical)  dotenvEnabled?: boolean;};
+  logLevel?: number; // Optional log level filter (0=trace, 1=debug, 2=info, 3=warn, 4=error, 5=critical)
+  dotenvEnabled?: boolean;
+  enforceProductionPropertyRules?: boolean; // Default: true - Enforce property access control rules
+};
 
 export type HookResult = {
   returnCode: number | null;

@@ -3,6 +3,7 @@ import { ProxyStatus, BufferType, MapType } from "./types";
 import { MemoryManager } from "./MemoryManager";
 import { HeaderManager } from "./HeaderManager";
 import { PropertyResolver } from "./PropertyResolver";
+import { PropertyAccessControl, HookContext } from "./PropertyAccessControl";
 import {
   SecretStore,
   Dictionary,
@@ -24,6 +25,8 @@ export enum LogLevel {
 export class HostFunctions {
   private memory: MemoryManager;
   private propertyResolver: PropertyResolver;
+  private propertyAccessControl: PropertyAccessControl;
+  private getCurrentHook: () => HookContext | null;
   private logs: LogEntry[] = [];
   private requestHeaders: HeaderMap = {};
   private responseHeaders: HeaderMap = {};
@@ -43,12 +46,16 @@ export class HostFunctions {
   constructor(
     memory: MemoryManager,
     propertyResolver: PropertyResolver,
+    propertyAccessControl: PropertyAccessControl,
+    getCurrentHook: () => HookContext | null,
     debug = false,
     secretStore?: SecretStore,
     dictionary?: Dictionary,
   ) {
     this.memory = memory;
     this.propertyResolver = propertyResolver;
+    this.propertyAccessControl = propertyAccessControl;
+    this.getCurrentHook = getCurrentHook;
     this.debug = debug;
     this.secretStore = secretStore ?? new SecretStore();
     this.dictionary = dictionary ?? new Dictionary();
@@ -151,6 +158,36 @@ export class HostFunctions {
       ) => {
         this.setLastHostCall(`proxy_get_property pathLen=${pathLen}`);
         const path = this.memory.readString(pathPtr, pathLen);
+
+        // Property access control check
+        const currentHook = this.getCurrentHook();
+        if (currentHook) {
+          const accessCheck = this.propertyAccessControl.canGetProperty(
+            path,
+            currentHook,
+          );
+
+          if (this.debug) {
+            console.log(
+              `[property access] ${currentHook}: GET ${path} - ${accessCheck.allowed ? "ALLOWED" : "DENIED"}`,
+            );
+            if (!accessCheck.allowed) {
+              console.log(`  Reason: ${accessCheck.reason}`);
+            }
+          }
+
+          if (!accessCheck.allowed) {
+            const denialMessage = `Property access denied: Cannot read '${path}' in ${currentHook}. ${accessCheck.reason}`;
+            // Only log to stderr in non-test environments (tests check this.logs instead)
+            if (!process.env.VITEST && process.env.NODE_ENV !== 'test') {
+              console.error(`[property access denied] ${accessCheck.reason}`);
+            }
+            this.logs.push({ level: LogLevel.Warn, message: denialMessage });
+            this.memory.writeStringResult("", valuePtrPtr, valueLenPtr);
+            return ProxyStatus.NotFound;
+          }
+        }
+
         const raw = this.propertyResolver.resolve(path);
         if (raw === undefined) {
           this.logDebug(`get_property miss: ${path}`);
@@ -173,6 +210,42 @@ export class HostFunctions {
         );
         const path = this.memory.readString(pathPtr, pathLen);
         const value = this.memory.readString(valuePtr, valueLen);
+
+        // Property access control check
+        const currentHook = this.getCurrentHook();
+        if (currentHook) {
+          const accessCheck = this.propertyAccessControl.canSetProperty(
+            path,
+            currentHook,
+          );
+
+          if (this.debug) {
+            console.log(
+              `[property access] ${currentHook}: SET ${path} - ${accessCheck.allowed ? "ALLOWED" : "DENIED"}`,
+            );
+            if (!accessCheck.allowed) {
+              console.log(`  Reason: ${accessCheck.reason}`);
+            }
+          }
+
+          if (!accessCheck.allowed) {
+            const denialMessage = `Property access denied: Cannot write '${path}' = '${value}' in ${currentHook}. ${accessCheck.reason}`;
+            // Only log to stderr in non-test environments (tests check this.logs instead)
+            if (!process.env.VITEST && process.env.NODE_ENV !== 'test') {
+              console.error(`[property access denied] ${accessCheck.reason}`);
+            }
+            this.logs.push({ level: LogLevel.Warn, message: denialMessage });
+            return ProxyStatus.BadArgument;
+          }
+
+          // Register custom property if it's not a built-in property
+          const valueBytes = this.memory.readBytes(valuePtr, valueLen);
+          this.propertyAccessControl.registerCustomProperty(
+            path,
+            valueBytes,
+            currentHook,
+          );
+        }
 
         // Update the property in the resolver
         this.propertyResolver.setProperty(path, value);

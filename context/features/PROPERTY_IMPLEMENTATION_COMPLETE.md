@@ -492,4 +492,210 @@ See [PROPERTY_TESTING.md](PROPERTY_TESTING.md) for comprehensive testing guide i
 
 ---
 
-**Status**: Full implementation complete with UI visibility, chaining, and URL reconstruction. Ready for testing! 🎉
+## Phase 4: Production Parity Property Access Control (February 9, 2026)
+
+### Overview
+
+Added comprehensive property access control system that enforces FastEdge production rules. This ensures the test runner accurately matches production CDN behavior for property access patterns.
+
+### Key Features
+
+1. **Hook-Specific Access Control**
+   - Built-in properties have different access levels per hook (read-only, read-write, write-only)
+   - Custom properties follow production context boundary rules
+   - Access violations are clearly logged and visible in UI
+
+2. **Built-in Property Rules**
+   - Request URL properties (url, host, path, query) are read-write in `onRequestHeaders`, read-only elsewhere
+   - Request metadata (scheme, method, extension, geo data) are always read-only
+   - `nginx.log_field1` is write-only in `onRequestHeaders` only
+   - `response.status` is read-only in response hooks
+
+3. **Custom Property Context Boundaries**
+   - Custom properties created in `onRequestHeaders` are **NOT** available in other hooks
+   - Custom properties created in `onRequestBody` onwards **ARE** available in subsequent hooks
+   - Matches production behavior exactly
+
+### Built-in Properties Access Table
+
+| Property Path          | Type    | onRequestHeaders | onRequestBody | onResponseHeaders | onResponseBody |
+| ---------------------- | ------- | ---------------- | ------------- | ----------------- | -------------- |
+| `request.url`          | String  | Read-write       | Read-only     | Read-only         | Read-only      |
+| `request.host`         | String  | Read-write       | Read-only     | Read-only         | Read-only      |
+| `request.path`         | String  | Read-write       | Read-only     | Read-only         | Read-only      |
+| `request.query`        | String  | Read-write       | Read-only     | Read-only         | Read-only      |
+| `request.scheme`       | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.method`       | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.extension`    | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.country`      | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.city`         | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.asn`          | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.geo.lat`      | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.geo.long`     | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.region`       | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.continent`    | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `request.country.name` | String  | Read-only        | Read-only     | Read-only         | Read-only      |
+| `nginx.log_field1`     | String  | Write-only       | Not accessible| Not accessible    | Not accessible |
+| `response.status`      | Integer | Not accessible   | Not accessible| Read-only         | Read-only      |
+
+### Custom Property Behavior
+
+#### Example: Markdown Processing
+
+```rust
+// In onResponseHeaders - Custom property created here
+fn on_response_headers() {
+    if content_type.starts_with("text/markdown") {
+        // Create custom property - available in onResponseBody
+        self.set_property(vec!["response.markdown"], Some(b"true"));
+    }
+}
+
+// In onResponseBody - Can access custom property from onResponseHeaders
+fn on_http_response_body(&mut self, body_size: usize, end_of_stream: bool) -> Action {
+    // Custom property IS available (created in onResponseHeaders)
+    if let Some(_) = self.get_property(vec!["response.markdown"]) {
+        // Process markdown to HTML
+    }
+}
+```
+
+#### Example: Request Headers Custom Property (NOT Available Later)
+
+```rust
+// In onRequestHeaders - Custom property created here
+fn on_request_headers() {
+    self.set_property(vec!["custom.trace_id"], Some(b"abc123"));
+    // Can access it in same hook
+    let trace = self.get_property(vec!["custom.trace_id"]); // ✅ Works
+}
+
+// In onRequestBody - CANNOT access custom property from onRequestHeaders
+fn on_request_body() {
+    // Custom property NOT available (created in onRequestHeaders)
+    let trace = self.get_property(vec!["custom.trace_id"]); // ❌ Returns None
+}
+```
+
+### Configuration
+
+The access control system can be configured via `test-config.json`:
+
+```json
+{
+  "enforceProductionPropertyRules": true  // Default: true
+}
+```
+
+**Modes:**
+- `true` (Production Mode): Enforces all access rules - matches FastEdge CDN behavior
+- `false` (Test Mode): Allows all property access - useful for debugging
+
+### Access Violation Display
+
+When a property access is denied:
+
+1. **Console Error Log:**
+   ```
+   [property access denied] Property 'request.method' is read-only in onRequestHeaders
+   ```
+
+2. **Debug Logging (when `PROXY_RUNNER_DEBUG=1`):**
+   ```
+   [property access] onRequestHeaders: SET request.method - DENIED
+     Reason: Property 'request.method' is read-only in onRequestHeaders
+   ```
+
+3. **Frontend UI:**
+   - Access violations appear in the Logs tab with:
+   - Red background highlight
+   - 🚫 icon indicator
+   - Clear error message
+   - Prominent visual styling
+
+### Implementation Details
+
+**Files Added/Modified:**
+
+- `server/runner/PropertyAccessControl.ts` - New access control system
+- `server/runner/PropertyAccessControl.test.ts` - Comprehensive unit tests (23 test cases)
+- `server/runner/ProxyWasmRunner.ts` - Hook context tracking and custom property reset
+- `server/runner/HostFunctions.ts` - Access control checks in get/set property
+- `server/runner/types.ts` - Added `enforceProductionPropertyRules` config field
+- `frontend/src/components/HookStagesPanel/HookStagesPanel.tsx` - Violation display
+- `frontend/src/components/HookStagesPanel/HookStagesPanel.module.css` - Violation styling
+- `test-config.json` - Added `enforceProductionPropertyRules` field
+
+**Key Classes:**
+
+- `PropertyAccessControl` - Main access control manager
+- `PropertyAccess` enum - ReadOnly, ReadWrite, WriteOnly
+- `HookContext` enum - OnRequestHeaders, OnRequestBody, OnResponseHeaders, OnResponseBody
+- `BUILT_IN_PROPERTIES` - Whitelist with access rules
+
+### Testing
+
+**Unit Tests (23 test cases):**
+- Built-in property access (read-only, read-write, write-only)
+- Custom property context boundaries
+- onRequestHeaders custom properties not available elsewhere
+- onRequestBody+ custom properties available in subsequent hooks
+- Test mode bypass (when rules not enforced)
+- Access denial with clear reasons
+
+**Run tests:**
+```bash
+cd server
+pnpm test PropertyAccessControl
+```
+
+### Debugging Tips
+
+**Enable debug logging:**
+```bash
+PROXY_RUNNER_DEBUG=1 pnpm start
+```
+
+**Common access violations:**
+
+1. **Trying to write read-only properties:**
+   ```
+   [property access denied] Property 'request.method' is read-only in onRequestHeaders
+   ```
+   **Solution:** Read-only properties cannot be modified. Use different properties.
+
+2. **Trying to read write-only properties:**
+   ```
+   [property access denied] Property 'nginx.log_field1' is write-only in onRequestHeaders
+   ```
+   **Solution:** Write-only properties (like logging fields) cannot be read back.
+
+3. **Accessing custom properties across context boundaries:**
+   ```
+   [property access denied] Custom property 'custom.trace_id' was created in onRequestHeaders and is not available in onRequestBody
+   ```
+   **Solution:** Create custom properties in `onRequestBody` or later hooks if you need them to persist.
+
+4. **Writing properties in wrong hooks:**
+   ```
+   [property access denied] Property 'request.url' is read-only in onRequestBody
+   ```
+   **Solution:** URL modification must happen in `onRequestHeaders`.
+
+### Production Parity Notes
+
+This implementation matches FastEdge CDN production behavior:
+
+- ✅ Property access rules match production exactly
+- ✅ Custom property context boundaries enforced
+- ✅ Same error behavior when access is denied
+- ✅ onRequestHeaders isolation from other hooks
+- ✅ Write-only logging properties
+- ✅ Read-only request metadata
+
+**Differences from production:**
+- None - access control is identical to FastEdge CDN
+
+---
+
+**Status**: Full implementation complete with UI visibility, chaining, URL reconstruction, and production parity property access control. Ready for testing! 🎉

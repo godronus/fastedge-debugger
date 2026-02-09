@@ -25,9 +25,10 @@ This index helps you discover relevant documentation without reading thousands o
 
 **When to read**: Adding modules, refactoring, structural changes, understanding system design
 
-- `BACKEND_ARCHITECTURE.md` (994 lines) - Server architecture, file organization, module responsibilities
-- `FRONTEND_ARCHITECTURE.md` (1,500 lines) - React components, state management, UI organization
-- `STATE_MANAGEMENT.md` (1,969 lines) - Zustand patterns, state sync, persistence
+- `architecture/BACKEND_ARCHITECTURE.md` (994 lines) - Server architecture, file organization, module responsibilities
+- `architecture/FRONTEND_ARCHITECTURE.md` (1,500 lines) - React components, state management, UI organization
+- `architecture/STATE_MANAGEMENT.md` (1,969 lines) - Zustand implementation, state sync, persistence
+- `architecture/ZUSTAND_ARCHITECTURE.md` (1,300 lines) - Zustand design document, slices pattern, architecture decisions
 
 ### ✨ Features (read when working on specific features)
 
@@ -49,6 +50,7 @@ This index helps you discover relevant documentation without reading thousands o
 
 - `IMPLEMENTATION_GUIDE.md` (1,102 lines) - Coding patterns, conventions, best practices
 - `TESTING_GUIDE.md` (350 lines) - How to test your changes
+- `development/INTEGRATION_TESTING.md` (450 lines) - ✅ Integration testing with compiled WASM applications
 - `TEST_PATTERNS.md` (825 lines) - Testing patterns and examples
 - `AI_AGENT_API_GUIDE.md` (601 lines) - API endpoint documentation
 - `COMPONENT_STYLING_PATTERN.md` (355 lines) - React component UI patterns
@@ -119,6 +121,12 @@ This index helps you discover relevant documentation without reading thousands o
 2. Read `TEST_PATTERNS.md` (testing patterns and examples)
 3. Read feature-specific doc for the feature you're testing
 
+### Working with Integration Tests
+1. Read `development/INTEGRATION_TESTING.md` (comprehensive integration testing guide)
+2. Read `TESTING_GUIDE.md` (overall testing approach)
+3. Read `TEST_PATTERNS.md` (testing patterns and conventions)
+4. Read relevant feature doc for what you're testing (e.g., `PROPERTY_IMPLEMENTATION_COMPLETE.md`)
+
 ### Working with Properties System
 1. Read `PROPERTY_IMPLEMENTATION_COMPLETE.md`
 2. Read `PROPERTY_TESTING.md` if testing
@@ -181,6 +189,7 @@ grep -n "## Section Name" context/IMPLEMENTATION_GUIDE.md
 - TESTING_GUIDE.md: ~350 lines
 - COMPONENT_STYLING_PATTERN.md: ~355 lines
 - PRODUCTION_PARITY_HEADERS.md: ~421 lines
+- development/INTEGRATION_TESTING.md: ~450 lines
 - PROPERTY_IMPLEMENTATION_COMPLETE.md: ~495 lines
 - WEBSOCKET_IMPLEMENTATION.md: ~586 lines
 - AI_AGENT_API_GUIDE.md: ~601 lines
@@ -190,6 +199,7 @@ grep -n "## Section Name" context/IMPLEMENTATION_GUIDE.md
 - TEST_PATTERNS.md: ~825 lines
 - BACKEND_ARCHITECTURE.md: ~994 lines
 - IMPLEMENTATION_GUIDE.md: ~1,102 lines
+- ZUSTAND_ARCHITECTURE.md: ~1,300 lines
 - FRONTEND_ARCHITECTURE.md: ~1,500 lines
 - STATE_MANAGEMENT.md: ~1,969 lines
 

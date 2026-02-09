@@ -1897,7 +1897,7 @@ const debouncedStorage = debounce(persist.createJSONStorage(() => localStorage),
 
 ## Related Documentation
 
-- [ZUSTAND_ARCHITECTURE.md](/home/gdoco/dev/playground/proxy-runner/ZUSTAND_ARCHITECTURE.md) - Original design document
+- [ZUSTAND_ARCHITECTURE.md](./ZUSTAND_ARCHITECTURE.md) - Original design document
 - [FRONTEND_ARCHITECTURE.md](/home/gdoco/dev/playground/proxy-runner/context/FRONTEND_ARCHITECTURE.md) - Overall frontend architecture
 - [TEST_PATTERNS.md](/home/gdoco/dev/playground/proxy-runner/context/TEST_PATTERNS.md) - Testing strategies
 - [IMPLEMENTATION_GUIDE.md](/home/gdoco/dev/playground/proxy-runner/context/IMPLEMENTATION_GUIDE.md) - Development workflows

@@ -1,0 +1,5 @@
+packages:
+  - test-applications/cdn-apps/*
+
+onlyBuiltDependencies:
+  - esbuild

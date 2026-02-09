@@ -4,6 +4,7 @@ import { MemoryManager } from "./MemoryManager";
 import { HeaderManager } from "./HeaderManager";
 import { PropertyResolver } from "./PropertyResolver";
 import { HostFunctions } from "./HostFunctions";
+import { PropertyAccessControl, HookContext } from "./PropertyAccessControl";
 import type { StateManager } from "../websocket/StateManager.js";
 import {
   SecretStore,
@@ -19,6 +20,8 @@ export class ProxyWasmRunner {
   private instance: WebAssembly.Instance | null = null; // Current instance (transient per hook)
   private memory: MemoryManager;
   private propertyResolver: PropertyResolver;
+  private propertyAccessControl: PropertyAccessControl;
+  private currentHook: HookContext | null = null;
   private hostFunctions: HostFunctions;
   private logs: { level: number; message: string }[] = [];
   private rootContextId = 1;
@@ -31,9 +34,13 @@ export class ProxyWasmRunner {
   private dictionary: Dictionary;
   private dotenvEnabled: boolean = true; // Default to enabled
 
-  constructor(fastEdgeConfig?: FastEdgeConfig, dotenvEnabled: boolean = true) {
+  constructor(
+    fastEdgeConfig?: FastEdgeConfig,
+    dotenvEnabled: boolean = true
+  ) {
     this.memory = new MemoryManager();
     this.propertyResolver = new PropertyResolver();
+    this.propertyAccessControl = new PropertyAccessControl();
     this.dotenvEnabled = dotenvEnabled;
 
     // Initialize FastEdge stores
@@ -43,6 +50,8 @@ export class ProxyWasmRunner {
     this.hostFunctions = new HostFunctions(
       this.memory,
       this.propertyResolver,
+      this.propertyAccessControl,
+      () => this.currentHook,
       this.debug,
       this.secretStore,
       this.dictionary,
@@ -105,6 +114,8 @@ export class ProxyWasmRunner {
       this.hostFunctions = new HostFunctions(
         this.memory,
         this.propertyResolver,
+        this.propertyAccessControl,
+        () => this.currentHook,
         this.debug,
         this.secretStore,
         this.dictionary,
@@ -363,6 +374,10 @@ export class ProxyWasmRunner {
         properties: propertiesAfterRequestBody,
       };
 
+      // Reset custom properties from onRequestHeaders before moving to response hooks
+      // (production behavior: custom properties created in onRequestHeaders are not available in response hooks)
+      this.propertyAccessControl.resetCustomPropertiesForNewContext();
+
       results.onResponseHeaders = await this.callHook({
         ...responseCall,
         hook: "onResponseHeaders",
@@ -494,6 +509,9 @@ export class ProxyWasmRunner {
     if (!this.module) {
       throw new Error("WASM module not loaded");
     }
+
+    // Set current hook context for property access control
+    this.currentHook = this.getHookContext(call.hook);
 
     // Create fresh instance for this hook call (isolated context)
     const imports = this.createImports();
@@ -810,7 +828,10 @@ export class ProxyWasmRunner {
                 nwritten: number,
               ) => number)
             | undefined;
-          if (typeof original === "function") {
+          // In test mode, suppress stdout/stderr to reduce noise
+          // Logs are still captured via proxy_log for test assertions
+          const isTestMode = process.env.VITEST || process.env.NODE_ENV === 'test';
+          if (typeof original === "function" && !isTestMode) {
             try {
               return original(fd, iovs, iovsLen, nwritten);
             } catch (error) {
@@ -856,6 +877,24 @@ export class ProxyWasmRunner {
       }
     }
     return null;
+  }
+
+  /**
+   * Map hook name to HookContext enum
+   */
+  private getHookContext(hookName: string): HookContext {
+    switch (hookName) {
+      case "onRequestHeaders":
+        return HookContext.OnRequestHeaders;
+      case "onRequestBody":
+        return HookContext.OnRequestBody;
+      case "onResponseHeaders":
+        return HookContext.OnResponseHeaders;
+      case "onResponseBody":
+        return HookContext.OnResponseBody;
+      default:
+        throw new Error(`Unknown hook name: ${hookName}`);
+    }
   }
 
   private logDebug(message: string): void {

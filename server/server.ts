@@ -23,7 +23,10 @@ app.use(express.json({ limit: "20mb" }));
 app.use(express.static(path.join(__dirname, "frontend")));
 
 app.post("/api/load", async (req: Request, res: Response) => {
-  const { wasmBase64, dotenvEnabled = true } = req.body ?? {};
+  const {
+    wasmBase64,
+    dotenvEnabled = true,
+  } = req.body ?? {};
   if (!wasmBase64 || typeof wasmBase64 !== "string") {
     res.status(400).json({ error: "Missing wasmBase64" });
     return;
@@ -31,6 +34,7 @@ app.post("/api/load", async (req: Request, res: Response) => {
 
   try {
     // Recreate runner with dotenvEnabled setting
+    // Production property rules are ALWAYS enforced for production parity
     runner = new ProxyWasmRunner(undefined, dotenvEnabled);
     runner.setStateManager(stateManager);
 
