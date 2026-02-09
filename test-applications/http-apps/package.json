@@ -1,0 +1,31 @@
+{
+  "name": "http_sdk_examples",
+  "version": "0.0.1",
+  "description": "FastEdge HTTP applications demonstrating SDK usage examples",
+  "scripts": {
+    "build": "npm-run-all -s clean build:all copy:wasm clean",
+    "build:all": "npm-run-all -p build:basic build:downstream-fetch build:downstream-modify-response build:headers build:variables-and-secrets",
+    "build:basic": "npx fastedge-build ./src/basic.js ./build/http_sdk_basic.wasm",
+    "build:downstream-fetch": "npx fastedge-build ./src/downstream-fetch.js ./build/http_sdk_downstream_fetch.wasm",
+    "build:downstream-modify-response": "npx fastedge-build ./src/downstream-modify-response.js ./build/http_sdk_downstream_modify_response.wasm",
+    "build:headers": "npx fastedge-build ./src/headers.js ./build/http_sdk_headers.wasm",
+    "build:variables-and-secrets": "npx fastedge-build ./src/variables-and-secrets.js ./build/http_sdk_variables_and_secrets.wasm",
+    "copy:wasm": "npm-run-all -p copy:basic copy:downstream-fetch copy:downstream-modify-response copy:headers copy:variables-and-secrets",
+    "copy:basic": "npx cross-env NAME=http_sdk_basic npm run mv:file",
+    "copy:downstream-fetch": "npx cross-env NAME=http_sdk_downstream_fetch npm run mv:file",
+    "copy:downstream-modify-response": "npx cross-env NAME=http_sdk_downstream_modify_response npm run mv:file",
+    "copy:headers": "npx cross-env NAME=http_sdk_headers npm run mv:file",
+    "copy:variables-and-secrets": "npx cross-env NAME=http_sdk_variables_and_secrets npm run mv:file",
+    "lint": "eslint src/",
+    "mv:file": "mv build/$NAME.wasm ../../../wasm/http/js/sdk_examples/$NAME.wasm",
+    "clean": "rm -rf build"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "keywords": [
+    "http",
+    "fastedge",
+    "sdk-examples"
+  ],
+  "license": "ISC"
+}
