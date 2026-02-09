@@ -1,5 +1,9 @@
 # Proxy-WASM Test Runner - Project Overview
 
+**📖 For detailed information, see [PROJECT_DETAILS.md](./PROJECT_DETAILS.md)**
+
+---
+
 ## Project Goal
 
 Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run on FastEdge. The runner allows developers to:
@@ -9,6 +13,8 @@ Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run 
 - See debug output, logs, and state changes
 - Test binaries locally before deploying to production
 
+---
+
 ## Production Context
 
 - **Production Environment**: nginx + custom wasmtime host
@@ -16,9 +22,9 @@ Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run 
 - **ABI**: Standard proxy-wasm ABI with specific format requirements for the G-Core SDK
 - **CDN Use Case**: Binaries run on FastEdge CDN for request/response manipulation
 
-## Architecture
+---
 
-### Tech Stack
+## Tech Stack
 
 - **Backend**: Node.js + Express + TypeScript 5.4.5
 - **Frontend**: React 19.2.3 + Vite 7.3.1 + TypeScript 5.4.5 + Zustand 5.0.11
@@ -27,150 +33,37 @@ Build a Postman-like test runner for debugging proxy-wasm CDN binaries that run 
 - **State Management**: Zustand 5.0.11 with Immer middleware and auto-save
 - **Port**: 5179 (configurable via PORT env var)
 
-### Project Structure
+---
 
-```
-server/                       # Backend code (formerly src/)
-  server.ts                   # Express server with /api/load, /api/call, /api/send, WebSocket
-  tsconfig.json              # Extends base tsconfig.json
-  runner/
-    ProxyWasmRunner.ts        # Main orchestrator (340 lines)
-    HostFunctions.ts          # Proxy-wasm host function implementations (413 lines)
-    HeaderManager.ts          # Header serialization/deserialization (66 lines)
-    MemoryManager.ts          # WASM memory operations (165 lines)
-    PropertyResolver.ts       # Property path resolution (160 lines)
-    types.ts                  # Shared TypeScript types (60 lines)
-  websocket/                  # WebSocket real-time synchronization (Jan 2026)
-    WebSocketManager.ts       # Connection management, client tracking (314 lines)
-    StateManager.ts           # Event coordination and broadcasting (153 lines)
-    types.ts                  # Event type definitions
-    index.ts                  # Module exports
-  fastedge-host/              # FastEdge-specific extensions (Feb 2026)
-    types.ts                  # FastEdge type definitions
-    SecretStore.ts            # Time-based secret rotation
-    Dictionary.ts             # Key-value configuration store
-    hostFunctions.ts          # Factory for FastEdge WASM host functions
-    index.ts                  # Module exports
+## Current Status
 
-frontend/                     # React + Vite frontend
-  src/
-    components/               # React components (CSS Modules - Feb 2026)
-      CollapsiblePanel/       # Reusable collapsible panel wrapper
-      ConnectionStatus/       # WebSocket connection status indicator
-      DictionaryInput/        # Key-value input with enable/disable checkboxes
-      HeadersEditor/          # Headers input component
-      HookStagesPanel/        # Hook execution logs and inputs viewer
-      JsonDisplay/            # JSON rendering with diff support
-      PropertiesEditor/       # JSON properties editor with country presets
-      RequestBar/             # Method selector, URL input, Send button
-      RequestTabs/            # Request headers/body tabs
-      ResponseTabs/           # Response tabs component
-      ResponseViewer/         # Response display with Body/Preview/Headers tabs
-      ServerPropertiesPanel/  # Server properties with dotenv toggle
-      Toggle/                 # Reusable toggle switch component
-      WasmLoader/             # File upload component
-    hooks/
-      useWasm.ts              # WASM loading with dotenv support
-      useWebSocket.ts         # WebSocket connection with auto-reconnect
-      websocket-types.ts      # Frontend event type definitions
-    stores/                   # Zustand state management (Feb 2026)
-      index.ts                # Main store with 5 slices
-      slices/                 # Modular state slices
-        requestSlice.ts       # Request state (method, URL, headers, body)
-        wasmSlice.ts          # WASM state (loaded file, dotenv toggle)
-        resultsSlice.ts       # Results state (hook execution data, logs)
-        configSlice.ts        # Config state (server properties, dictionaries)
-        uiSlice.ts            # UI state (active tabs, collapsed panels)
-    utils/
-      contentType.ts          # Auto content-type detection
-      diff.ts                 # JSON diff algorithms
-- [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
-- [x] Capture logs from `proxy_log` and `fd_write` (stdout) with log level filtering
-- [x] Log level filtering: Trace(0), Debug(1), Info(2), Warn(3), Error(4), Critical(5)
-  - **Server always returns all logs (Trace level)** - filtering happens client-side
-  - **Developer can change log level in UI without re-running request**
-  - Logs show level indicator and count of filtered/total logs
-- [x] Header serialization in G-Core SDK format
-- [x] Property resolution (request.method, request.path, request.url, request.host, response.code, etc.)
-- [x] Request metadata (headers, body, trailers)
-- [x] Response metadata (headers, body, trailers)
-- [x] "Run All Hooks" button for full request flow simulation
-- [x] React-based frontend with component architecture
-- [x] TypeScript type safety throughout (frontend + backend)
-- [x] Vite build system for fast development
-- [x] SPA routing with Express fallback
-- [x] **WebSocket real-time synchronization** (January 2026)
-  - Bi-directional communication between server and all clients
-  - Auto-reconnection with exponential backoff
-  - Visual connection status indicator
-  - Events: request_started, hook_executed, request_completed, wasm_loaded
-  - Multi-client support - all users see all activity
-  - AI agent integration - API requests visible in UI
-  - Optimized for instant connections (<100ms via 127.0.0.1)
-- [x] **Configuration Sharing System** (February 2026)
-  - Save/load test configurations via UI
-  - `test-config.json` file stores request settings, headers, properties
-  - AI agents can read config via GET `/api/config`
-  - Enables developer + AI collaboration workflow
-  - Version-controllable test scenarios
-  - See [CONFIG_SHARING.md](./CONFIG_SHARING.md) for details
-- [x] **Production Parity Headers** (February 2026)
-  - Browser default headers (user-agent, accept, accept-language, accept-encoding) as opt-in defaults
-  - Auto-injection of Host header from target URL (hostname or hostname:port)
-  - Auto-injection of proxy headers (x-forwarded-proto, x-forwarded-port, x-real-ip, x-forwarded-for)
-  - Editable request.x_real_ip property (default: 203.0.113.42 TEST-NET-3)
-  - Test-specific headers (x-inject-req-body, x-inject-res-body) moved to config files only
-  - Closer simulation of production CDN environment
-  - See [PRODUCTION_PARITY_HEADERS.md](./PRODUCTION_PARITY_HEADERS.md) for details
-- [x] **FastEdge Host Functions** (February 2026)
-  - Secret management with time-based rotation (`proxy_get_secret`, `proxy_get_effective_at_secret`)
-  - Dictionary/configuration store (`proxy_dictionary_get`)
-  - Production parity with G-Core FastEdge CDN runtime
-  - Dotenv file support (.env, .env.secrets, .env.variables)
-  - UI toggle for enabling/disabling dotenv loading
-  - Dotenv toggle triggers WASM reload (February 6, 2026)
-  - Prepared for wasi-http component model integration
-  - See [DOTENV.md](./DOTENV.md) for configuration details
-- [x] **CSS Modules Migration** (February 6, 2026)
-  - All 14 React components migrated to CSS Modules
-  - Folder-per-component structure with scoped styles
-  - Improved maintainability and developer experience
-  - No global CSS conflicts
-- [x] **Zustand State Management** (February 6, 2026)
-  - Centralized state management with 5 modular slices
-  - Auto-save to localStorage with 500ms debounce
-  - 176 comprehensive tests (90%+ coverage)
-  - Redux DevTools integration for debugging
-  - Replaced 14 useState hooks with single store
-  - See [STATE_MANAGEMENT.md](./STATE_MANAGEMENT.md) for details
+### ✅ Core Features Working
+
+- Load WASM binaries and execute all proxy-wasm hooks
+- Isolated hook execution (each hook gets fresh WASM instance)
+- Real HTTP requests with WASM-modified headers, body, and properties
+- Header serialization in G-Core SDK format
+- Complete property system with runtime calculation
+- Log capture with client-side filtering (Trace/Debug/Info/Warn/Error/Critical)
+- WebSocket real-time synchronization across clients
+- Configuration save/load system (test-config.json)
+- FastEdge host functions (secrets, dictionaries, dotenv support)
+- Postman-like UI with CSS Modules
+- Zustand state management with auto-save
 
 ### ⚠️ Known Issues
 
-- `proxy_on_vm_start` and `proxy_on_configure` initialization hooks fail silently
-  - **Status**: Suppressed (February 2026) - Error messages no longer visible
-  - **Cause**: G-Core SDK expects host environment configuration that test runner doesn't provide
+- **Initialization hooks**: `proxy_on_vm_start` and `proxy_on_configure` fail silently
+  - **Status**: Suppressed (error messages filtered)
+  - **Cause**: G-Core SDK expects host environment configuration
   - **Impact**: None - hooks execute successfully, only initialization phase affected
-  - **Solution**: Abort messages and proc_exit(255) calls filtered during initialization
-  - Test runner provides default config `{"test_mode": true}` for VM/plugin configuration
-  - Production nginx would provide actual configuration; test runner sets state via API
-- Host header auto-injection (February 2026)
-  - Test runner automatically injects Host header from target URL before hooks execute
-  - Format: `hostname` or `hostname:port` (non-standard ports only)
-  - Native `fetch()` may override, but WASM hooks see correct value
-  - Original host preserved as `X-Forwarded-Host` during HTTP fetch
 
 ### ⚠️ Known Limitations
 
 - **Response streaming not implemented**: Responses are fetched completely before processing
-  - Current: `await response.text()` waits for entire response
   - Hooks receive complete body in single call with `end_of_stream=true`
-  - Production behavior: Hooks called incrementally as chunks arrive
-  - Impact: Cannot test streaming scenarios or incremental processing
-  - Works correctly for: Final state testing, total body modifications
-  - Possible solutions:
-    - Chunk-based processing: Read stream incrementally, call hooks for each chunk
-    - Configurable chunk size: Split responses into artificial chunks for testing
-    - Current approach: Document limitation, suitable for most testing needs
+  - Cannot test streaming scenarios or incremental processing
+  - Works correctly for final state testing and total body modifications
 
 ### 🚧 Not Yet Implemented
 
@@ -180,294 +73,57 @@ frontend/                     # React + Vite frontend
 - Full property path coverage (only common paths implemented)
 - Request/response trailers (map types implemented but not tested)
 
-## Current Status
+---
 
-### ✅ Working Features
+## Philosophy
 
-- [x] Load WASM binaries via UI
-- [x] Execute proxy-wasm hooks: onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody
-- [x] **Isolated hook execution** (February 2026) - Each hook runs in fresh WASM instance for production parity
-- [x] Request header modifications flow through to HTTP fetch
-- [x] Response header modifications apply correctly (MapType bug fixed Jan 29, 2026)
-- [x] Request body modifications flow through to HTTP fetch
-- [x] Response body modifications work correctly
-- [x] Real HTTP requests with WASM-modified headers and body
-- [x] Capture logs from `proxy_log` and `fd_write` (stdout)
-- [x] Log level filtering: Trace(0), Debug(1), Info(2), Warn(3), Error(4), Critical(5)
-- [x] Header serialization in G-Core SDK format
-- [x] **Property System** (February 2026) - Complete implementation:
-  - Runtime property extraction from URLs (request.url, request.host, request.path, request.query, request.scheme, request.extension)
-  - User properties + runtime-calculated properties with smart priority (user overrides calculated)
-  - `get_property` and `set_property` host functions fully functional
-  - Property chaining between hooks (modifications flow through like headers/bodies)
-  - Modified properties affect actual HTTP requests (URL reconstruction from properties)
-  - Properties displayed in Inputs/Outputs tabs with diff highlighting
-- [x] Full request/response pipeline with hook chaining
-- [x] Postman-like UI with collapsible panels and CSS Modules (February 6, 2026)
-- [x] TypeScript type safety throughout (frontend + backend)
-- [x] Vite build system with fast HMR
-- [x] Works with change-header-code.wasm test binary
-- [x] WebSocket real-time synchronization
-- [x] Configuration save/load system
-- [x] **Dotenv Toggle** (February 6, 2026) - UI toggle properly reloads WASM when dotenv setting changed
+- **Production Parity**: Test runner must match FastEdge CDN behavior exactly
+- **No Over-Engineering**: Simple solutions over complex abstractions
+- **Type Safety**: TypeScript throughout (frontend + backend)
+- **Modular Architecture**: Clean separation of concerns
 
-### ⚠️ Known Issues
+---
 
-- `proxy_on_vm_start` and `proxy_on_configure` initialization hooks fail silently
-  - **Status**: Suppressed (February 2026) - Error messages no longer visible
-  - **Cause**: G-Core SDK expects host environment configuration that test runner doesn't provide
-  - **Impact**: None - hooks execute successfully, only initialization phase affected
-  - **Solution**: Abort messages and proc_exit(255) calls filtered during initialization
-  - Test runner provides default config `{"test_mode": true}` for VM/plugin configuration
-  - Production nginx would provide actual configuration; test runner sets state via API
-
-## Critical Technical Details
-
-### Header Serialization Format
-
-**This was the major breakthrough.** The G-Core AssemblyScript SDK expects a specific binary format:
-
-```
-
-[num_pairs: u32] # Header pair count
-[key1_len: u32][val1_len: u32] # Size array for all pairs
-[key2_len: u32][val2_len: u32]
-...
-[key1_bytes][0x00] # Data with null terminators
-[val1_bytes][0x00]
-[key2_bytes][0x00]
-[val2_bytes][0x00]
-...
-
-```
-
-**Example** (2 headers: "host: example.com" and "x-custom-relay: Fifteen"):
-
-```
-
-02 00 00 00 # 2 pairs
-04 00 00 00 0b 00 00 00 # "host" = 4 bytes, "example.com" = 11 bytes
-0e 00 00 00 07 00 00 00 # "x-custom-relay" = 14 bytes, "Fifteen" = 7 bytes
-68 6f 73 74 00 # "host\0"
-pnpm install
-pnpm run build # Builds both backend and frontend
-pnpm start # Starts server on port 5179
-
-````
-
-Or run in development mode:
-
-```bash
-pnpm run dev:backend    # Runs backend with watch mode
-pnpm run dev:frontend   # Runs Vite dev server on port 5173 (with proxy to backend)
-````
-
-### Build Commands
-
-- `pnpm run build` - Build both backend and frontend
-- `pnpm run build:backend` - Build only backend (TypeScript → dist/)
-- `pnpm run build:frontend` - Build only frontend (React → dist/frontend/)
-- `pnpm run dev:backend` - Run backend in watch mode
-- `pnpm run dev:frontend` - Run Vite dev server with hot reload
-
-### Debug Mode
-
-Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
-
-- Host function calls
-- Memory operations
-- Header hex dumps
-- Trap information
-
-### Loading a Binary
-
-1. Open http://localhost:5179
-2. Click file input and select a .wasm file
-3. File is read in browser and sent as base64 to `/api/load`
-4. Wait for success message
-
-### Running Hooks
-
-1. Configure request headers, body, trailers (supports key:value format)
-2. Configure response headers, body, trailers
-3. Set properties (JSON format)
-4. Select log level (default: Info)
-5. Click "Run All Hooks" or individual hook buttons
-6. View output with logs and return codes
-   Path separators supported: `\0` (null), `.` (dot), `/` (slash)
-
-## How to Use
-
-### Running the Server
+## Quick Start
 
 ```bash
 pnpm install
-pnpm build
-PROXY_RUNNER_DEBUG=1 PORT=5179 pnpm start
+pnpm run build
+pnpm start  # Server on http://localhost:5179
 ```
 
-**Note:** Use `pnpm` (not `npm`) as the project uses pnpm for package management.
-
-### Debug Mode
-
-Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
-
-- Host function calls
-- Memory operations
-- Header hex dumps
-- Trap information
-
-### Loading a Binary
-
-1. Open http://localhost:5179
-2. Click "Choose File" and select a .wasm file
-3. Click "Load"
-4. Wait for "Loaded successfully"
-
-### Running Hooks
-
-1. Configure request (method, path, headers, body)
-2. Configure response (status, headers, body)G-Core SDK format
-   - Tried: simple length-prefixed format ❌
-   - Tried: null-terminated strings only ❌
-   - Tried: count prefix without null terminators ❌
-   - **Success**: Count + size array + null-terminated data ✅
-3. **Frontend Migration**: Vanilla JS → React + Vite + TypeScript
-   - Component-based architecture for better maintainability
-   - Type-safe API layer
-   - Modern development workflow with hot reload
-4. **Project Structure Reorganization**:
-   - `src/` → `server/` for clarity
-   - Separate `frontend/` directory
-   - Base `tsconfig.json` extended by both backend and frontend
-   - Build outputs: `dist/` (backend at root, frontend at dist/frontend/)
-
-### Example Request
-
-```json
-// Request Headers
-{"host": "example.com", "x-custom-header": "value"}
-
-// Properties
-{"root_id": "httpheaders", "fastedge.trace_id": "test-123"}
+**Development mode:**
+```bash
+pnpm run dev:backend    # Watch mode on port 5179
+pnpm run dev:frontend   # Vite dev server on port 5173 (with proxy)
 ```
 
-## Development History
+**Debug mode:**
+```bash
+PROXY_RUNNER_DEBUG=1 pnpm start
+```
 
-### Evolution of the Project
+---
 
-1. **Initial**: Monolithic 942-line ProxyWasmRunner.ts
-2. **Refactoring**: Split into 6 modular files for maintainability
-3. **Header Format Discovery**: Critical breakthrough in G-Core SDK format
-   - Tried: simple length-prefixed format ❌
-   - Tried: null-terminated strings only ❌
-   - Tried: count prefix without null terminators ❌
-   - **Success**: Count + size array + null-terminated data ✅
-4. **Frontend Migration**: Vanilla JS → React 19 + Vite + TypeScript
-   - Component-based architecture for better maintainability
-   - Type-safe API layer
-   - Modern development workflow with hot reload
-5. **UI Redesign** (January 2026):
-   - Moved "Send" button to request bar (Postman-like)
-   - Tabbed hook stages panel with Logs/Inputs views
-   - Response viewer with Body/Preview/Headers
-   - Smart tab visibility based on content type
-6. **HTTP Integration**: Added actual fetching between hooks
-   - Request hooks modify headers/body
-   - Real HTTP request with modifications
-   - Response hooks process real server response
-   - Binary content handling with base64 encoding
-7. **State Management Migration** (February 6, 2026):
-   - Migrated from useState to Zustand
-   - 5 modular slices: Request, WASM, Results, Config, UI
-   - Auto-save functionality with localStorage persistence
-   - 176 comprehensive tests for stores
-   - Improved maintainability and testability
+## Key Documentation
 
-### Test Binaries
+**Architecture:**
+- [BACKEND_ARCHITECTURE.md](./architecture/BACKEND_ARCHITECTURE.md) - Server structure and modules
+- [FRONTEND_ARCHITECTURE.md](./architecture/FRONTEND_ARCHITECTURE.md) - React components and state
+- [STATE_MANAGEMENT.md](./architecture/STATE_MANAGEMENT.md) - Zustand patterns
 
-- **basic-wasm-code.md**: Simple binary that logs hook invocations
-  - Tests: Basic hook execution, logging
-  - Status: Works perfectly
+**Features:**
+- [WEBSOCKET_IMPLEMENTATION.md](./features/WEBSOCKET_IMPLEMENTATION.md) - Real-time sync
+- [FASTEDGE_IMPLEMENTATION.md](./features/FASTEDGE_IMPLEMENTATION.md) - FastEdge integration
+- [PROPERTY_IMPLEMENTATION_COMPLETE.md](./features/PROPERTY_IMPLEMENTATION_COMPLETE.md) - Property system
 
-- **print-wasm-code.md**: Complex binary that parses and prints headers
-  - Tests: Header serialization, property resolution, SDK integration
-  - Status: Works with correct header format
+**Development:**
+- [IMPLEMENTATION_GUIDE.md](./development/IMPLEMENTATION_GUIDE.md) - Coding patterns
+- [TESTING_GUIDE.md](./development/TESTING_GUIDE.md) - How to test
 
-- **change-header-code.md**: Request modification binary (Added Jan 29, 2026)
-  - Tests: Header injection, body modification, set_buffer_bytes
-  - Features: Injects `x-custom-me` header, conditionally modifies JSON body
-  - Status: Header injection verified working, body modification in testing
+**See [CONTEXT_INDEX.md](./CONTEXT_INDEX.md) for complete documentation map.**
 
-## Code Quality Notes
-
-### Strengths
-
-- Clean modular separation of concerns
-- Comprehensive error handling as JSON
-
-5. Automated testing suite
-
-- Debug logging throughout
-- Type safety with TypeScript
-- Memory management abstraction
-
-### Areas for Improvement
-
-- Missing host functions cause initialization errors (non-critical)
-- Could add more proxy-wasm host functions
-- UI could be more feature-rich (file upload, save/load test cases)
-- No tests yet
-
-## Future Enhancements
-
-### Short Term
-
-1. Fix initialization errors by implementing missing host functions
-2. Add more property paths
-3. Better error messages in UI
-
-### Medium Term
-
-1. Support for HTTP callouts (proxy_http_call)
-2. Shared data operations
-3. Metrics support
-4. Save/load test configurations
-
-### Long Term
-
-1. Support for multiple WASM binaries in one session
-2. Request/response history
-3. Diff view for header/body changes
-4. Integration with CI/CD pipelines
-
-## Debugging Tips
-
-### Common Issues
-
-**Headers not parsing correctly**
-
-- Check hex dump in debug logs
-- Verify format matches Kong SDK expectations
-- Ensure null terminators are present
-
-**Hook returns unexpected value**
-
-- Check logs for "debug: host_call ..." to see what WASM requested
-- Verify property value6, 2026
-  Status: React frontend complete, log filtering working, core features stable
-
-**WASM initialization fails**
-
-- Usually non-critical if hooks still execute
-- Check what host functions WASM imports vs what we provide
-- Add missing functions to HostFunctions.ts if needed
-
-**Memory errors**
-
-- Ensure allocator is available (proxy_on_memory_allocate or malloc)
-- Check memory growth in MemoryManager.hostAllocate()
-- Verify pointers aren't out of bounds
+---
 
 ## References
 
@@ -476,9 +132,7 @@ Set `PROXY_RUNNER_DEBUG=1` to see detailed logs:
 - [WebAssembly JavaScript API](https://developer.mozilla.org/en-US/docs/WebAssembly)
 - [WASI Preview1](https://github.com/WebAssembly/WASI/blob/main/legacy/preview1/docs.md)
 
-## Contact & Context
+---
 
-This test runner was built for FastEdge CDN binary development. The code runs in production on nginx with a custom wasmtime host, so exact format compatibility with the G-Core SDK is critical.
-
-Last Updated: February 6, 2026
-Status: Production-ready with CSS Modules, dotenv toggle with WASM reload, complete property system, real HTTP integration, and WebSocket synchronization
+**Last Updated**: February 2026
+**Status**: Production-ready with complete feature set

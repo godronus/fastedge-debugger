@@ -4,7 +4,7 @@
 
 The backend is a Node.js + Express + TypeScript server that orchestrates WASM execution for proxy-wasm testing. It loads WASM binaries, executes hooks, performs HTTP requests, and returns detailed execution results.
 
-**✅ Real-Time Synchronization**: WebSocket integration (January 2026) enables real-time event broadcasting to all connected clients. See [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) for details.
+**✅ Real-Time Synchronization**: WebSocket integration (January 2026) enables real-time event broadcasting to all connected clients. See [WEBSOCKET_IMPLEMENTATION.md](../features/WEBSOCKET_IMPLEMENTATION.md) for details.
 
 ## Technology Stack
 
@@ -253,7 +253,7 @@ constructor(fastEdgeConfig?: FastEdgeConfig, dotenvEnabled: boolean = true)
 - When `dotenvEnabled=true`: Loads `.env`, `.env.secrets`, `.env.variables` files
 - Merges with programmatic `fastEdgeConfig` (dotenv values take precedence)
 - Recreates `SecretStore` and `Dictionary` with merged configuration
-- See [DOTENV.md](./DOTENV.md) for complete details
+- See [DOTENV.md](../features/DOTENV.md) for complete details
 
 **Architecture (February 2026):** Each hook executes in a completely isolated WASM instance to simulate production behavior:
 
@@ -273,7 +273,7 @@ constructor(fastEdgeConfig?: FastEdgeConfig, dotenvEnabled: boolean = true)
   - `x-forwarded-port`: 443 for https, 80 for http
   - `x-real-ip`: From `request.x_real_ip` property (if set)
   - `x-forwarded-for`: Same as `x-real-ip` (if set)
-- See [PRODUCTION_PARITY_HEADERS.md](./PRODUCTION_PARITY_HEADERS.md) for details
+- See [PRODUCTION_PARITY_HEADERS.md](../features/PRODUCTION_PARITY_HEADERS.md) for details
 
 #### Key Methods
 
@@ -505,7 +505,7 @@ Implements proxy-wasm ABI host functions that WASM code calls:
 
 - Uses SecretStore for time-based secret rotation
 - Uses Dictionary for configuration key-value pairs
-- Supports dotenv file loading (see [DOTENV.md](./DOTENV.md))
+- Supports dotenv file loading (see [DOTENV.md](../features/DOTENV.md))
 - Production parity with G-Core FastEdge CDN runtime
 
 ### MemoryManager.ts
@@ -705,7 +705,7 @@ return {
 
 #### Dotenv Support (February 2026)
 
-**✅ COMPLETED**: Full dotenv integration with toggle support. See [DOTENV.md](./DOTENV.md) for complete documentation.
+**✅ COMPLETED**: Full dotenv integration with toggle support. See [DOTENV.md](../features/DOTENV.md) for complete documentation.
 
 **Implementation:**
 

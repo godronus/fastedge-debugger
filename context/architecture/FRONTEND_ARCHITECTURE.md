@@ -4,9 +4,9 @@
 
 The frontend is a React 19 + TypeScript application built with Vite. It provides a modern, type-safe interface for testing proxy-wasm binaries.
 
-**✅ Real-Time Updates**: WebSocket integration (January 2026) provides instant synchronization with server state. All activity from UI interactions and AI agent API calls appears in real-time. See [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) for details.
+**✅ Real-Time Updates**: WebSocket integration (January 2026) provides instant synchronization with server state. All activity from UI interactions and AI agent API calls appears in real-time. See [WEBSOCKET_IMPLEMENTATION.md](../features/WEBSOCKET_IMPLEMENTATION.md) for details.
 
-**✅ Configuration Sharing** (February 2026): Load/save test configurations to share between UI and AI agents. See [CONFIG_SHARING.md](./CONFIG_SHARING.md) for details.
+**✅ Configuration Sharing** (February 2026): Load/save test configurations to share between UI and AI agents. See [CONFIG_SHARING.md](../features/CONFIG_SHARING.md) for details.
 
 **✅ Client-Side Log Filtering** (February 2026): Server returns all logs at Trace level. UI filters dynamically - change log level without re-running requests.
 
@@ -148,7 +148,7 @@ Manages global state and orchestrates all components:
 - **Host Header**: Auto-calculated from target URL, shown as `<Calculated from URL>` placeholder
   - Test-specific headers (x-inject-req-body, x-inject-res-body) removed from defaults
   - Now only come from test-config.json when needed for specific tests
-- See [PRODUCTION_PARITY_HEADERS.md](./PRODUCTION_PARITY_HEADERS.md) for details
+- See [PRODUCTION_PARITY_HEADERS.md](../features/PRODUCTION_PARITY_HEADERS.md) for details
 
 ```typescript
 const App = () => {
@@ -900,7 +900,7 @@ export const createWasmSlice: StateCreator<AppStore, [['zustand/immer', never]],
 
 ### useWebSocket.ts
 
-WebSocket connection management with auto-reconnect (314 lines). See [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) for details.
+WebSocket connection management with auto-reconnect (314 lines). See [WEBSOCKET_IMPLEMENTATION.md](../features/WEBSOCKET_IMPLEMENTATION.md) for details.
 
 ## State Management
 
@@ -959,8 +959,8 @@ See [STATE_MANAGEMENT.md](./STATE_MANAGEMENT.md) for complete documentation.
 ### Related Documentation
 
 - [STATE_MANAGEMENT.md](./STATE_MANAGEMENT.md) - Complete Zustand implementation guide
-- [TEST_PATTERNS.md](./TEST_PATTERNS.md) - Testing patterns including store tests
-- [CHANGELOG.md](./CHANGELOG.md) - Full migration details (Feb 6, 2026 entry)
+- [TEST_PATTERNS.md](../development/TEST_PATTERNS.md) - Testing patterns including store tests
+- [CHANGELOG.md](../CHANGELOG.md) - Full migration details (Feb 6, 2026 entry)
 
 ## API Layer
 

@@ -47,7 +47,7 @@ Load a WASM binary before testing.
 }
 ```
 
-**Note:** When `dotenvEnabled` is true (default), the server automatically loads secrets from `.env.secrets` and dictionary values from `.env.variables` files in the project root. See [DOTENV.md](./DOTENV.md) for details.
+**Note:** When `dotenvEnabled` is true (default), the server automatically loads secrets from `.env.secrets` and dictionary values from `.env.variables` files in the project root. See [DOTENV.md](../features/DOTENV.md) for details.
 
 **Example:**
 
@@ -193,7 +193,7 @@ curl -X POST http://127.0.0.1:5179/api/send \
   -d "{\"url\": \"$URL\", ...}"
 ```
 
-**See also**: [CONFIG_SHARING.md](./CONFIG_SHARING.md) for complete workflow documentation.
+**See also**: [CONFIG_SHARING.md](../features/CONFIG_SHARING.md) for complete workflow documentation.
 
 ### 4. Execute Single Hook (Advanced)
 
@@ -586,7 +586,7 @@ If you encounter issues:
 2. Verify WASM binary is valid
 3. Check server logs for errors
 4. Open UI in browser to see visual feedback
-5. Review [WEBSOCKET_IMPLEMENTATION.md](./WEBSOCKET_IMPLEMENTATION.md) for architecture details
+5. Review [WEBSOCKET_IMPLEMENTATION.md](../features/WEBSOCKET_IMPLEMENTATION.md) for architecture details
 
 ## Summary
 
