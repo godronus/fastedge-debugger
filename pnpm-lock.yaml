@@ -99,7 +99,11 @@ importers:
 
   test-applications/cdn-apps/cdn-properties: {}
 
-  test-applications/http-apps/sdk-examples: {}
+  test-applications/http-apps/basic-examples:
+    devDependencies:
+      '@gcoredev/fastedge-sdk-js':
+        specifier: '*'
+        version: 2.2.0
 
 packages:
 

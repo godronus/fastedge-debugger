@@ -76,6 +76,11 @@ export const WASM_TEST_BINARIES = {
       validResponseStatusRead: 'valid-response-status-read.wasm',
       invalidResponseStatusWrite: 'invalid-response-status-write.wasm',
       validNginxLogWrite: 'valid-nginx-log-write.wasm',
+      validReadonlyRead: 'valid-readonly-read.wasm',
+      invalidReadonlyWrite: 'invalid-readonly-write.wasm',
+    },
+    headers: {
+      headersChange: 'headers-change.wasm',
     },
   },
   httpApps: {
@@ -85,6 +90,9 @@ export const WASM_TEST_BINARIES = {
       sdkDownstreamModifyResponse: 'sdk-downstream-modify-response.wasm',
       sdkHeaders: 'sdk-headers.wasm',
       sdkVariablesAndSecrets: 'sdk-variables-and-secrets.wasm',
+    },
+    basicExamples: {
+      httpResponder: 'http-responder.wasm',
     },
   },
 } as const;

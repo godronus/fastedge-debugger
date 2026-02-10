@@ -95,6 +95,32 @@ Build a Postman-like test runner for debugging WASM binaries that run on FastEdg
 - Zustand state management with Immer middleware
 - Component reuse (ResponseViewer, DictionaryInput, RequestBar)
 
+**Integration Testing:** ✨ NEW
+- **42 Integration Tests Total**: Comprehensive end-to-end WASM execution testing
+
+**Property Access Control (35 tests)**:
+- **100% Property Coverage**: All 17 built-in FastEdge properties tested
+  - 11/11 ReadOnly properties (method, scheme, country, city, asn, geo.lat, geo.long, region, continent, country.name, extension)
+  - 4/4 ReadWrite properties (path, url, host, query)
+  - 1/1 Response properties (status)
+  - 1/1 WriteOnly properties (nginx.log_field1)
+- **Production Parity**: Tests validate actual FastEdge CDN access rules
+- **Comprehensive Coverage**: Read tests, write denial tests, value preservation tests
+
+**Full-Flow Testing (7 tests)**:
+- **Complete Request/Response Cycle**: All 4 hooks tested with downstream HTTP services
+  - onRequestHeaders → onRequestBody → HTTP fetch → onResponseHeaders → onResponseBody
+- **Header Injection & Preservation**: Validates headers flow through entire lifecycle
+- **Body Modification**: Request and response JSON field injection
+- **Production Parity**: Real HTTP communication with downstream services
+- **UI Output Validation**: Final response structure matches UI output exactly
+
+**Test Infrastructure**:
+- **95 Unit Tests**: PropertyResolver logic (URL extraction, property calculation)
+- **12+ Test Applications**: Compiled WASM binaries for different test scenarios
+- **Downstream Service Testing**: Spawn HTTP WASM apps as downstream targets
+- See [INTEGRATION_TESTING.md](./development/INTEGRATION_TESTING.md) for details
+
 ### ⚠️ Known Issues
 
 - **Initialization hooks**: `proxy_on_vm_start` and `proxy_on_configure` fail silently

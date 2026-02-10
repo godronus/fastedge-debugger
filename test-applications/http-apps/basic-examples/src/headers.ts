@@ -1,6 +1,6 @@
 import { getEnv } from "fastedge::env";
 
-async function eventHandler(event) {
+async function eventHandler(event: FetchEvent): Promise<Response> {
   const request = event.request;
 
   const customEnvVariable = getEnv("MY_CUSTOM_ENV_VAR");

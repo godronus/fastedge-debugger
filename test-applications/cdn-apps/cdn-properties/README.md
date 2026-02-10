@@ -47,6 +47,20 @@ These test applications are compiled to WASM and used in integration tests (`ser
 - **Expected**: ❌ Write denied (read-only geolocation)
 - **Coverage**: ReadOnly geolocation property write denial
 
+#### `valid-readonly-read.ts`
+- **Tests**: Reading all 8 read-only properties in `onRequestHeaders`
+  - `request.extension`, `request.city`, `request.asn`
+  - `request.geo.lat`, `request.geo.long`
+  - `request.region`, `request.continent`, `request.country.name`
+- **Expected**: ✅ All reads succeed
+- **Coverage**: Comprehensive read-only property access verification
+
+#### `invalid-readonly-write.ts`
+- **Tests**: Attempting to write to all 8 read-only properties in `onRequestHeaders`
+  - Same properties as `valid-readonly-read.ts`
+- **Expected**: ❌ All writes denied (read-only)
+- **Coverage**: Comprehensive read-only property write denial verification
+
 ### Response Properties
 
 #### `valid-response-status-read.ts`
@@ -84,6 +98,7 @@ The compiled WASM binaries are loaded in integration tests:
 - **Test Files**:
   - `read-write-properties.test.ts` - Tests for ReadWrite properties
   - `read-only-properties.test.ts` - Tests for ReadOnly properties
+  - `all-readonly-properties.test.ts` - Comprehensive tests for all read-only properties
   - `response-properties.test.ts` - Tests for response properties
   - `nginx-properties.test.ts` - Tests for nginx properties
   - `cross-hook-access.test.ts` - Tests for cross-hook access patterns
@@ -107,18 +122,23 @@ pnpm test:integration
 | `request.method` | ReadOnly | onRequestHeaders | `invalid-method-write` | ✅ Tested |
 | `request.scheme` | ReadOnly | onRequestHeaders | `invalid-scheme-write` | ✅ Tested |
 | `request.country` | ReadOnly | onRequestHeaders | `invalid-geolocation-write` | ✅ Tested |
+| `request.extension` | ReadOnly | onRequestHeaders | `valid-readonly-read`, `invalid-readonly-write` | ✅ Tested |
+| `request.city` | ReadOnly | onRequestHeaders | `valid-readonly-read`, `invalid-readonly-write` | ✅ Tested |
+| `request.asn` | ReadOnly | onRequestHeaders | `valid-readonly-read`, `invalid-readonly-write` | ✅ Tested |
+| `request.geo.lat` | ReadOnly | onRequestHeaders | `valid-readonly-read`, `invalid-readonly-write` | ✅ Tested |
+| `request.geo.long` | ReadOnly | onRequestHeaders | `valid-readonly-read`, `invalid-readonly-write` | ✅ Tested |
+| `request.region` | ReadOnly | onRequestHeaders | `valid-readonly-read`, `invalid-readonly-write` | ✅ Tested |
+| `request.continent` | ReadOnly | onRequestHeaders | `valid-readonly-read`, `invalid-readonly-write` | ✅ Tested |
+| `request.country.name` | ReadOnly | onRequestHeaders | `valid-readonly-read`, `invalid-readonly-write` | ✅ Tested |
 | `response.status` | ReadOnly | onResponseHeaders | `valid-response-status-read`, `invalid-response-status-write` | ✅ Tested |
 | `nginx.log_field1` | WriteOnly | onRequestHeaders | `valid-nginx-log-write` | ✅ Tested |
 
-### Coverage Gaps (Future Work)
+**Coverage Summary**: 17/17 built-in properties tested (100% coverage) ✅
 
-**Hook Coverage**:
-- `onRequestBody` - No tests yet
-- `onResponseBody` - No tests yet
+### Future Work
 
-**Untested Properties**:
-- `request.extension` (ReadOnly)
-- `request.region`, `request.city`, `request.continent`, `request.asn` (ReadOnly geolocation)
+**Hook Coverage Expansion**:
+- Additional tests for `onRequestBody` and `onResponseBody` hooks
 - Custom properties with context isolation
 
 ## Adding New Test Applications

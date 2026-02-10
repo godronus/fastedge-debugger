@@ -174,7 +174,8 @@ export class HttpWasmRunner implements IWasmRunner {
     responseStatus: number,
     responseStatusText: string,
     properties: Record<string, unknown>,
-    enforceProductionPropertyRules: boolean
+    enforceProductionPropertyRules: boolean,
+    logLevel?: number
   ): Promise<FullFlowResult> {
     throw new Error(
       "callFullFlow() is not supported for HTTP WASM. Use execute() instead."

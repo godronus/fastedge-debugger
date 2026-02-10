@@ -1,6 +1,6 @@
-async function app(event) {
+async function eventHandler(event: FetchEvent): Promise<Response> {
   const downstreamResponse = await fetch(
-    "http://jsonplaceholder.typicode.com/users"
+    "http://jsonplaceholder.typicode.com/users",
   );
   const users = await downstreamResponse.json();
   return new Response(
@@ -15,10 +15,10 @@ async function app(event) {
       headers: {
         "content-type": "application/json",
       },
-    }
+    },
   );
 }
 
 addEventListener("fetch", (event) => {
-  event.respondWith(app(event));
+  event.respondWith(eventHandler(event));
 });

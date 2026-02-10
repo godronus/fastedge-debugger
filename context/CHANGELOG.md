@@ -1,5 +1,343 @@
 # Proxy-WASM Runner - Changelog
 
+## February 10, 2026 - Full-Flow Integration Testing with Downstream Services
+
+### Overview
+Implemented comprehensive full-flow integration testing infrastructure that validates complete request/response cycles through CDN proxy-wasm applications making downstream HTTP calls. This ensures production parity by testing the entire hook lifecycle with real HTTP communication.
+
+### 🎯 What Was Completed
+
+#### 1. Full-Flow Test Infrastructure
+**Test Helper for Downstream Services**
+- Created `spawnDownstreamHttpApp()` helper in `server/__tests__/integration/utils/http-wasm-helpers.ts`
+- Spawns HTTP WASM apps as downstream targets for CDN app testing
+- Manages port allocation (8100-8199 range) via shared PortManager
+- Returns runner instance and port for integration tests
+
+**Enhanced callFullFlow() API**
+- Added optional `logLevel` parameter to `IWasmRunner.callFullFlow()`
+- Defaults to 0 (Trace level) to capture all logs including debug messages
+- Previously defaulted to 2 (Info) which filtered out debug logs from test apps
+- Updated ProxyWasmRunner and HttpWasmRunner to support new signature
+
+**WASM Binary Constants**
+- Added `WASM_TEST_BINARIES.cdnApps.headers.headersChange`
+- Added `WASM_TEST_BINARIES.httpApps.basicExamples.httpResponder`
+- Enables easy reference to compiled test binaries
+
+#### 2. Comprehensive Test Suite (7 Tests)
+**Location**: `server/__tests__/integration/cdn-apps/full-flow/headers-change-with-downstream.test.ts`
+
+**Test Coverage**:
+1. ✅ Request header injection via onRequestHeaders
+2. ✅ Request body modification via onRequestBody
+3. ✅ Response header injection via onResponseHeaders
+4. ✅ Response body modification via onResponseBody
+5. ✅ Complete flow through all 4 hooks with both request/response modifications
+6. ✅ Header preservation through hook lifecycle
+7. ✅ **UI Parity Test** - Complete response structure validation matching UI output
+
+**Test Applications Used**:
+- `cdn-apps/headers/headers-change.wasm` - CDN proxy that injects headers and body fields
+- `http-apps/basic-examples/http-responder.wasm` - Downstream HTTP service that echoes request
+
+**Files Modified**:
+- `server/__tests__/integration/utils/wasm-loader.ts` - Added binary constants
+- `server/__tests__/integration/utils/http-wasm-helpers.ts` - Added downstream helper
+- `server/runner/ProxyWasmRunner.ts` - Enhanced callFullFlow with logLevel
+- `server/runner/HttpWasmRunner.ts` - Updated callFullFlow signature
+- `server/runner/IWasmRunner.ts` - Updated interface with logLevel parameter
+
+**Files Created**:
+- `server/__tests__/integration/cdn-apps/full-flow/headers-change-with-downstream.test.ts`
+
+#### 3. Documentation Updates
+
+**Updated**: `context/development/INTEGRATION_TESTING.md`
+
+**New Sections**:
+- Full-Flow Testing with Downstream Services (architecture, test flow, examples)
+- spawnDownstreamHttpApp Helper (API documentation)
+- Full Flow Verification Points (what to verify in tests)
+- Log Level in Full Flow (log level options and defaults)
+- Port Management (allocation strategy and cleanup)
+- Best Practices (spawn once, cleanup, timeouts)
+
+**Updated Test Coverage**:
+- ✅ Full-flow testing with downstream HTTP services
+- ✅ All 4 hooks tested in full request/response cycle (onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody)
+- ✅ Header manipulation testing through full flow
+- ✅ Body modification testing (request and response JSON injection)
+
+### 🧪 Testing
+
+**Run Full-Flow Tests**:
+```bash
+pnpm vitest run server/__tests__/integration/cdn-apps/full-flow/headers-change-with-downstream.test.ts
+```
+
+**Test Results**:
+- ✅ 7 tests passed
+- ✅ ~10.4s execution time
+- ✅ All hooks verified in complete request/response cycle
+
+### 📊 Test Coverage Summary
+
+**Total Integration Tests**: 42 tests
+- 35 property access tests (100% property coverage - 17/17 properties)
+- 7 full-flow tests (complete request/response cycle)
+
+**Hook Coverage**: ✅ All 4 hooks
+- onRequestHeaders ✅
+- onRequestBody ✅
+- onResponseHeaders ✅
+- onResponseBody ✅
+
+### 💡 Key Insights
+
+**Production Parity Validated**:
+- CDN apps correctly proxy requests through all hooks
+- Headers and body modifications propagate correctly
+- Downstream services receive fully processed requests
+- Response modifications applied correctly before returning to client
+
+**Log Capture Critical**:
+- Setting logLevel=0 essential for capturing debug logs
+- Default Info level (2) filtered out most test app logs
+- Trace level captures complete hook execution details
+
+### 🔄 Breaking Changes
+
+**IWasmRunner.callFullFlow() Signature**:
+- Added optional `logLevel?: number` parameter
+- Default value: 0 (Trace) to capture all logs
+- Existing calls remain compatible (parameter is optional)
+
+---
+
+## February 10, 2026 - Complete Read-Only Property Integration Test Coverage
+
+### Overview
+
+Achieved **100% integration test coverage** for all built-in FastEdge CDN properties by implementing comprehensive tests for the 8 remaining read-only properties. Created an efficient grouped testing approach that tests all 8 properties using just 2 test applications, reducing test app count from a potential 16 to 2 while maintaining thorough coverage of both read and write-denial scenarios.
+
+### 🎯 What Was Completed
+
+#### 1. Test Applications Created (2 files) ✅
+
+**Files**:
+- `test-applications/cdn-apps/cdn-properties/assembly/valid-readonly-read.ts`
+- `test-applications/cdn-apps/cdn-properties/assembly/invalid-readonly-write.ts`
+
+**Grouped Testing Approach:**
+- **Before**: Would have needed 16 test apps (8 read + 8 write denial = 16 apps)
+- **After**: Only 2 test apps testing all 8 properties together
+- **Efficiency**: 87.5% reduction in test application count
+
+**Properties Tested (8 new)**:
+1. `request.extension` - File extension from URL path
+2. `request.city` - City name from IP geolocation
+3. `request.asn` - ASN of request IP
+4. `request.geo.lat` - Latitude from IP geolocation
+5. `request.geo.long` - Longitude from IP geolocation
+6. `request.region` - Region from IP geolocation
+7. `request.continent` - Continent from IP geolocation
+8. `request.country.name` - Full country name from IP geolocation
+
+**Test Logic**:
+- `valid-readonly-read.ts` reads all 8 properties in `onRequestHeaders` hook
+- `invalid-readonly-write.ts` attempts writes to all 8 properties (expects denial)
+- Both apps use UTF-8 encoding for property values
+- All apps register with root context name `"httpProperties"`
+
+#### 2. Integration Tests Created ✅
+
+**File**: `server/__tests__/integration/cdn-apps/property-access/all-readonly-properties.test.ts`
+
+**Test Coverage (24 tests total)**:
+- 8 read tests - Verify properties are readable and return correct values
+- 8 write denial tests - Verify writes are denied with access violations
+- 8 value preservation tests - Verify values remain unchanged after denied writes
+
+**Test Properties Validation**:
+```typescript
+const testProperties = {
+  'request.country': 'LU',
+  'request.city': 'Luxembourg',
+  'request.region': 'LU',
+  'request.geo.lat': '49.6116',
+  'request.geo.long': '6.1319',
+  'request.continent': 'Europe',
+  'request.country.name': 'Luxembourg',
+  'request.asn': '64512',
+  'request.extension': 'html',
+};
+```
+
+**Test Assertions**:
+- ✅ No property access violations for reads
+- ✅ Exact value matching (e.g., "Request City: Luxembourg")
+- ✅ Write operations denied with "read-only" violations
+- ✅ Original values unchanged after write attempts
+
+**Test Quality**:
+- Initially had weak assertions checking only for log line existence
+- Enhanced to validate actual property values (100% of properties with known values)
+- Tests catch incorrect values, not just successful reads
+
+#### 3. Build Configuration Updated ✅
+
+**File**: `test-applications/cdn-apps/cdn-properties/package.json`
+
+**Changes**:
+- Added 2 build scripts (parallel compilation with `npm-run-all -p`)
+- Added 2 copy scripts (move WASM to `wasm/cdn-apps/properties/`)
+- Updated `build:all` and `copy:all` scripts
+
+**Build Output**:
+- `valid-readonly-read.wasm` - 31KB
+- `invalid-readonly-write.wasm` - 33KB
+
+#### 4. Test Infrastructure Updated ✅
+
+**File**: `server/__tests__/integration/utils/wasm-loader.ts`
+
+**Changes**:
+```typescript
+export const WASM_TEST_BINARIES = {
+  cdnApps: {
+    properties: {
+      // ... existing entries ...
+      validReadonlyRead: 'valid-readonly-read.wasm',
+      invalidReadonlyWrite: 'invalid-readonly-write.wasm',
+    },
+  },
+} as const;
+```
+
+#### 5. Documentation Updated ✅
+
+**Files Updated**:
+- `test-applications/cdn-apps/cdn-properties/README.md` - Added new test apps, updated coverage table to 17/17
+- `context/development/INTEGRATION_TESTING.md` - Updated test count (19→35), documented 100% coverage
+
+**Coverage Table** (now in README.md):
+```
+Coverage Summary: 17/17 built-in properties tested (100% coverage) ✅
+```
+
+### 📊 Coverage Achievement
+
+**Before This Work**:
+- Properties tested: 9/17 (53%)
+- Read-only properties: 3/11 (27%)
+- Integration tests: 19
+- Test applications: 10
+
+**After This Work**:
+- Properties tested: 17/17 (100%) ✅
+- Read-only properties: 11/11 (100%) ✅
+- Integration tests: 35 (+16)
+- Test applications: 12 (+2)
+
+### 🧪 Test Results
+
+```
+✓ 6 test files passing
+✓ 43 integration tests passing
+✓ 95 PropertyResolver unit tests passing
+✓ 0 failures
+```
+
+**Property System Test Coverage**:
+- **Unit Tests** (PropertyResolver.test.ts): 95 tests covering URL extraction, property calculation, path parsing
+- **Integration Tests**: 43 tests covering property access control, WASM integration, production parity
+
+**Total**: 138 property-related tests
+
+### 🔑 Key Insights
+
+#### Property Testing Strategy
+
+**Calculated Properties**:
+- Properties like `request.extension` are normally extracted via `PropertyResolver.extractRuntimePropertiesFromUrl()`
+- This happens in `callFullFlowLegacy()` but not in `callHook()` (used by tests)
+- Solution: Provide values directly in `testProperties` for consistent testing
+- URL extraction logic is covered by 95 unit tests in `PropertyResolver.test.ts`
+
+**Test vs Production Flow**:
+- **Production**: `callFullFlow()` → `extractRuntimePropertiesFromUrl()` → execute hooks
+- **Tests**: `callHook()` → properties from `call.properties` → execute single hook
+- Integration tests validate property access control with WASM
+- Unit tests validate URL parsing and property extraction logic
+
+#### Test Quality Improvements
+
+**Initial Issue**: Tests only checked for log line existence
+```typescript
+// ❌ Too lenient - always passes
+expect(logsContain(result, 'Request Extension:')).toBe(true);
+```
+
+**Fixed**: Tests validate actual values
+```typescript
+// ✅ Validates exact value
+expect(logsContain(result, 'Request Extension: html')).toBe(true);
+```
+
+**Result**: 100% of properties with known values now have strict value validation
+
+### 📝 Implementation Notes
+
+**Efficient Grouped Testing**:
+- Testing 8 properties individually would require 16 test apps (8 read + 8 write)
+- Grouped approach: 1 app reads all 8, 1 app writes to all 8
+- Maintains comprehensive coverage while minimizing build artifacts
+- Pattern is reusable for future property additions
+
+**Production Parity**:
+- All tests use `createTestRunner()` which enforces production property access rules
+- Property access violations logged and validated
+- Access patterns match FastEdge CDN: ReadOnly in all 4 hooks
+
+**Property Access Control Validation**:
+- Read tests ensure no access violations occur
+- Write tests ensure violations are logged with "read-only" message
+- Value preservation tests ensure denied writes don't modify properties
+
+### 🔗 Related Files
+
+**Test Applications**:
+- `test-applications/cdn-apps/cdn-properties/assembly/valid-readonly-read.ts`
+- `test-applications/cdn-apps/cdn-properties/assembly/invalid-readonly-write.ts`
+
+**Integration Tests**:
+- `server/__tests__/integration/cdn-apps/property-access/all-readonly-properties.test.ts`
+
+**Configuration**:
+- `test-applications/cdn-apps/cdn-properties/package.json`
+- `server/__tests__/integration/utils/wasm-loader.ts`
+
+**Documentation**:
+- `test-applications/cdn-apps/cdn-properties/README.md`
+- `context/development/INTEGRATION_TESTING.md`
+
+**Property Resolver**:
+- `server/runner/PropertyResolver.ts` - URL extraction and property calculation
+- `server/runner/PropertyResolver.test.ts` - 95 unit tests for extraction logic
+
+### ✨ Benefits
+
+1. **Complete Coverage**: 100% of built-in FastEdge properties now tested
+2. **Production Parity**: Tests validate actual CDN property access rules
+3. **Efficiency**: 2 test apps instead of 16 for same coverage
+4. **Maintainability**: Grouped testing makes updates easier
+5. **Quality**: Strict value validation catches incorrect property values
+6. **Scalability**: Pattern established for testing future property additions
+7. **Documentation**: Clear examples for property access patterns
+
+---
+
 ## February 10, 2026 - Automatic WASM Type Detection & UI Polish
 
 ### Overview

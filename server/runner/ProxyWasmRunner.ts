@@ -934,7 +934,8 @@ export class ProxyWasmRunner implements IWasmRunner {
     responseStatus: number,
     responseStatusText: string,
     properties: Record<string, unknown>,
-    enforceProductionPropertyRules: boolean
+    enforceProductionPropertyRules: boolean,
+    logLevel?: number
   ): Promise<FullFlowResult> {
     // Convert to HookCall format and call legacy method
     const call: HookCall = {
@@ -952,6 +953,7 @@ export class ProxyWasmRunner implements IWasmRunner {
       },
       properties,
       enforceProductionPropertyRules,
+      logLevel: logLevel !== undefined ? logLevel : 0, // Default to 0 (Trace) for full flow to capture all logs
     };
 
     return this.callFullFlowLegacy(call, url);

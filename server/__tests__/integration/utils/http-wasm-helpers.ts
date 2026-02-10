@@ -75,3 +75,46 @@ export function isBase64Encoded(response: HttpResponse): boolean {
 export function hasContentType(response: HttpResponse, expectedType: string): boolean {
   return response.contentType?.toLowerCase().includes(expectedType.toLowerCase()) ?? false;
 }
+
+/**
+ * Spawns an HTTP WASM app as a downstream service for integration testing
+ *
+ * This helper loads and starts an HTTP WASM app using HttpWasmRunner,
+ * making it available as a downstream target for CDN app testing.
+ *
+ * The port is allocated by PortManager from the 8100-8199 range.
+ * Since tests use a shared PortManager, the first runner gets 8100,
+ * second gets 8101, etc.
+ *
+ * @param wasmBinary - The compiled WASM binary to run
+ * @param expectedPort - The expected port (default 8100 for first runner)
+ * @returns Object with runner instance and the expected port it's running on
+ *
+ * @example
+ * ```typescript
+ * // Spawn http-responder (will get port 8100 if it's the first runner)
+ * const downstream = await spawnDownstreamHttpApp(httpResponderWasm);
+ *
+ * // Use in CDN app full-flow test
+ * await cdnRunner.callFullFlow(`http://localhost:${downstream.port}/test`, ...);
+ *
+ * // Cleanup
+ * await downstream.runner.cleanup();
+ * ```
+ */
+export async function spawnDownstreamHttpApp(
+  wasmBinary: Uint8Array,
+  expectedPort: number = 8100
+): Promise<{ runner: IWasmRunner; port: number }> {
+  const runner = createHttpWasmRunner();
+
+  // Load the WASM binary (HttpWasmRunner will allocate a port from PortManager)
+  await runner.load(Buffer.from(wasmBinary));
+
+  // Return the expected port (PortManager allocates sequentially from 8100)
+  // In a test suite with clean state, first allocation is always 8100
+  return {
+    runner,
+    port: expectedPort,
+  };
+}

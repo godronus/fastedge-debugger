@@ -1,7 +1,7 @@
 import { getEnv } from "fastedge::env";
 import { getSecret } from "fastedge::secret";
 
-async function eventHandler(event) {
+async function eventHandler(event: FetchEvent): Promise<Response> {
   const username = getEnv("USERNAME");
   const password = getSecret("PASSWORD");
 

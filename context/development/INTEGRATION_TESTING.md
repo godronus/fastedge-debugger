@@ -1,7 +1,7 @@
 # Integration Testing
 
-**Status**: ✅ Complete - Modular Test Structure with Expanded Coverage
-**Last Updated**: February 9, 2026
+**Status**: ✅ Complete - Full Property Coverage (17/17 Properties Tested)
+**Last Updated**: February 10, 2026
 
 ---
 
@@ -19,7 +19,7 @@ The proxy-runner uses compiled WASM test applications for integration testing to
 test-applications/
 ├── cdn-apps/                     # Proxy-WASM CDN applications
 │   └── properties/               # Property access control testing
-│       ├── assembly/             # AssemblyScript source files (10 test apps)
+│       ├── assembly/             # AssemblyScript source files (12 test apps)
 │       │   ├── valid-path-write.ts              # ReadWrite: request.path
 │       │   ├── valid-url-write.ts               # ReadWrite: request.url
 │       │   ├── valid-host-write.ts              # ReadWrite: request.host
@@ -29,14 +29,16 @@ test-applications/
 │       │   ├── invalid-geolocation-write.ts     # ReadOnly: request.country
 │       │   ├── valid-response-status-read.ts    # Response: read status
 │       │   ├── invalid-response-status-write.ts # Response: deny write
-│       │   └── valid-nginx-log-write.ts         # WriteOnly: nginx.log_field1
+│       │   ├── valid-nginx-log-write.ts         # WriteOnly: nginx.log_field1
+│       │   ├── valid-readonly-read.ts           # ReadOnly: all 8 read-only properties
+│       │   └── invalid-readonly-write.ts        # ReadOnly: deny writes to 8 properties
 │       ├── package.json          # Build configuration
 │       ├── asconfig.json         # AssemblyScript compiler config
 │       └── README.md             # Test app documentation
 │
 wasm/                             # Compiled WASM binaries (generated)
 └── cdn-apps/
-    └── properties/               # 10 compiled WASM binaries
+    └── properties/               # 12 compiled WASM binaries
         ├── valid-path-write.wasm
         ├── valid-url-write.wasm
         ├── valid-host-write.wasm
@@ -46,12 +48,15 @@ wasm/                             # Compiled WASM binaries (generated)
         ├── invalid-geolocation-write.wasm
         ├── valid-response-status-read.wasm
         ├── invalid-response-status-write.wasm
-        └── valid-nginx-log-write.wasm
+        ├── valid-nginx-log-write.wasm
+        ├── valid-readonly-read.wasm
+        └── invalid-readonly-write.wasm
 
 server/__tests__/integration/     # Integration test files
-├── property-access/             # Modular property access tests (19 tests)
+├── property-access/             # Modular property access tests (35 tests)
 │   ├── read-write-properties.test.ts    # Tests for ReadWrite properties
 │   ├── read-only-properties.test.ts     # Tests for ReadOnly properties
+│   ├── all-readonly-properties.test.ts  # Comprehensive read-only property tests (16 tests)
 │   ├── response-properties.test.ts      # Tests for response properties
 │   ├── nginx-properties.test.ts         # Tests for nginx properties
 │   └── cross-hook-access.test.ts        # Tests for cross-hook access
@@ -65,7 +70,7 @@ server/__tests__/integration/     # Integration test files
 
 ### Test Applications
 
-The test suite now includes **10 test applications** covering **9 properties** across **4 property access patterns**:
+The test suite now includes **12 test applications** covering **17 properties** (100% of built-in properties) across **4 property access patterns**:
 
 #### Read-Write Properties (4 apps)
 
@@ -92,17 +97,25 @@ The test suite now includes **10 test applications** covering **9 properties** a
 7. **`invalid-geolocation-write.ts`** - Tests `request.country` write denial
    - ❌ Expected: Write denied, country unchanged, violation logged
 
+8. **`valid-readonly-read.ts`** - Tests reading all 8 read-only properties
+   - Properties: `request.extension`, `request.city`, `request.asn`, `request.geo.lat`, `request.geo.long`, `request.region`, `request.continent`, `request.country.name`
+   - ✅ Expected: All reads succeed, values logged from test-config.json
+
+9. **`invalid-readonly-write.ts`** - Tests write denial for all 8 read-only properties
+   - Properties: Same as `valid-readonly-read.ts`
+   - ❌ Expected: All writes denied, values unchanged, violations logged
+
 #### Response Properties (2 apps)
 
-8. **`valid-response-status-read.ts`** - Tests `response.status` read in onResponseHeaders
-   - ✅ Expected: Read succeeds, status value logged
+10. **`valid-response-status-read.ts`** - Tests `response.status` read in onResponseHeaders
+    - ✅ Expected: Read succeeds, status value logged
 
-9. **`invalid-response-status-write.ts`** - Tests `response.status` write denial
-   - ❌ Expected: Write denied, status unchanged, violation logged
+11. **`invalid-response-status-write.ts`** - Tests `response.status` write denial
+    - ❌ Expected: Write denied, status unchanged, violation logged
 
 #### Write-Only Properties (1 app)
 
-10. **`valid-nginx-log-write.ts`** - Tests `nginx.log_field1` write
+12. **`valid-nginx-log-write.ts`** - Tests `nginx.log_field1` write
     - ✅ Expected: Write succeeds, no violations
 
 ---
@@ -165,9 +178,10 @@ Integration tests use `vitest.integration.config.ts`:
 
 ### Current Test Coverage
 
-**19 passing tests** across **5 test files**:
+**35 passing tests** across **6 test files**:
 - `read-write-properties.test.ts` - 4 tests (path, url, host, query)
 - `read-only-properties.test.ts` - 6 tests (method, scheme, geolocation)
+- `all-readonly-properties.test.ts` - 16 tests (8 read + 8 write denial tests for all read-only properties)
 - `response-properties.test.ts` - 3 tests (status read/write)
 - `nginx-properties.test.ts` - 2 tests (write-only property)
 - `cross-hook-access.test.ts` - 4 tests (cross-hook patterns)
@@ -189,12 +203,13 @@ The integration tests are organized by property type for better maintainability:
 server/__tests__/integration/property-access/
 ├── read-write-properties.test.ts    # ~50 lines, 4 tests
 ├── read-only-properties.test.ts     # ~60 lines, 6 tests
+├── all-readonly-properties.test.ts  # ~450 lines, 16 tests (comprehensive)
 ├── response-properties.test.ts      # ~40 lines, 3 tests
 ├── nginx-properties.test.ts         # ~35 lines, 2 tests
 └── cross-hook-access.test.ts        # ~50 lines, 4 tests
 ```
 
-Each file is **focused and maintainable** (under 70 lines), making it easy to:
+Most files are **focused and maintainable** (under 70 lines), making it easy to:
 - Add new tests for the same property type
 - Update assertions for specific property behaviors
 - Debug failures in a specific category
@@ -389,6 +404,202 @@ const wasm = await loadCdnAppWasm(
 
 ---
 
+## Full-Flow Testing with Downstream Services
+
+Full-flow tests validate the complete request/response cycle through a CDN app that makes downstream HTTP calls. This ensures production parity for CDN apps that act as proxies or edge functions.
+
+### Architecture
+
+```
+Test Setup:
+  ┌─────────────────┐
+  │ HTTP WASM App   │  (Spawned on port 8100)
+  │ (http-responder)│  Acts as downstream service
+  └─────────────────┘
+           ↑
+           │ HTTP fetch
+           │
+  ┌─────────────────┐
+  │ CDN App         │  (headers-change)
+  │ (proxy-wasm)    │  Processes request/response
+  └─────────────────┘
+           ↑
+           │ callFullFlow()
+           │
+  ┌─────────────────┐
+  │ Integration Test│
+  └─────────────────┘
+```
+
+### Test Flow
+
+1. **Spawn Downstream Service**: Use `spawnDownstreamHttpApp()` to start an HTTP WASM app
+2. **Load CDN App**: Load the proxy-wasm CDN app with `ProxyWasmRunner`
+3. **Execute Full Flow**: Call `callFullFlow()` with downstream URL
+4. **Verify Results**: Check that all 4 hooks executed and modifications propagated
+
+### Example: Headers-Change with HTTP Responder
+
+```typescript
+import { spawnDownstreamHttpApp } from '../../utils/http-wasm-helpers';
+import { createTestRunner } from '../../utils/test-helpers';
+import { loadCdnAppWasm, loadHttpAppWasm, WASM_TEST_BINARIES } from '../../utils/wasm-loader';
+
+describe('Full-Flow: CDN Headers-Change with Downstream', () => {
+  let downstreamRunner: IWasmRunner;
+  let downstreamPort: number;
+  let cdnRunner: ProxyWasmRunner;
+
+  beforeAll(async () => {
+    // Step 1: Spawn downstream HTTP service
+    const httpResponderWasm = await loadHttpAppWasm(
+      'basic-examples',
+      WASM_TEST_BINARIES.httpApps.basicExamples.httpResponder
+    );
+
+    const downstream = await spawnDownstreamHttpApp(httpResponderWasm, 8100);
+    downstreamRunner = downstream.runner;
+    downstreamPort = downstream.port;
+
+    // Step 2: Load CDN app
+    cdnRunner = createTestRunner();
+    const cdnWasm = await loadCdnAppWasm(
+      'headers',
+      WASM_TEST_BINARIES.cdnApps.headers.headersChange
+    );
+    await cdnRunner.load(Buffer.from(cdnWasm));
+  }, 40000);
+
+  afterAll(async () => {
+    if (downstreamRunner) {
+      await downstreamRunner.cleanup();
+    }
+  });
+
+  it('should complete full flow with header injection', async () => {
+    const downstreamUrl = `http://localhost:${downstreamPort}/test`;
+
+    // Execute full flow
+    const result = await cdnRunner.callFullFlow(
+      downstreamUrl,
+      'GET',
+      {}, // Request headers
+      '', // Request body
+      {}, // Response headers (filled by downstream)
+      '', // Response body (filled by downstream)
+      200,
+      'OK',
+      {}, // Properties
+      true // Enforce production property rules
+    );
+
+    // Verify all hooks executed
+    expect(result.hookResults.onRequestHeaders).toBeDefined();
+    expect(result.hookResults.onRequestBody).toBeDefined();
+    expect(result.hookResults.onResponseHeaders).toBeDefined();
+    expect(result.hookResults.onResponseBody).toBeDefined();
+
+    // Verify final response from downstream
+    expect(result.finalResponse.status).toBe(200);
+    expect(result.finalResponse.body).toBeTruthy();
+
+    // Verify modifications propagated
+    const responseData = JSON.parse(result.finalResponse.body);
+    expect(responseData.reqHeaders['x-custom-request']).toBe('I am injected from onRequestHeaders');
+    expect(result.finalResponse.headers['x-custom-response']).toBe('I am injected from onResponseHeaders');
+  });
+});
+```
+
+### spawnDownstreamHttpApp Helper
+
+The `spawnDownstreamHttpApp()` helper in `utils/http-wasm-helpers.ts` spawns an HTTP WASM app as a downstream service:
+
+```typescript
+const downstream = await spawnDownstreamHttpApp(wasmBinary, 8100);
+// Returns: { runner: IWasmRunner, port: number }
+```
+
+**Parameters**:
+- `wasmBinary` - Compiled HTTP WASM binary (Uint8Array)
+- `expectedPort` - Expected port number (default 8100)
+
+**Returns**:
+- `runner` - HttpWasmRunner instance for cleanup
+- `port` - Port number the service is running on
+
+### Full Flow Verification Points
+
+When testing full flow, verify:
+
+1. **All 4 Hooks Execute**:
+   - `result.hookResults.onRequestHeaders` defined
+   - `result.hookResults.onRequestBody` defined
+   - `result.hookResults.onResponseHeaders` defined
+   - `result.hookResults.onResponseBody` defined
+
+2. **Request Modifications Reach Downstream**:
+   - Check `result.finalResponse.body` for downstream's echo of request
+   - Verify headers added in onRequestHeaders are present
+   - Verify body modifications in onRequestBody are present
+
+3. **Response Modifications Applied**:
+   - Check `result.finalResponse.headers` for headers added in onResponseHeaders
+   - Check `result.finalResponse.body` for body modifications in onResponseBody
+
+4. **Logs Captured**:
+   - Each hook's logs should be non-empty
+   - Verify debug messages show expected operations
+
+### Log Level in Full Flow
+
+The `callFullFlow()` method accepts an optional `logLevel` parameter:
+
+```typescript
+await cdnRunner.callFullFlow(
+  url, method, headers, body,
+  responseHeaders, responseBody,
+  status, statusText,
+  properties, enforceRules,
+  0 // logLevel: 0 = Trace (capture all logs)
+);
+```
+
+**Log Levels**:
+- `0` - Trace (all logs)
+- `1` - Debug
+- `2` - Info (default)
+- `3` - Warn
+- `4` - Error
+
+**Default**: `0` (Trace) to capture all logs including debug messages
+
+### Port Management
+
+- HTTP WASM runners use `PortManager` which allocates from 8100-8199
+- Sequential allocation: first runner gets 8100, second gets 8101, etc.
+- Shared `PortManager` instance prevents conflicts across tests
+- Ports are released when `runner.cleanup()` is called
+
+### Best Practices
+
+1. **Spawn Once**: Spawn downstream services in `beforeAll()` for performance
+2. **Cleanup Always**: Always call `runner.cleanup()` in `afterAll()`
+3. **Port Conflicts**: If tests fail with EADDRINUSE, ensure cleanup is working
+4. **Timeouts**: Use longer timeouts (40s) for `beforeAll()` when spawning multiple runners
+5. **Test Independence**: Each test should be independent and not rely on state from previous tests
+
+### Test Location
+
+Full-flow tests are located in:
+```
+server/__tests__/integration/cdn-apps/full-flow/
+```
+
+This separates them from single-hook tests in `property-access/` and other test categories.
+
+---
+
 ## Adding New Test Applications
 
 ### Step 1: Create AssemblyScript Source
@@ -572,22 +783,23 @@ pnpm test:integration
 **Completed**:
 - ✅ Property access control (read-only, read-write, write-only)
 - ✅ Property access violations and denial logging
-- ✅ ReadWrite properties: path, url, host, query (4/4)
-- ✅ ReadOnly properties: method, scheme, country (3/14)
-- ✅ Response properties: status read/write (1/1)
-- ✅ WriteOnly properties: nginx.log_field1 (1/1)
+- ✅ ReadWrite properties: path, url, host, query (4/4) - 100% coverage
+- ✅ ReadOnly properties: method, scheme, country, extension, city, asn, geo.lat, geo.long, region, continent, country.name (11/11) - 100% coverage
+- ✅ Response properties: status read/write (1/1) - 100% coverage
+- ✅ WriteOnly properties: nginx.log_field1 (1/1) - 100% coverage
 - ✅ Hook context isolation (onRequestHeaders, onResponseHeaders)
 - ✅ Modular test structure for scalability
-
-**In Progress**:
-- ⏳ Remaining ReadOnly properties (11 properties untested)
-- ⏳ onRequestBody and onResponseBody hook coverage
-- ⏳ Custom property context boundaries
+- ✅ **All 17 built-in properties tested (100% coverage)**
+- ✅ **Full-flow testing with downstream HTTP services**
+- ✅ **All 4 hooks tested in full request/response cycle (onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody)**
+- ✅ **Header manipulation testing through full flow**
+- ✅ **Body modification testing (request and response JSON injection)**
 
 **Planned**:
-- ⏳ Header manipulation testing
-- ⏳ Request/response flow testing
-- ⏳ FastEdge secrets/dictionary integration
+- ⏳ Custom property context boundaries
+- ⏳ FastEdge secrets/dictionary integration in full-flow tests
+- ⏳ Additional downstream service patterns (multiple downstreams, error handling)
+- ⏳ Performance benchmarking for full-flow execution
 
 ---
 

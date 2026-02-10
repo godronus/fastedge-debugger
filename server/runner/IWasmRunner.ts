@@ -74,6 +74,7 @@ export interface IWasmRunner {
    * @param responseStatusText Response status text
    * @param properties Shared properties
    * @param enforceProductionPropertyRules Whether to enforce property access rules
+   * @param logLevel Optional log level filter (0=trace, 1=debug, 2=info, 3=warn, 4=error) - defaults to 0 (trace) to capture all logs
    * @returns Full flow execution result
    */
   callFullFlow(
@@ -86,7 +87,8 @@ export interface IWasmRunner {
     responseStatus: number,
     responseStatusText: string,
     properties: Record<string, unknown>,
-    enforceProductionPropertyRules: boolean
+    enforceProductionPropertyRules: boolean,
+    logLevel?: number
   ): Promise<FullFlowResult>;
 
   /**
