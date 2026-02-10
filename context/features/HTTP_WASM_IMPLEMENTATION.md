@@ -2,7 +2,7 @@
 
 ## Overview
 
-The fastedge-testing server now supports both **Proxy-WASM** (CDN apps) and **HTTP WASM** (component model with wasi-http interface) test execution.
+The fastedge-debugger server now supports both **Proxy-WASM** (CDN apps) and **HTTP WASM** (component model with wasi-http interface) test execution.
 
 ## Architecture
 
