@@ -115,7 +115,7 @@ export type UISlice = UIState & UIActions;
 export interface HttpWasmState {
   // Request state
   httpMethod: string;
-  httpUrl: string;
+  httpUrl: string;  // Full URL, but host prefix (http://test.localhost/) is fixed
   httpRequestHeaders: Record<string, string>;
   httpRequestBody: string;
 
@@ -138,7 +138,7 @@ export interface HttpWasmState {
 
 export interface HttpWasmActions {
   setHttpMethod: (method: string) => void;
-  setHttpUrl: (url: string) => void;
+  setHttpUrl: (url: string) => void;  // Full URL (host prefix is enforced)
   setHttpRequestHeaders: (headers: Record<string, string>) => void;
   setHttpRequestBody: (body: string) => void;
   setHttpResponse: (response: HttpWasmState['httpResponse']) => void;

@@ -6,12 +6,25 @@
 
 ## Project Goal
 
-Build a Postman-like test runner for debugging WASM binaries that run on FastEdge. The runner supports both **Proxy-WASM (CDN apps)** and **HTTP WASM (component model)**, allowing developers to:
+Build a Postman-like test runner for debugging WASM binaries that run on FastEdge. The runner features an **adaptive UI** that provides specialized interfaces for both **Proxy-WASM (CDN apps)** and **HTTP WASM (component model)**:
 
-- Load proxy-wasm WASM binaries compiled from AssemblyScript (CDN apps)
-- Load HTTP WASM component model binaries with wasi-http interface
-- Send simulated HTTP requests through proxy-wasm hooks or directly to HTTP WASM
-- See debug output, logs, and state changes
+**HTTP WASM Interface:**
+- Simple Postman-like UI for HTTP request/response testing
+- Configure method, URL, headers, and body
+- View response with body, headers, and execution logs
+- Real-time execution with status indicators
+
+**Proxy-WASM Interface:**
+- Hook-based execution with full lifecycle control
+- Test all four hooks (onRequestHeaders, onRequestBody, onResponseHeaders, onResponseBody)
+- Property system with runtime calculation
+- Server-side configuration and state management
+
+**Common Features:**
+- Load WASM binaries with explicit type selection
+- Real-time WebSocket synchronization across clients
+- Debug output and comprehensive logging
+- Configuration save/load (Proxy-WASM)
 - Test binaries locally before deploying to production
 
 ---
@@ -48,20 +61,34 @@ Build a Postman-like test runner for debugging WASM binaries that run on FastEdg
 - Complete property system with runtime calculation
 - FastEdge host functions (secrets, dictionaries, dotenv support)
 
-**HTTP WASM (Component Model):** ✨ NEW
+**HTTP WASM (Component Model):**
 - Process-based runner using FastEdge-run CLI
 - Simple request/response execution (no hooks)
 - Port management (8100-8199 range)
 - Log capture from stdout/stderr
 - Dotenv support via FastEdge-run --dotenv flag
+- **Postman-like UI** with dedicated HTTP WASM view ✨ NEW
+
+**Adaptive User Interface:** ✨ NEW
+- **Type Selection**: Choose HTTP WASM or Proxy-WASM before loading binary
+- **Dual Views**: Automatic UI switching based on WASM type
+  - **HttpWasmView**: Simple request/response interface (Postman-like)
+  - **ProxyWasmView**: Full hook execution interface with properties
+- **Component Architecture**: Domain-based organization
+  - `components/common/`: Shared components (8 components)
+  - `components/http-wasm/`: HTTP WASM-specific UI (2 components)
+  - `components/proxy-wasm/`: Proxy-WASM-specific UI (6 components)
+  - `views/`: Main view containers (2 views)
+- **LogsViewer**: Reusable component with filtering and color-coding
 
 **Shared Features:**
 - Log capture with client-side filtering (Trace/Debug/Info/Warn/Error/Critical)
 - WebSocket real-time synchronization across clients
-- Configuration save/load system (test-config.json)
-- Explicit WASM type selection (http-wasm vs proxy-wasm)
-- Postman-like UI with CSS Modules
-- Zustand state management with auto-save
+- Configuration save/load system (Proxy-WASM only)
+- Explicit WASM type selection with radio buttons
+- Dark theme UI with CSS Modules
+- Zustand state management with Immer middleware
+- Component reuse (ResponseViewer, DictionaryInput, RequestBar)
 
 ### ⚠️ Known Issues
 

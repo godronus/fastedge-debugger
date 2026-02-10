@@ -4,6 +4,103 @@
   gap: 1rem;
 }
 
+/* Request Bar */
+.requestBar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.methodSelect {
+  flex: 0 0 auto;
+  min-width: 100px;
+  width: 100px;
+  padding: 0.5rem;
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.methodSelect:hover:not(:disabled) {
+  border-color: #ff6c37;
+}
+
+.methodSelect:focus {
+  outline: none;
+  border-color: #ff6c37;
+}
+
+.methodSelect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.urlInputContainer {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  background-color: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.urlInputContainer:focus-within {
+  border-color: #ff6c37;
+  outline: none;
+}
+
+.urlPrefix {
+  padding: 0.5rem 0 0.5rem 0.75rem;
+  color: #808080;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.urlInput {
+  flex: 1 !important;
+  width: auto !important;
+  padding: 0.5rem 0.75rem 0.5rem 0 !important;
+  background-color: transparent !important;
+  color: #e0e0e0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace !important;
+  font-size: 0.85rem !important;
+  line-height: 1.5 !important;
+  min-width: 0 !important;
+}
+
+.urlInput:focus {
+  outline: none !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.urlInput::placeholder {
+  color: #666;
+}
+
+.urlInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .tabs {
   display: flex;
   gap: 0.5rem;

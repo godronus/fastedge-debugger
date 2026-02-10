@@ -35,6 +35,7 @@ This index helps you discover relevant documentation without reading thousands o
 **When to read**: Implementing, debugging, or modifying a specific feature
 
 - `features/HTTP_WASM_IMPLEMENTATION.md` (~400 lines) - ✅ HTTP WASM runner support, FastEdge-run CLI integration, process management
+- `features/HTTP_WASM_UI.md` (~1,200 lines) - ✅ Postman-like UI for HTTP WASM, adaptive UI architecture, component organization (NEW - Feb 10, 2026)
 - `WEBSOCKET_IMPLEMENTATION.md` (586 lines) - Real-time sync between clients, event broadcasting
 - `FASTEDGE_IMPLEMENTATION.md` (645 lines) - FastEdge CDN integration, secrets, env vars
 - `PROPERTY_IMPLEMENTATION_COMPLETE.md` (495 lines) - Property system, runtime calculation

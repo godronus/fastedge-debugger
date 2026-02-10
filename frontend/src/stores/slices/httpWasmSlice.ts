@@ -3,13 +3,20 @@ import { AppStore, HttpWasmSlice, HttpWasmState } from '../types';
 import { executeHttpWasm } from '../../api';
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// HTTP WASM binaries always run on this fixed host
+export const HTTP_WASM_HOST = 'http://test.localhost/';
+
+// ============================================================================
 // DEFAULT STATE
 // ============================================================================
 
 const DEFAULT_HTTP_WASM_STATE: HttpWasmState = {
   // Request state
   httpMethod: 'GET',
-  httpUrl: 'http://example.com',
+  httpUrl: 'http://test.localhost/',  // Full URL with fixed host prefix
   httpRequestHeaders: {},
   httpRequestBody: '',
 
@@ -54,9 +61,14 @@ export const createHttpWasmSlice: StateCreator<
   },
 
   /**
-   * Set request URL
+   * Set request URL (must start with http://test.localhost/)
    */
   setHttpUrl: (url: string) => {
+    // Ensure URL always starts with the fixed host
+    if (!url.startsWith(HTTP_WASM_HOST)) {
+      url = HTTP_WASM_HOST;
+    }
+
     set(
       (state) => {
         state.httpUrl = url;

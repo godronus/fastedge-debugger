@@ -2,7 +2,9 @@
 
 ## Overview
 
-The frontend is a React 19 + TypeScript application built with Vite. It provides a modern, type-safe interface for testing proxy-wasm binaries.
+The frontend is a React 19 + TypeScript application built with Vite. It provides a modern, type-safe interface with **adaptive UI** that supports both HTTP WASM and Proxy-WASM testing workflows.
+
+**✅ Adaptive UI** (February 10, 2026): Dual-view architecture with automatic switching between HTTP WASM and Proxy-WASM interfaces based on selected type. See [HTTP_WASM_UI.md](../features/HTTP_WASM_UI.md) for details.
 
 **✅ Real-Time Updates**: WebSocket integration (January 2026) provides instant synchronization with server state. All activity from UI interactions and AI agent API calls appears in real-time. See [WEBSOCKET_IMPLEMENTATION.md](../features/WEBSOCKET_IMPLEMENTATION.md) for details.
 
@@ -25,71 +27,100 @@ The frontend is a React 19 + TypeScript application built with Vite. It provides
 ```
 frontend/
 ├── src/
-│   ├── components/          # React components (all with CSS modules)
-│   │   ├── WasmLoader/
-│   │   │   ├── WasmLoader.tsx       # File upload component
-│   │   │   ├── WasmLoader.module.css
+│   ├── components/          # React components (domain-based organization)
+│   │   ├── common/          # Shared by both views (8 components)
+│   │   │   ├── WasmLoader/
+│   │   │   │   ├── WasmLoader.tsx       # File upload with type selector
+│   │   │   │   ├── WasmLoader.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── DictionaryInput/
+│   │   │   │   ├── DictionaryInput.tsx  # Postman-style key-value editor
+│   │   │   │   ├── DictionaryInput.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── RequestBar/
+│   │   │   │   ├── RequestBar.tsx       # Method + URL input
+│   │   │   │   ├── RequestBar.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── ResponseViewer/
+│   │   │   │   ├── ResponseViewer.tsx   # Smart response display
+│   │   │   │   ├── ResponseViewer.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── CollapsiblePanel/
+│   │   │   │   ├── CollapsiblePanel.tsx # Reusable collapsible wrapper
+│   │   │   │   ├── CollapsiblePanel.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── ConnectionStatus/
+│   │   │   │   ├── ConnectionStatus.tsx # WebSocket connection indicator
+│   │   │   │   ├── ConnectionStatus.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── JsonDisplay/
+│   │   │   │   ├── JsonDisplay.tsx      # Smart JSON renderer with diff
+│   │   │   │   ├── JsonDisplay.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── Toggle/
+│   │   │   │   ├── Toggle.tsx           # Reusable toggle switch
+│   │   │   │   ├── Toggle.module.css
+│   │   │   │   └── index.tsx
+│   │   │   └── LogsViewer/             # NEW (Feb 10, 2026)
+│   │   │       ├── LogsViewer.tsx       # Reusable logs viewer with filtering
+│   │   │       ├── LogsViewer.module.css
+│   │   │       └── index.tsx
+│   │   │
+│   │   ├── proxy-wasm/      # Proxy-WASM specific (6 components)
+│   │   │   ├── HeadersEditor/
+│   │   │   │   ├── HeadersEditor.tsx    # Headers editor wrapper
+│   │   │   │   ├── HeadersEditor.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── PropertiesEditor/
+│   │   │   │   ├── PropertiesEditor.tsx # Properties with country presets
+│   │   │   │   ├── PropertiesEditor.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── ServerPropertiesPanel/
+│   │   │   │   ├── ServerPropertiesPanel.tsx # Properties panel
+│   │   │   │   ├── ServerPropertiesPanel.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── RequestTabs/
+│   │   │   │   ├── RequestTabs.tsx      # Request config tabs
+│   │   │   │   ├── RequestTabs.module.css
+│   │   │   │   └── index.tsx
+│   │   │   ├── ResponseTabs/
+│   │   │   │   ├── ResponseTabs.tsx     # Response tabs (unused)
+│   │   │   │   ├── ResponseTabs.module.css
+│   │   │   │   └── index.tsx
+│   │   │   └── HookStagesPanel/
+│   │   │       ├── HookStagesPanel.tsx  # Hook execution viewer
+│   │   │       ├── HookStagesPanel.module.css
+│   │   │       └── index.tsx
+│   │   │
+│   │   └── http-wasm/       # HTTP WASM specific (2 components) - NEW
+│   │       ├── HttpRequestPanel/
+│   │       │   ├── HttpRequestPanel.tsx  # HTTP request configuration
+│   │       │   ├── HttpRequestPanel.module.css
+│   │       │   └── index.tsx
+│   │       └── HttpResponsePanel/
+│   │           ├── HttpResponsePanel.tsx # HTTP response display
+│   │           ├── HttpResponsePanel.module.css
+│   │           └── index.tsx
+│   │
+│   ├── views/               # Main view containers - NEW (Feb 10, 2026)
+│   │   ├── HttpWasmView/
+│   │   │   ├── HttpWasmView.tsx         # HTTP WASM main container
+│   │   │   ├── HttpWasmView.module.css
 │   │   │   └── index.tsx
-│   │   ├── DictionaryInput/
-│   │   │   ├── DictionaryInput.tsx  # Postman-style key-value editor
-│   │   │   ├── DictionaryInput.module.css
-│   │   │   └── index.tsx
-│   │   ├── HeadersEditor/
-│   │   │   ├── HeadersEditor.tsx    # Wrapper around DictionaryInput
-│   │   │   ├── HeadersEditor.module.css
-│   │   │   └── index.tsx
-│   │   ├── PropertiesEditor/
-│   │   │   ├── PropertiesEditor.tsx # Properties editor with country presets
-│   │   │   ├── PropertiesEditor.module.css
-│   │   │   └── index.tsx
-│   │   ├── ServerPropertiesPanel/
-│   │   │   ├── ServerPropertiesPanel.tsx # Collapsible server properties panel
-│   │   │   ├── ServerPropertiesPanel.module.css
-│   │   │   └── index.tsx
-│   │   ├── RequestBar/
-│   │   │   ├── RequestBar.tsx       # Method + URL + Send button
-│   │   │   ├── RequestBar.module.css
-│   │   │   └── index.tsx
-│   │   ├── RequestTabs/
-│   │   │   ├── RequestTabs.tsx      # Collapsible request config (Headers/Body)
-│   │   │   ├── RequestTabs.module.css
-│   │   │   └── index.tsx
-│   │   ├── ResponseTabs/
-│   │   │   ├── ResponseTabs.tsx     # Response tabs component
-│   │   │   ├── ResponseTabs.module.css
-│   │   │   └── index.tsx
-│   │   ├── HookStagesPanel/
-│   │   │   ├── HookStagesPanel.tsx  # Collapsible hook logs/inputs/outputs viewer
-│   │   │   ├── HookStagesPanel.module.css
-│   │   │   └── index.tsx
-│   │   ├── ResponseViewer/
-│   │   │   ├── ResponseViewer.tsx   # Collapsible response display
-│   │   │   ├── ResponseViewer.module.css
-│   │   │   └── index.tsx
-│   │   ├── CollapsiblePanel/
-│   │   │   ├── CollapsiblePanel.tsx # Reusable collapsible wrapper
-│   │   │   ├── CollapsiblePanel.module.css
-│   │   │   └── index.tsx
-│   │   ├── ConnectionStatus/
-│   │   │   ├── ConnectionStatus.tsx # WebSocket connection indicator
-│   │   │   ├── ConnectionStatus.module.css
-│   │   │   └── index.tsx
-│   │   ├── JsonDisplay/
-│   │   │   ├── JsonDisplay.tsx      # Smart JSON renderer with diff capabilities
-│   │   │   ├── JsonDisplay.module.css
-│   │   │   └── index.tsx
-│   │   └── Toggle/
-│   │       ├── Toggle.tsx           # Reusable toggle switch component
-│   │       ├── Toggle.module.css
+│   │   └── ProxyWasmView/
+│   │       ├── ProxyWasmView.tsx        # Proxy-WASM main container
+│   │       ├── ProxyWasmView.module.css
 │   │       └── index.tsx
-│   ├── stores/              # Zustand state management (Feb 6, 2026)
+│   │
+│   ├── stores/              # Zustand state management
 │   │   ├── index.ts         # Main store with middleware stack
 │   │   └── slices/
-│   │       ├── requestSlice.ts   # HTTP request/response state (persisted)
-│   │       ├── wasmSlice.ts      # WASM loading state (ephemeral)
-│   │       ├── resultsSlice.ts   # Hook execution results (ephemeral)
-│   │       ├── configSlice.ts    # Properties & settings (persisted)
-│   │       └── uiSlice.ts        # UI state & tabs (partially persisted)
+│   │       ├── requestSlice.ts   # Proxy-WASM request state (persisted)
+│   │       ├── wasmSlice.ts      # WASM loading + type tracking
+│   │       ├── resultsSlice.ts   # Proxy-WASM hook results (ephemeral)
+│   │       ├── configSlice.ts    # Proxy-WASM config (persisted)
+│   │       ├── uiSlice.ts        # UI state & tabs (partial persist)
+│   │       └── httpWasmSlice.ts  # HTTP WASM state - NEW (Feb 10, 2026)
 │   ├── hooks/
 │   │   ├── useWebSocket.ts  # WebSocket connection with auto-reconnect (314 lines)
 │   │   └── websocket-types.ts # Event type definitions
@@ -113,32 +144,67 @@ frontend/
 
 ## Component Architecture
 
-**CSS Modules Migration Complete** (February 6, 2026): All 14 components now use CSS modules with a consistent folder structure:
+**Domain-Based Organization** (February 10, 2026): Components reorganized by domain for clear separation and reusability:
+
+### Component Organization
+
+**common/ - Shared Components (8)**:
+1. **WasmLoader** - File upload with type selector (HTTP WASM vs Proxy-WASM)
+2. **DictionaryInput** - Postman-style key-value editor
+3. **RequestBar** - Method + URL input
+4. **ResponseViewer** - Smart response display (JSON, HTML, images, etc.)
+5. **CollapsiblePanel** - Reusable collapsible wrapper
+6. **ConnectionStatus** - WebSocket status indicator
+7. **JsonDisplay** - JSON renderer with diff support
+8. **Toggle** - Reusable toggle switch
+9. **LogsViewer** - Logs viewer with filtering (NEW - Feb 10, 2026)
+
+**proxy-wasm/ - Proxy-WASM Specific (6)**:
+1. **HeadersEditor** - Headers editing wrapper
+2. **PropertiesEditor** - Server properties with country presets
+3. **ServerPropertiesPanel** - Collapsible properties panel
+4. **RequestTabs** - Request configuration tabs (Headers/Body)
+5. **ResponseTabs** - Response display tabs (unused currently)
+6. **HookStagesPanel** - Hook execution viewer (Logs/Inputs/Outputs)
+
+**http-wasm/ - HTTP WASM Specific (2)** - NEW (Feb 10, 2026):
+1. **HttpRequestPanel** - HTTP request configuration (method, URL, headers, body)
+2. **HttpResponsePanel** - HTTP response display (body, headers, logs)
+
+**views/ - Main Containers (2)** - NEW (Feb 10, 2026):
+1. **HttpWasmView** - HTTP WASM main container (Postman-like interface)
+2. **ProxyWasmView** - Proxy-WASM main container (hook execution interface)
+
+**Design Principles**:
+- ✅ Clear ownership - components belong to specific domains
+- ✅ Prevents coupling - domain-specific components can't accidentally depend on each other
+- ✅ Component reuse - common/ components shared by both views
+- ✅ Scalability - easy to add new WASM types
+- ✅ Maintainability - clear separation of concerns
+
+**CSS Modules**: All components use CSS modules with consistent structure:
 - Each component in its own folder: `ComponentName/ComponentName.tsx`
 - Scoped styles: `ComponentName.module.css`
 - Clean exports: `index.tsx` re-exports the component
 - No global style pollution, improved maintainability
 
-### Component List
+### App.tsx (Main Router) - REFACTORED (Feb 10, 2026)
 
-1. **WasmLoader** - File upload and config management
-2. **DictionaryInput** - Postman-style key-value editor
-3. **HeadersEditor** - Headers editing wrapper
-4. **PropertiesEditor** - Server properties with country presets
-5. **ServerPropertiesPanel** - Collapsible properties panel
-6. **RequestBar** - Method, URL, and Send button
-7. **RequestTabs** - Request configuration tabs
-8. **ResponseTabs** - Response display tabs
-9. **HookStagesPanel** - Hook execution viewer
-10. **ResponseViewer** - Response display panel
-11. **CollapsiblePanel** - Reusable collapsible wrapper
-12. **ConnectionStatus** - WebSocket status indicator
-13. **JsonDisplay** - JSON renderer with diff support
-14. **Toggle** - Reusable toggle switch component
+**New Role**: Adaptive UI router that switches between views based on WASM type.
 
-### App.tsx (Main Container)
+**Routing Logic**:
+```tsx
+{!wasmPath && <EmptyState />}
+{wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
+{wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
+```
 
-Manages global state and orchestrates all components:
+**Responsibilities**:
+- WebSocket connection management
+- Event routing to correct state slice
+- Dynamic title based on WASM type
+- Empty state when no WASM loaded
+- Load/Save Config (Proxy-WASM only)
 
 **Production Parity Headers (February 2026):**
 

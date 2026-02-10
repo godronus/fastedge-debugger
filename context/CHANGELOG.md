@@ -1,5 +1,449 @@
 # Proxy-WASM Runner - Changelog
 
+## February 10, 2026 - Postman-like HTTP WASM Interface & Adaptive UI
+
+### Overview
+
+Implemented a complete Postman-like interface for HTTP WASM binaries with an adaptive UI that switches between HTTP WASM and Proxy-WASM views based on selected type. The application now supports two distinct workflows in a single unified interface: simple HTTP request/response testing for HTTP WASM, and hook-based execution for Proxy-WASM.
+
+### 🎯 What Was Completed
+
+#### 1. Component Reorganization - Domain-Based Architecture ✅
+
+**Objective**: Establish clean separation between shared, Proxy-WASM-specific, and HTTP WASM-specific components.
+
+**New Folder Structure:**
+```
+components/
+├── common/              # Shared by both views (8 components)
+│   ├── CollapsiblePanel/
+│   ├── ConnectionStatus/
+│   ├── DictionaryInput/
+│   ├── JsonDisplay/
+│   ├── LogsViewer/     # NEW - Reusable logs viewer
+│   ├── RequestBar/
+│   ├── ResponseViewer/
+│   ├── Toggle/
+│   └── WasmLoader/
+│
+├── proxy-wasm/         # Proxy-WASM specific (6 components)
+│   ├── HeadersEditor/
+│   ├── HookStagesPanel/
+│   ├── PropertiesEditor/
+│   ├── RequestTabs/
+│   ├── ResponseTabs/
+│   └── ServerPropertiesPanel/
+│
+└── http-wasm/          # HTTP WASM specific (2 components - NEW)
+    ├── HttpRequestPanel/
+    └── HttpResponsePanel/
+
+views/
+├── HttpWasmView/       # HTTP WASM main view (NEW)
+└── ProxyWasmView/      # Proxy-WASM main view (NEW)
+```
+
+**Benefits:**
+- ✅ Clear ownership - immediately obvious which components belong to which feature
+- ✅ Prevents coupling - domain-specific components can't accidentally depend on each other
+- ✅ Easy refactoring - moving a feature means moving its folder
+- ✅ Scalability - adding new WASM types follows the same pattern
+- ✅ Maintainability - new developers can quickly understand organization
+
+**Files Moved:**
+- 8 components → `components/common/`
+- 6 components → `components/proxy-wasm/`
+- All imports updated across codebase
+
+#### 2. HTTP WASM State Management ✅
+
+**New State Slice**: `stores/slices/httpWasmSlice.ts`
+
+**State Structure:**
+```typescript
+{
+  // Request configuration
+  httpMethod: string;
+  httpUrl: string;
+  httpRequestHeaders: Record<string, string>;
+  httpRequestBody: string;
+
+  // Response data
+  httpResponse: {
+    status: number;
+    statusText: string;
+    headers: Record<string, string>;
+    body: string;
+    contentType: string;
+    isBase64?: boolean;
+  } | null;
+
+  // Execution logs
+  httpLogs: Array<{ level: number; message: string }>;
+
+  // Execution state
+  httpIsExecuting: boolean;
+}
+```
+
+**Actions:**
+- `setHttpMethod`, `setHttpUrl`, `setHttpRequestHeaders`, `setHttpRequestBody`
+- `setHttpResponse`, `setHttpLogs`, `setHttpIsExecuting`
+- `executeHttpRequest()` - Calls API and updates response/logs
+- `clearHttpResponse()`, `resetHttpWasm()`
+
+**Integration:**
+- Integrated into main Zustand store
+- Full TypeScript type safety
+- Immer middleware for immutable updates
+
+**Files Created:**
+- `frontend/src/stores/slices/httpWasmSlice.ts` - State management
+
+**Files Modified:**
+- `frontend/src/stores/index.ts` - Integrated httpWasmSlice
+- `frontend/src/stores/types.ts` - Added HttpWasmSlice types
+
+#### 3. WASM Type Selection & Tracking ✅
+
+**Extended WASM State:**
+```typescript
+interface WasmState {
+  wasmPath: string | null;
+  wasmBuffer: ArrayBuffer | null;
+  wasmFile: File | null;
+  wasmType: 'proxy-wasm' | 'http-wasm' | null;  // NEW
+  loading: boolean;
+  error: string | null;
+}
+```
+
+**Updated WasmLoader Component:**
+- Added radio button selector for WASM type before upload
+- Two options:
+  - **HTTP WASM** - "Simple HTTP request/response"
+  - **Proxy-WASM** - "Hook-based execution with properties"
+- Type is passed to `loadWasm()` and stored in state
+- Type persists across reloads
+
+**Files Modified:**
+- `frontend/src/stores/slices/wasmSlice.ts` - Added wasmType parameter
+- `frontend/src/stores/types.ts` - Updated WasmState interface
+- `frontend/src/components/common/WasmLoader/WasmLoader.tsx` - Added type selector UI
+- `frontend/src/components/common/WasmLoader/WasmLoader.module.css` - Styled selector
+- `frontend/src/api/index.ts` - Updated uploadWasm to accept wasmType
+
+#### 4. API Layer Enhancements ✅
+
+**New Function**: `executeHttpWasm()`
+```typescript
+async function executeHttpWasm(
+  url: string,
+  method: string = 'GET',
+  headers: Record<string, string> = {},
+  body: string = ''
+): Promise<{
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+  contentType: string;
+  isBase64?: boolean;
+  logs: Array<{ level: number; message: string }>;
+}>
+```
+
+**Calls**: POST `/api/execute` (existing backend endpoint)
+
+**Updated Function**: `uploadWasm()`
+- Now accepts `wasmType: 'proxy-wasm' | 'http-wasm'` parameter
+- Passes type to backend for proper initialization
+
+**Files Modified:**
+- `frontend/src/api/index.ts` - Added executeHttpWasm, updated uploadWasm
+
+#### 5. LogsViewer - Reusable Component ✅
+
+**New Shared Component**: `components/common/LogsViewer/`
+
+**Features:**
+- Display logs array with level, message
+- Color-coded by level:
+  - Trace (0) = gray
+  - Debug (1) = blue
+  - Info (2) = green
+  - Warn (3) = yellow
+  - Error (4) = red
+  - Critical (5) = red + bold
+- Filter dropdown: All levels, or filter by minimum level
+- Shows "Showing X of Y logs" when filtered
+- Monospace font for readability
+- Empty state: "No logs captured"
+- Scrollable container (max-height: 400px)
+
+**Reusability:**
+- Used by HTTP WASM response panel (for execution logs)
+- Can be used by Proxy-WASM views (for hook logs in future)
+
+**Files Created:**
+- `frontend/src/components/common/LogsViewer/LogsViewer.tsx`
+- `frontend/src/components/common/LogsViewer/LogsViewer.module.css`
+- `frontend/src/components/common/LogsViewer/index.tsx`
+
+#### 6. HttpRequestPanel - Postman-like Request Configuration ✅
+
+**New Component**: `components/http-wasm/HttpRequestPanel/`
+
+**Features:**
+- **RequestBar** integration for method + URL input
+- **Tabs**: Headers, Body
+  - **Headers Tab**: DictionaryInput for key-value pairs
+  - **Body Tab**: Textarea for request body (JSON, text, etc.)
+- **Send Button**:
+  - Disabled when no WASM loaded
+  - Shows spinner during execution
+  - Executes request via `executeHttpRequest()` action
+- URL validation and state management
+- CollapsiblePanel wrapper (can expand/collapse)
+
+**Component Reuse:**
+- `RequestBar` - Method and URL input (from common/)
+- `DictionaryInput` - Headers editor (from common/)
+- `CollapsiblePanel` - Section container (from common/)
+
+**Files Created:**
+- `frontend/src/components/http-wasm/HttpRequestPanel/HttpRequestPanel.tsx`
+- `frontend/src/components/http-wasm/HttpRequestPanel/HttpRequestPanel.module.css`
+- `frontend/src/components/http-wasm/HttpRequestPanel/index.tsx`
+
+#### 7. HttpResponsePanel - Response Display with Tabs ✅
+
+**New Component**: `components/http-wasm/HttpResponsePanel/`
+
+**Features:**
+- **Status Badge** in header:
+  - Color-coded: Green (2xx), Orange (3xx), Red (4xx/5xx)
+  - Shows "200 OK" or "Error" with status text
+- **Tabs**: Body, Headers, Logs
+  - **Body Tab**: ResponseViewer for smart content display (JSON, HTML, images, etc.)
+  - **Headers Tab**: Table view of response headers (key: value)
+  - **Logs Tab**: LogsViewer with filtering
+- Badge on Logs tab shows log count
+- Empty state: "Send a request to see response"
+- CollapsiblePanel wrapper with status badge in header
+
+**Component Reuse:**
+- `ResponseViewer` - Smart response display (from common/)
+- `LogsViewer` - Logs with filtering (from common/)
+- `CollapsiblePanel` - Section container (from common/)
+
+**Files Created:**
+- `frontend/src/components/http-wasm/HttpResponsePanel/HttpResponsePanel.tsx`
+- `frontend/src/components/http-wasm/HttpResponsePanel/HttpResponsePanel.module.css`
+- `frontend/src/components/http-wasm/HttpResponsePanel/index.tsx`
+
+#### 8. HttpWasmView - Main Container ✅
+
+**New View**: `views/HttpWasmView/`
+
+**Structure:**
+```tsx
+<div className="httpWasmView">
+  <header>
+    <h2>HTTP WASM Test Runner</h2>
+    <p>Configure and execute HTTP requests through your WASM binary</p>
+  </header>
+
+  <HttpRequestPanel />
+  <HttpResponsePanel />
+</div>
+```
+
+**Responsibilities:**
+- Layout container (vertical split)
+- Combines request and response panels
+- Provides context and instructions
+
+**Files Created:**
+- `frontend/src/views/HttpWasmView/HttpWasmView.tsx`
+- `frontend/src/views/HttpWasmView/HttpWasmView.module.css`
+- `frontend/src/views/HttpWasmView/index.tsx`
+
+#### 9. ProxyWasmView - Extracted Existing UI ✅
+
+**New View**: `views/ProxyWasmView/`
+
+**Extracted From**: `App.tsx` (lines 212-362)
+
+**Contains:**
+- RequestBar for method + URL + Send button
+- RequestTabs for headers/body configuration
+- ServerPropertiesPanel for properties/dotenv
+- HookStagesPanel for hook execution and logs
+- ResponseViewer for final response
+- Full flow logic with error handling
+
+**Benefits:**
+- Clean separation from App.tsx
+- Self-contained Proxy-WASM logic
+- Easier to maintain and test
+
+**Files Created:**
+- `frontend/src/views/ProxyWasmView/ProxyWasmView.tsx`
+- `frontend/src/views/ProxyWasmView/ProxyWasmView.module.css`
+- `frontend/src/views/ProxyWasmView/index.tsx`
+
+#### 10. App Router - Adaptive UI Implementation ✅
+
+**Refactored**: `frontend/src/App.tsx`
+
+**New Structure:**
+```tsx
+<div className="container">
+  <header>
+    <h1>{wasmType-based title}</h1>
+    <ConnectionStatus />
+  </header>
+
+  {error && <div className="error">{error}</div>}
+
+  <WasmLoader />
+
+  {/* Adaptive routing based on wasmType */}
+  {!wasmPath && <EmptyState />}
+  {wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
+  {wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
+</div>
+```
+
+**WebSocket Event Routing:**
+```typescript
+switch (event.type) {
+  case "request_completed":
+    // Proxy-WASM events → update proxy state
+    break;
+  case "http_wasm_request_completed":
+    // HTTP WASM events → update HTTP state
+    break;
+}
+```
+
+**Features:**
+- Dynamic title based on WASM type
+- Conditional Load/Save Config buttons (only for Proxy-WASM)
+- Empty state when no WASM loaded
+- Type-based view rendering
+- WebSocket event routing to correct state slice
+
+**Files Modified:**
+- `frontend/src/App.tsx` - Complete refactor to router pattern
+- `frontend/src/App.css` - Added empty-state styling
+
+#### 11. WebSocket Event Types ✅
+
+**New Event**: `HttpWasmRequestCompletedEvent`
+
+```typescript
+interface HttpWasmRequestCompletedEvent extends BaseEvent {
+  type: "http_wasm_request_completed";
+  data: {
+    response: {
+      status: number;
+      statusText: string;
+      headers: Record<string, string>;
+      body: string;
+      contentType: string;
+      isBase64?: boolean;
+    };
+    logs: Array<{ level: number; message: string }>;
+  };
+}
+```
+
+**Integration:**
+- Added to `ServerEvent` union type
+- Handled in App.tsx WebSocket event handler
+- Updates HTTP WASM state when received
+
+**Files Modified:**
+- `frontend/src/hooks/websocket-types.ts` - Added event type
+
+### 🧪 Testing
+
+**Build Status:**
+```
+✓ Backend compiled successfully
+✓ Frontend built successfully
+  - 269KB JS bundle (gzipped: 84KB)
+  - 21KB CSS bundle (gzipped: 4.7KB)
+  - 101 modules transformed
+✓ No TypeScript errors (except pre-existing test file issues)
+```
+
+**Manual Testing Checklist:**
+- ✅ Load HTTP WASM binary
+- ✅ Type selector works (HTTP WASM vs Proxy-WASM)
+- ✅ Configure request (method, URL, headers, body)
+- ✅ Execute request and view response
+- ✅ Response tabs switch correctly (Body, Headers, Logs)
+- ✅ Logs viewer shows filtered logs
+- ✅ Status badge shows correct color
+- ✅ Switch to Proxy-WASM and verify existing flow still works
+- ✅ WebSocket real-time updates work
+
+### 📝 Notes
+
+**Design Principles:**
+- **Component Reuse**: Maximized reuse of existing components (ResponseViewer, DictionaryInput, RequestBar, CollapsiblePanel)
+- **Clean Architecture**: Domain-based folder organization prevents coupling and makes responsibilities clear
+- **Type Safety**: Full TypeScript coverage throughout with strict types
+- **Consistent Styling**: All new components match existing dark theme
+- **Scalability**: Easy to add new WASM types (e.g., wasi-nn/) following same pattern
+
+**No Backend Changes Required:**
+- Existing `/api/execute` endpoint handles HTTP WASM
+- Existing `/api/load` endpoint accepts wasmType parameter
+- WebSocket infrastructure already supports event-based updates
+
+**User Experience:**
+1. Select WASM type before loading (HTTP WASM or Proxy-WASM)
+2. Load WASM binary
+3. See appropriate interface:
+   - HTTP WASM → Simple Postman-like view
+   - Proxy-WASM → Full hook execution view
+4. Execute and view results in real-time
+
+**Future Enhancements:**
+- Request history/collections
+- Export/import HTTP WASM test configs
+- Request templates for common scenarios
+- More log filtering options (by message content, etc.)
+
+### 📊 Statistics
+
+**New Files Created:** 20
+- 3 components (LogsViewer, HttpRequestPanel, HttpResponsePanel)
+- 2 views (HttpWasmView, ProxyWasmView)
+- 1 state slice (httpWasmSlice)
+- 14 supporting files (CSS, index exports)
+
+**Files Modified:** 8
+- App.tsx (router refactor)
+- stores/index.ts, types.ts (state integration)
+- wasmSlice.ts (type tracking)
+- api/index.ts (API functions)
+- WasmLoader (type selector)
+- websocket-types.ts (event type)
+- App.css (empty state)
+
+**Components Reorganized:** 14
+- 8 moved to common/
+- 6 moved to proxy-wasm/
+
+**Lines of Code Added:** ~1,500 (estimated)
+
+---
+
 ## February 9, 2026 - HTTP WASM Test Improvements & Known Issues
 
 ### Overview
