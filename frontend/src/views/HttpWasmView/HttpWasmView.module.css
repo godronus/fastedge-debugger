@@ -1,0 +1,53 @@
+.httpWasmView {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+.description {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #b0b0b0;
+}
+
+.panels {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Scrollbar styling */
+.panels::-webkit-scrollbar {
+  width: 8px;
+}
+
+.panels::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.panels::-webkit-scrollbar-thumb {
+  background: #3d3d3d;
+  border-radius: 4px;
+}
+
+.panels::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

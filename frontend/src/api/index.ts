@@ -4,6 +4,7 @@ const API_BASE = "/api";
 
 export async function uploadWasm(
   file: File,
+  wasmType: 'proxy-wasm' | 'http-wasm',
   dotenvEnabled: boolean = true,
 ): Promise<string> {
   // Read file as ArrayBuffer and convert to base64
@@ -20,7 +21,7 @@ export async function uploadWasm(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ wasmBase64: base64, dotenvEnabled }),
+    body: JSON.stringify({ wasmBase64: base64, wasmType, dotenvEnabled }),
   });
 
   if (!response.ok) {
@@ -28,7 +29,7 @@ export async function uploadWasm(
     throw new Error(result.error || "Failed to load WASM file");
   }
 
-  const data = await response.json();
+  await response.json();
   return file.name; // Return filename as "path"
 }
 
@@ -188,4 +189,42 @@ export async function saveConfig(config: TestConfig): Promise<void> {
     const result = await response.json();
     throw new Error(result.error || "Failed to save config");
   }
+}
+
+export async function executeHttpWasm(
+  url: string,
+  method: string = 'GET',
+  headers: Record<string, string> = {},
+  body: string = ''
+): Promise<{
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
+  contentType: string;
+  isBase64?: boolean;
+  logs: Array<{ level: number; message: string }>;
+}> {
+  const payload = {
+    url,
+    method,
+    headers,
+    body,
+  };
+
+  const response = await fetch(`${API_BASE}/execute`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.error || "Failed to execute HTTP WASM");
+  }
+
+  const result = await response.json();
+  return result.result;
 }

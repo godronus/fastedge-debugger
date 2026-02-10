@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { HeadersEditor } from "../HeadersEditor";
-import { CollapsiblePanel } from "../CollapsiblePanel";
+import { CollapsiblePanel } from "../../common/CollapsiblePanel";
 import styles from "./RequestTabs.module.css";
 
 interface DefaultValue {

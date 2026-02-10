@@ -35,12 +35,13 @@ export interface WasmState {
   wasmPath: string | null;
   wasmBuffer: ArrayBuffer | null;
   wasmFile: File | null;
+  wasmType: 'proxy-wasm' | 'http-wasm' | null;
   loading: boolean;
   error: string | null;
 }
 
 export interface WasmActions {
-  loadWasm: (file: File, dotenvEnabled: boolean) => Promise<void>;
+  loadWasm: (file: File, wasmType: 'proxy-wasm' | 'http-wasm', dotenvEnabled: boolean) => Promise<void>;
   reloadWasm: (dotenvEnabled: boolean) => Promise<void>;
   clearWasm: () => void;
   setLoading: (loading: boolean) => void;
@@ -110,11 +111,51 @@ export interface UIActions {
 
 export type UISlice = UIState & UIActions;
 
+// HTTP WASM Store
+export interface HttpWasmState {
+  // Request state
+  httpMethod: string;
+  httpUrl: string;
+  httpRequestHeaders: Record<string, string>;
+  httpRequestBody: string;
+
+  // Response state
+  httpResponse: {
+    status: number;
+    statusText: string;
+    headers: Record<string, string>;
+    body: string;
+    contentType: string;
+    isBase64?: boolean;
+  } | null;
+
+  // Logs
+  httpLogs: Array<{ level: number; message: string }>;
+
+  // Execution state
+  httpIsExecuting: boolean;
+}
+
+export interface HttpWasmActions {
+  setHttpMethod: (method: string) => void;
+  setHttpUrl: (url: string) => void;
+  setHttpRequestHeaders: (headers: Record<string, string>) => void;
+  setHttpRequestBody: (body: string) => void;
+  setHttpResponse: (response: HttpWasmState['httpResponse']) => void;
+  setHttpLogs: (logs: Array<{ level: number; message: string }>) => void;
+  setHttpIsExecuting: (isExecuting: boolean) => void;
+  executeHttpRequest: () => Promise<void>;
+  clearHttpResponse: () => void;
+  resetHttpWasm: () => void;
+}
+
+export type HttpWasmSlice = HttpWasmState & HttpWasmActions;
+
 // ============================================================================
 // COMBINED APP STORE
 // ============================================================================
 
-export type AppStore = RequestSlice & WasmSlice & ResultsSlice & ConfigSlice & UISlice;
+export type AppStore = RequestSlice & WasmSlice & ResultsSlice & ConfigSlice & UISlice & HttpWasmSlice;
 
 // ============================================================================
 // UTILITY TYPES

@@ -1,6 +1,6 @@
-import { CollapsiblePanel } from "../CollapsiblePanel";
+import { CollapsiblePanel } from "../../common/CollapsiblePanel";
 import { PropertiesEditor } from "../PropertiesEditor";
-import { Toggle } from "../Toggle";
+import { Toggle } from "../../common/Toggle";
 import styles from "./ServerPropertiesPanel.module.css";
 
 interface ServerPropertiesPanelProps {

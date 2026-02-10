@@ -1,7 +1,7 @@
 import { useState, ChangeEvent } from "react";
 import { HookCall, HookResult, LogEntry } from "../../types";
-import { CollapsiblePanel } from "../CollapsiblePanel";
-import { JsonDisplay } from "../JsonDisplay";
+import { CollapsiblePanel } from "../../common/CollapsiblePanel";
+import { JsonDisplay } from "../../common/JsonDisplay";
 import styles from "./HookStagesPanel.module.css";
 
 interface HookStagesPanelProps {

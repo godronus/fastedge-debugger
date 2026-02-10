@@ -1,4 +1,4 @@
-import { DictionaryInput } from "../DictionaryInput";
+import { DictionaryInput } from "../../common/DictionaryInput";
 
 interface DefaultValue {
   value: string;

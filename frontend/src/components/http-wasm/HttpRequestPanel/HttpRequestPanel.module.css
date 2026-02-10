@@ -1,0 +1,129 @@
+.requestPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  background-color: transparent;
+  color: #b0b0b0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  color: #e0e0e0;
+  background-color: #2d2d2d;
+}
+
+.tab.active {
+  color: #ff6c37;
+  border-bottom-color: #ff6c37;
+}
+
+.tabContent {
+  padding: 1rem 0;
+}
+
+.headersTab,
+.bodyTab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.headersTab label,
+.bodyTab label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.bodyTextarea {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.bodyTextarea:focus {
+  outline: none;
+  border-color: #ff6c37;
+}
+
+.actionBar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #3d3d3d;
+}
+
+.sendButton {
+  padding: 0.75rem 2rem;
+  background-color: #ff6c37;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sendButton:hover:not(:disabled) {
+  background-color: #ff8555;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 108, 55, 0.3);
+}
+
+.sendButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.sendButton:disabled {
+  background-color: #555;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: #b0b0b0;
+  font-style: italic;
+}

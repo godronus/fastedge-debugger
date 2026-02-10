@@ -2,54 +2,41 @@ import { useEffect, useRef } from "react";
 import { useAppStore } from "./stores";
 import { useWebSocket } from "./hooks/useWebSocket";
 import type { ServerEvent } from "./hooks/websocket-types";
-import { WasmLoader } from "./components/WasmLoader";
-import { ConnectionStatus } from "./components/ConnectionStatus";
-import { RequestBar } from "./components/RequestBar";
-import { RequestTabs } from "./components/RequestTabs";
-import { ServerPropertiesPanel } from "./components/ServerPropertiesPanel";
-import { HookStagesPanel } from "./components/HookStagesPanel";
-import { ResponseViewer } from "./components/ResponseViewer";
-import { applyDefaultContentType } from "./utils/contentType";
+import { WasmLoader } from "./components/common/WasmLoader";
+import { ConnectionStatus } from "./components/common/ConnectionStatus";
+import { HttpWasmView } from "./views/HttpWasmView";
+import { ProxyWasmView } from "./views/ProxyWasmView";
 import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI } from "./api";
 import "./App.css";
 
 function App() {
   // Get state and actions from stores
   const {
-    // Request state
-    method,
-    url,
-    requestHeaders,
-    requestBody,
-    responseHeaders,
-    responseBody,
-    setMethod,
-    setUrl,
-    setRequestHeaders,
-    setRequestBody,
-
     // WASM state
     wasmPath,
     wasmFile,
+    wasmType,
     loading,
     error,
     loadWasm,
     reloadWasm,
 
-    // Results state
-    hookResults,
-    finalResponse,
+    // Proxy-WASM state (for WebSocket event handling)
+    setUrl,
+    setMethod,
+    setRequestHeaders,
     setHookResults,
     setFinalResponse,
+    hookResults,
+    properties,
+    mergeProperties,
+
+    // HTTP WASM state (for WebSocket event handling)
+    setHttpResponse,
+    setHttpLogs,
 
     // Config state
-    properties,
     dotenvEnabled,
-    logLevel,
-    setProperties,
-    mergeProperties,
-    setDotenvEnabled,
-    setLogLevel,
     loadFromConfig,
     exportConfig,
 
@@ -59,7 +46,7 @@ function App() {
   } = useAppStore();
 
   // WebSocket connection for real-time updates
-  const { status, lastEvent } = useWebSocket({
+  const { status } = useWebSocket({
     autoConnect: true,
     debug: true, // Enable debug logging to console
     onEvent: handleServerEvent,
@@ -105,7 +92,7 @@ function App() {
         break;
 
       case "request_started":
-        // Request started - update URL and method in UI
+        // Request started - update URL and method in UI (for proxy-wasm)
         setUrl(event.data.url);
         setMethod(event.data.method);
         setRequestHeaders(event.data.headers);
@@ -115,13 +102,13 @@ function App() {
         break;
 
       case "hook_executed":
-        // Individual hook executed - update hook results incrementally
+        // Individual hook executed - update hook results incrementally (for proxy-wasm)
         const hookName = event.data.hook;
         setHookResults({
           ...hookResults,
           [hookName]: {
             logs: [], // Will be populated by request_completed
-            returnValue: event.data.returnCode,
+            returnValue: event.data.returnCode ?? undefined,
             input: event.data.input,
             output: event.data.output,
           },
@@ -129,7 +116,7 @@ function App() {
         break;
 
       case "request_completed":
-        // Full request completed - update all results and final response
+        // Full request completed (for proxy-wasm) - update all results and final response
         setHookResults(event.data.hookResults);
         setFinalResponse(event.data.finalResponse);
 
@@ -152,7 +139,7 @@ function App() {
         break;
 
       case "request_failed":
-        // Request failed - show error
+        // Request failed (for proxy-wasm) - show error
         const errorResult = {
           logs: [],
           returnValue: undefined,
@@ -167,8 +154,15 @@ function App() {
         setFinalResponse(null);
         break;
 
+      case "http_wasm_request_completed":
+        // HTTP WASM request completed - update response and logs
+        console.log("[WebSocket] http_wasm_request_completed:", event.data);
+        setHttpResponse(event.data.response);
+        setHttpLogs(event.data.logs);
+        break;
+
       case "properties_updated":
-        // Properties updated externally
+        // Properties updated externally (for proxy-wasm)
         mergeProperties(event.data.properties);
         break;
 
@@ -209,156 +203,35 @@ function App() {
     }
   };
 
-  const hookCall = {
-    request_headers: requestHeaders,
-    request_body: requestBody,
-    request_trailers: {},
-    response_headers: responseHeaders,
-    response_body: responseBody,
-    response_trailers: {},
-    properties,
-  };
-
   return (
     <div className="container">
       <header>
-        <h1>Proxy-WASM Test Runner</h1>
+        <h1>
+          {wasmType === 'http-wasm' ? 'HTTP WASM Debugger' :
+           wasmType === 'proxy-wasm' ? 'Proxy-WASM Test Runner' :
+           'FastEdge WASM Debugger'}
+        </h1>
         <ConnectionStatus status={wsStatus} />
       </header>
 
       {error && <div className="error">{error}</div>}
 
       <WasmLoader
-        onFileLoad={(file) => loadWasm(file, dotenvEnabled)}
+        onFileLoad={(file, type) => loadWasm(file, type, dotenvEnabled)}
         loading={loading}
-        onLoadConfig={handleLoadConfig}
-        onSaveConfig={handleSaveConfig}
+        onLoadConfig={wasmType === 'proxy-wasm' ? handleLoadConfig : undefined}
+        onSaveConfig={wasmType === 'proxy-wasm' ? handleSaveConfig : undefined}
       />
 
-      <RequestBar
-        method={method}
-        url={url}
-        wasmLoaded={wasmPath !== null}
-        onMethodChange={setMethod}
-        onUrlChange={setUrl}
-        onSend={async () => {
-          try {
-            const finalHeaders = applyDefaultContentType(
-              requestHeaders,
-              requestBody,
-            );
+      {/* Show appropriate view based on WASM type */}
+      {!wasmPath && (
+        <div className="empty-state">
+          <p>👆 Select a WASM type and load a binary to get started</p>
+        </div>
+      )}
 
-            const { sendFullFlow } = await import("./api");
-            const {
-              hookResults: newHookResults,
-              finalResponse: response,
-              calculatedProperties,
-            } = await sendFullFlow(url, method, {
-              ...hookCall,
-              request_headers: finalHeaders,
-              logLevel,
-            });
-
-            // Update hook results and final response
-            setHookResults(newHookResults);
-            setFinalResponse(response);
-
-            // Merge calculated properties into the UI
-            console.log(
-              "[API] Received calculatedProperties:",
-              calculatedProperties,
-            );
-            if (calculatedProperties) {
-              console.log("[API] Updating properties. Previous:", properties);
-              const propsToMerge: Record<string, string> = {};
-              // Always update calculated properties - they change with each request
-              for (const [key, value] of Object.entries(calculatedProperties)) {
-                propsToMerge[key] = String(value);
-              }
-              console.log("[API] Merging properties:", propsToMerge);
-              mergeProperties(propsToMerge);
-            }
-          } catch (err) {
-            // Show error in all hooks
-            const errorMsg =
-              err instanceof Error ? err.message : "Unknown error";
-            const errorResult = {
-              logs: [],
-              returnValue: undefined,
-              error: errorMsg,
-            };
-            setHookResults({
-              onRequestHeaders: errorResult,
-              onRequestBody: errorResult,
-              onResponseHeaders: errorResult,
-              onResponseBody: errorResult,
-            });
-            setFinalResponse(null);
-          }
-        }}
-      />
-
-      <RequestTabs
-        headers={requestHeaders}
-        body={requestBody}
-        onHeadersChange={setRequestHeaders}
-        onBodyChange={setRequestBody}
-        defaultHeaders={{
-          "user-agent": {
-            value:
-              "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0",
-            enabled: false,
-            placeholder: "Browser user agent",
-          },
-          accept: {
-            value:
-              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            enabled: false,
-            placeholder: "Browser accept types",
-          },
-          "accept-language": {
-            value: "en-US,en;q=0.9",
-            enabled: false,
-            placeholder: "Browser languages",
-          },
-          "accept-encoding": {
-            value: "gzip, deflate, br, zstd",
-            enabled: false,
-            placeholder: "Browser encodings",
-          },
-          host: {
-            value: "",
-            enabled: false,
-            placeholder: "<Calculated from URL>",
-          },
-          "content-type": {
-            value: "",
-            enabled: false,
-            placeholder: "<Calculated from body>",
-          },
-          Authorization: {
-            value: "",
-            enabled: false,
-            placeholder: "Bearer <token>",
-          },
-        }}
-      />
-
-      <ServerPropertiesPanel
-        properties={properties}
-        onPropertiesChange={setProperties}
-        dotenvEnabled={dotenvEnabled}
-        onDotenvToggle={setDotenvEnabled}
-      />
-
-      <HookStagesPanel
-        results={hookResults}
-        hookCall={hookCall}
-        logLevel={logLevel}
-        onLogLevelChange={setLogLevel}
-      />
-
-      <ResponseViewer response={finalResponse} />
+      {wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
+      {wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
     </div>
   );
 }

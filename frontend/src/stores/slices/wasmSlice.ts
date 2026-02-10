@@ -10,6 +10,7 @@ const DEFAULT_WASM_STATE: WasmState = {
   wasmPath: null,
   wasmBuffer: null,
   wasmFile: null,
+  wasmType: null,
   loading: false,
   error: null,
 };
@@ -35,7 +36,7 @@ export const createWasmSlice: StateCreator<
    * Load a WASM file from disk
    * Reads the file as ArrayBuffer, uploads it to the server, and creates a blob URL
    */
-  loadWasm: async (file: File, dotenvEnabled: boolean) => {
+  loadWasm: async (file: File, wasmType: 'proxy-wasm' | 'http-wasm', dotenvEnabled: boolean) => {
     // Set loading state
     set(
       (state) => {
@@ -51,7 +52,7 @@ export const createWasmSlice: StateCreator<
       const buffer = await file.arrayBuffer();
 
       // Upload to server and get path
-      const path = await uploadWasm(file, dotenvEnabled);
+      const path = await uploadWasm(file, wasmType, dotenvEnabled);
 
       // Update state with loaded WASM
       set(
@@ -59,6 +60,7 @@ export const createWasmSlice: StateCreator<
           state.wasmPath = path;
           state.wasmBuffer = buffer;
           state.wasmFile = file; // Store file for reload capability
+          state.wasmType = wasmType;
           state.loading = false;
           state.error = null;
         },
@@ -84,10 +86,10 @@ export const createWasmSlice: StateCreator<
    * Useful when .env changes or server needs to reload
    */
   reloadWasm: async (dotenvEnabled: boolean) => {
-    const { wasmFile, loadWasm } = get();
+    const { wasmFile, wasmType, loadWasm } = get();
 
     // Check if there's a file to reload
-    if (!wasmFile) {
+    if (!wasmFile || !wasmType) {
       set(
         (state) => {
           state.error = 'No WASM file loaded to reload';
@@ -99,7 +101,7 @@ export const createWasmSlice: StateCreator<
     }
 
     // Reuse loadWasm logic
-    await loadWasm(wasmFile, dotenvEnabled);
+    await loadWasm(wasmFile, wasmType, dotenvEnabled);
   },
 
   /**
@@ -112,6 +114,7 @@ export const createWasmSlice: StateCreator<
         state.wasmPath = null;
         state.wasmBuffer = null;
         state.wasmFile = null;
+        state.wasmType = null;
         state.loading = false;
         state.error = null;
       },

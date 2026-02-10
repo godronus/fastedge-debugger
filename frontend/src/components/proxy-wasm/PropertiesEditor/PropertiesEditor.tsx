@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DictionaryInput } from "../DictionaryInput";
+import { DictionaryInput } from "../../common/DictionaryInput";
 import styles from "./PropertiesEditor.module.css";
 
 interface PropertiesEditorProps {

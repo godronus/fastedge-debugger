@@ -147,3 +147,18 @@ pre {
   color: #b0b0b0;
   line-height: 1.4;
 }
+
+.empty-state {
+  padding: 4rem 2rem;
+  text-align: center;
+  color: #b0b0b0;
+  background-color: #1e1e1e;
+  border: 2px dashed #3d3d3d;
+  border-radius: 8px;
+  margin: 2rem;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 1.1rem;
+}

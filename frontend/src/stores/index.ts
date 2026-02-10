@@ -7,6 +7,7 @@ import { createWasmSlice } from './slices/wasmSlice';
 import { createResultsSlice } from './slices/resultsSlice';
 import { createConfigSlice } from './slices/configSlice';
 import { createUISlice } from './slices/uiSlice';
+import { createHttpWasmSlice } from './slices/httpWasmSlice';
 import type { AppStore, PersistConfig } from './types';
 
 // Create debounced localStorage
@@ -24,6 +25,7 @@ export const useAppStore = create<AppStore>()(
           ...createResultsSlice(...args),
           ...createConfigSlice(...args),
           ...createUISlice(...args),
+          ...createHttpWasmSlice(...args),
         }),
         {
           name: 'proxy-runner-config',
