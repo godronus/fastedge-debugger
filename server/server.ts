@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { WasmRunnerFactory } from "./runner/WasmRunnerFactory.js";
 import type { IWasmRunner } from "./runner/IWasmRunner.js";
 import { WebSocketManager, StateManager } from "./websocket/index.js";
+import { detectWasmType } from "./utils/wasmTypeDetector.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -25,7 +26,6 @@ app.post("/api/load", async (req: Request, res: Response) => {
   const {
     wasmBase64,
     dotenvEnabled = true,
-    wasmType,
   } = req.body ?? {};
 
   // Validate required parameters
@@ -33,25 +33,24 @@ app.post("/api/load", async (req: Request, res: Response) => {
     res.status(400).json({ error: "Missing wasmBase64" });
     return;
   }
-  if (!wasmType || !["http-wasm", "proxy-wasm"].includes(wasmType)) {
-    res.status(400).json({
-      error: "Invalid or missing wasmType (must be 'http-wasm' or 'proxy-wasm')",
-    });
-    return;
-  }
 
   try {
+    // Convert to buffer
+    const buffer = Buffer.from(wasmBase64, "base64");
+
+    // Auto-detect WASM type
+    const wasmType = await detectWasmType(buffer);
+
     // Cleanup previous runner
     if (currentRunner) {
       await currentRunner.cleanup();
     }
 
-    // Create appropriate runner
+    // Create appropriate runner based on detected type
     currentRunner = runnerFactory.createRunner(wasmType, dotenvEnabled);
     currentRunner.setStateManager(stateManager);
 
     // Load WASM
-    const buffer = Buffer.from(wasmBase64, "base64");
     await currentRunner.load(buffer, { dotenvEnabled });
 
     // Emit WASM loaded event

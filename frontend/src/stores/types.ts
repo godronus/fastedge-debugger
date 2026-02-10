@@ -41,7 +41,7 @@ export interface WasmState {
 }
 
 export interface WasmActions {
-  loadWasm: (file: File, wasmType: 'proxy-wasm' | 'http-wasm', dotenvEnabled: boolean) => Promise<void>;
+  loadWasm: (file: File, dotenvEnabled: boolean) => Promise<void>;
   reloadWasm: (dotenvEnabled: boolean) => Promise<void>;
   clearWasm: () => void;
   setLoading: (loading: boolean) => void;

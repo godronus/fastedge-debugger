@@ -34,9 +34,9 @@ export const createWasmSlice: StateCreator<
 
   /**
    * Load a WASM file from disk
-   * Reads the file as ArrayBuffer, uploads it to the server, and creates a blob URL
+   * Reads the file as ArrayBuffer, uploads it to the server, and automatically detects type
    */
-  loadWasm: async (file: File, wasmType: 'proxy-wasm' | 'http-wasm', dotenvEnabled: boolean) => {
+  loadWasm: async (file: File, dotenvEnabled: boolean) => {
     // Set loading state
     set(
       (state) => {
@@ -51,8 +51,8 @@ export const createWasmSlice: StateCreator<
       // Read file as ArrayBuffer
       const buffer = await file.arrayBuffer();
 
-      // Upload to server and get path
-      const path = await uploadWasm(file, wasmType, dotenvEnabled);
+      // Upload to server and get path + detected type
+      const { path, wasmType } = await uploadWasm(file, dotenvEnabled);
 
       // Update state with loaded WASM
       set(
@@ -60,7 +60,7 @@ export const createWasmSlice: StateCreator<
           state.wasmPath = path;
           state.wasmBuffer = buffer;
           state.wasmFile = file; // Store file for reload capability
-          state.wasmType = wasmType;
+          state.wasmType = wasmType; // Store detected type
           state.loading = false;
           state.error = null;
         },
@@ -86,10 +86,10 @@ export const createWasmSlice: StateCreator<
    * Useful when .env changes or server needs to reload
    */
   reloadWasm: async (dotenvEnabled: boolean) => {
-    const { wasmFile, wasmType, loadWasm } = get();
+    const { wasmFile, loadWasm } = get();
 
     // Check if there's a file to reload
-    if (!wasmFile || !wasmType) {
+    if (!wasmFile) {
       set(
         (state) => {
           state.error = 'No WASM file loaded to reload';
@@ -100,8 +100,8 @@ export const createWasmSlice: StateCreator<
       return;
     }
 
-    // Reuse loadWasm logic
-    await loadWasm(wasmFile, wasmType, dotenvEnabled);
+    // Reuse loadWasm logic (type will be auto-detected)
+    await loadWasm(wasmFile, dotenvEnabled);
   },
 
   /**

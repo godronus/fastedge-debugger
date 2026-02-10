@@ -4,9 +4,8 @@ const API_BASE = "/api";
 
 export async function uploadWasm(
   file: File,
-  wasmType: 'proxy-wasm' | 'http-wasm',
   dotenvEnabled: boolean = true,
-): Promise<string> {
+): Promise<{ path: string; wasmType: 'proxy-wasm' | 'http-wasm' }> {
   // Read file as ArrayBuffer and convert to base64
   const buffer = await file.arrayBuffer();
   const base64 = btoa(
@@ -21,7 +20,7 @@ export async function uploadWasm(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ wasmBase64: base64, wasmType, dotenvEnabled }),
+    body: JSON.stringify({ wasmBase64: base64, dotenvEnabled }),
   });
 
   if (!response.ok) {
@@ -29,8 +28,11 @@ export async function uploadWasm(
     throw new Error(result.error || "Failed to load WASM file");
   }
 
-  await response.json();
-  return file.name; // Return filename as "path"
+  const result = await response.json();
+  return {
+    path: file.name,
+    wasmType: result.wasmType,
+  };
 }
 
 export async function callHook(

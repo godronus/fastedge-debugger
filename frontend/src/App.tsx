@@ -4,6 +4,7 @@ import { useWebSocket } from "./hooks/useWebSocket";
 import type { ServerEvent } from "./hooks/websocket-types";
 import { WasmLoader } from "./components/common/WasmLoader";
 import { ConnectionStatus } from "./components/common/ConnectionStatus";
+import { LoadingSpinner } from "./components/common/LoadingSpinner";
 import { HttpWasmView } from "./views/HttpWasmView";
 import { ProxyWasmView } from "./views/ProxyWasmView";
 import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI } from "./api";
@@ -217,21 +218,24 @@ function App() {
       {error && <div className="error">{error}</div>}
 
       <WasmLoader
-        onFileLoad={(file, type) => loadWasm(file, type, dotenvEnabled)}
+        onFileLoad={(file) => loadWasm(file, dotenvEnabled)}
         loading={loading}
         onLoadConfig={wasmType === 'proxy-wasm' ? handleLoadConfig : undefined}
         onSaveConfig={wasmType === 'proxy-wasm' ? handleSaveConfig : undefined}
       />
 
+      {/* Show loading spinner while detecting WASM type */}
+      {loading && <LoadingSpinner message="Loading and detecting WASM type..." />}
+
       {/* Show appropriate view based on WASM type */}
-      {!wasmPath && (
+      {!loading && !wasmPath && (
         <div className="empty-state">
-          <p>👆 Select a WASM type and load a binary to get started</p>
+          <p>👆 Load a WASM binary to get started</p>
         </div>
       )}
 
-      {wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
-      {wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
+      {!loading && wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
+      {!loading && wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
     </div>
   );
 }

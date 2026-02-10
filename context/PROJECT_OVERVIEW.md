@@ -70,22 +70,27 @@ Build a Postman-like test runner for debugging WASM binaries that run on FastEdg
 - **Postman-like UI** with dedicated HTTP WASM view ✨ NEW
 
 **Adaptive User Interface:** ✨ NEW
-- **Type Selection**: Choose HTTP WASM or Proxy-WASM before loading binary
-- **Dual Views**: Automatic UI switching based on WASM type
+- **Automatic Type Detection**: Server inspects WASM binary exports to determine type
+  - No manual selection needed - just upload and go!
+  - Handles TypeScript HTTP WASM (Component Model)
+  - Handles Rust HTTP WASM (Traditional Module with http-handler)
+  - Handles Proxy-WASM (Traditional Module with proxy_* functions)
+- **Dual Views**: Automatic UI switching based on detected WASM type
   - **HttpWasmView**: Simple request/response interface (Postman-like)
   - **ProxyWasmView**: Full hook execution interface with properties
 - **Component Architecture**: Domain-based organization
-  - `components/common/`: Shared components (8 components)
+  - `components/common/`: Shared components (9 components)
   - `components/http-wasm/`: HTTP WASM-specific UI (2 components)
   - `components/proxy-wasm/`: Proxy-WASM-specific UI (6 components)
   - `views/`: Main view containers (2 views)
+- **LoadingSpinner**: Orange-themed spinner shown during WASM detection
 - **LogsViewer**: Reusable component with filtering and color-coding
 
 **Shared Features:**
+- Automatic WASM type detection via WebAssembly module inspection
 - Log capture with client-side filtering (Trace/Debug/Info/Warn/Error/Critical)
 - WebSocket real-time synchronization across clients
 - Configuration save/load system (Proxy-WASM only)
-- Explicit WASM type selection with radio buttons
 - Dark theme UI with CSS Modules
 - Zustand state management with Immer middleware
 - Component reuse (ResponseViewer, DictionaryInput, RequestBar)

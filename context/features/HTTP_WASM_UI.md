@@ -4,7 +4,74 @@
 
 The HTTP WASM UI provides a simple, Postman-like interface for testing HTTP WASM binaries. Unlike the hook-based Proxy-WASM interface, this view focuses on straightforward HTTP request/response testing without the complexity of lifecycle hooks or property management.
 
-**Key Feature**: The application now has an **adaptive UI** that automatically switches between HTTP WASM and Proxy-WASM views based on the selected WASM type.
+**Key Feature**: The application now has an **adaptive UI** that automatically switches between HTTP WASM and Proxy-WASM views based on **automatically detected** WASM type.
+
+---
+
+## Automatic Type Detection
+
+### Overview
+
+Users no longer need to manually select "HTTP WASM" or "Proxy-WASM" when loading binaries. The server automatically detects the WASM type by inspecting the binary structure and routes to the appropriate interface.
+
+### Detection Strategy
+
+**Module**: `server/utils/wasmTypeDetector.ts`
+
+The detector uses a simple, reliable approach:
+
+1. **Attempt to compile** the WASM module with `WebAssembly.compile()`
+2. **If compilation fails** (version mismatch) → **HTTP WASM** (Component Model)
+3. **If compilation succeeds**, inspect exports:
+   - Has `http-handler` or `process` exports → **HTTP WASM** (Rust builds)
+   - Has `proxy_*` functions → **Proxy-WASM**
+   - Default → **Proxy-WASM**
+
+### Handled Binary Types
+
+| Type | Build Tool | Detection Method | Example Export |
+|------|-----------|------------------|----------------|
+| HTTP WASM (Component Model) | TypeScript/JS (jco) | Compile fails with version error | N/A - can't compile |
+| HTTP WASM (Traditional) | Rust (cargo component) | Has `http-handler` export | `gcore:fastedge/http-handler#process` |
+| Proxy-WASM | Rust (proxy-wasm) | Has `proxy_*` exports | `proxy_on_request_headers` |
+
+### Implementation Details
+
+**Server (`server/server.ts`):**
+```typescript
+// No wasmType required in request
+POST /api/load { wasmBase64, dotenvEnabled }
+
+// Auto-detect type
+const wasmType = await detectWasmType(buffer);
+
+// Return detected type
+res.json({ ok: true, wasmType });
+```
+
+**Frontend (`frontend/src/stores/slices/wasmSlice.ts`):**
+```typescript
+// Upload without type
+const { path, wasmType } = await uploadWasm(file, dotenvEnabled);
+
+// Store detected type
+state.wasmType = wasmType;
+```
+
+**UI (`frontend/src/App.tsx`):**
+```typescript
+// Route based on detected type
+{wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
+{wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
+```
+
+### Benefits
+
+- ✅ **Simpler UX**: One less step - just upload the file
+- ✅ **No user error**: Can't accidentally select wrong type
+- ✅ **Universal**: Works across all build toolchains (Rust, TypeScript, JS)
+- ✅ **Reliable**: Based on actual binary structure, not file extensions
+- ✅ **Fast**: Instant detection using native WebAssembly API
 
 ---
 
@@ -18,9 +85,10 @@ frontend/src/
 │   ├── common/              # Shared by both views
 │   │   ├── CollapsiblePanel/
 │   │   ├── DictionaryInput/
+│   │   ├── LoadingSpinner/  # Loading indicator (NEW)
+│   │   ├── LogsViewer/      # Reusable logs viewer (NEW)
 │   │   ├── ResponseViewer/
 │   │   ├── RequestBar/
-│   │   ├── LogsViewer/     # Reusable logs viewer (NEW)
 │   │   └── ...
 │   │
 │   ├── http-wasm/          # HTTP WASM-specific (NEW)
@@ -601,6 +669,73 @@ import styles from './HttpRequestPanel.module.css';
   <button className={styles.sendButton}>Send</button>
 </div>
 ```
+
+---
+
+## UI Polish & Refinements
+
+### URL Input Constraints
+
+**Problem**: HTTP WASM binaries always execute on `http://test.localhost/` - the host cannot be changed.
+
+**Solution**: Fixed prefix URL input
+- Displays `http://test.localhost/` as non-editable gray prefix
+- Only the path portion is editable (white text)
+- Clicking the prefix focuses the input
+- Unified appearance - looks like one text field
+
+**Implementation**:
+```tsx
+<div className={styles.urlInputContainer}>
+  <span className={styles.urlPrefix} onClick={focusInput}>
+    http://test.localhost/
+  </span>
+  <input
+    ref={inputRef}
+    value={path}
+    onChange={(e) => setHttpUrl(HTTP_WASM_HOST + e.target.value)}
+  />
+</div>
+```
+
+**CSS Overrides**:
+- Used `!important` to override global input styles (width, padding, border)
+- Prevented visual breaks between prefix and input
+- Removed focus border from input (only container gets orange border)
+
+### Consistent View Padding
+
+Both `HttpWasmView` and `ProxyWasmView` now have equal padding:
+- Horizontal: `2rem` (left/right breathing room)
+- Vertical: `1.5rem` (top/bottom spacing)
+
+**Before**: HTTP WASM content was tight against edges
+**After**: Consistent, professional spacing across all views
+
+### Loading Spinner
+
+**Component**: `components/common/LoadingSpinner/`
+
+**Purpose**: Visual feedback during WASM loading and type detection
+
+**Features**:
+- 60px spinning circle with orange accent (`#ff6c37`)
+- Centered display with customizable message
+- Smooth animation (1s linear infinite)
+- Replaces old view during loading (prevents confusion)
+
+**Usage in App.tsx**:
+```tsx
+{loading && <LoadingSpinner message="Loading and detecting WASM type..." />}
+{!loading && wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
+{!loading && wasmType === 'proxy-wasm' && <ProxyWasmView />}
+```
+
+**Benefits**:
+- Clear feedback for large files (12MB+)
+- Branded with application colors
+- Prevents displaying stale views during detection
+- Reusable for future loading states
 
 ---
 
