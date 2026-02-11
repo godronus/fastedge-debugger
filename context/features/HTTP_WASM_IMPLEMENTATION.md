@@ -1,8 +1,23 @@
 # HTTP WASM Test Runner
 
-## Overview
+⚠️ **DEPRECATION NOTICE** ⚠️
+
+**This document describes an OUTDATED API.** The `/api/load` endpoint no longer accepts a `wasmType` parameter. WASM type is now **automatically detected**.
+
+**For current API documentation, see:**
+- `context/development/AI_AGENT_API_GUIDE.md` (up-to-date API docs)
+- `context/features/HTTP_WASM_UI.md` (current behavior with auto-detection)
+- `docs/API.md` (REST API reference)
+
+**Last Updated**: This document is outdated as of February 2026 and should not be used.
+
+---
+
+## Overview (OUTDATED)
 
 The fastedge-debugger server now supports both **Proxy-WASM** (CDN apps) and **HTTP WASM** (component model with wasi-http interface) test execution.
+
+**NOTE**: The information below is OUTDATED. The API has changed to use automatic WASM type detection.
 
 ## Architecture
 

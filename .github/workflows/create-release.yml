@@ -116,7 +116,10 @@ jobs:
 
       - name: Create SHA256 checksum
         run: |
-          shasum -a 256 release/fastedge-debugger.zip > release/fastedge-debugger.zip.sha256
+          cd release
+          # Create checksum without path prefix (just filename)
+          shasum -a 256 fastedge-debugger.zip > fastedge-debugger.zip.sha256
+          cd ..
           echo "ASSET=release/fastedge-debugger.zip" >> $GITHUB_ENV
           echo "ASSET_SUM=release/fastedge-debugger.zip.sha256" >> $GITHUB_ENV
 
