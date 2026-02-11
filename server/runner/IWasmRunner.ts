@@ -43,10 +43,10 @@ export interface HttpResponse {
 export interface IWasmRunner {
   /**
    * Load WASM binary into the runner
-   * @param buffer The WASM binary as a Buffer
+   * @param bufferOrPath The WASM binary as a Buffer, or a file path string
    * @param config Optional configuration
    */
-  load(buffer: Buffer, config?: RunnerConfig): Promise<void>;
+  load(bufferOrPath: Buffer | string, config?: RunnerConfig): Promise<void>;
 
   /**
    * Execute a request through the WASM module (HTTP WASM only)

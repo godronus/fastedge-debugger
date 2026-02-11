@@ -6,6 +6,7 @@ import { WasmRunnerFactory } from "./runner/WasmRunnerFactory.js";
 import type { IWasmRunner } from "./runner/IWasmRunner.js";
 import { WebSocketManager, StateManager } from "./websocket/index.js";
 import { detectWasmType } from "./utils/wasmTypeDetector.js";
+import { validatePath } from "./utils/pathValidator.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -30,21 +31,71 @@ app.get("/health", (req: Request, res: Response) => {
 app.post("/api/load", async (req: Request, res: Response) => {
   const {
     wasmBase64,
+    wasmPath,
     dotenvEnabled = true,
   } = req.body ?? {};
 
-  // Validate required parameters
-  if (!wasmBase64 || typeof wasmBase64 !== "string") {
-    res.status(400).json({ error: "Missing wasmBase64" });
+  // Validate that at least one of wasmBase64 or wasmPath is provided
+  if (!wasmBase64 && !wasmPath) {
+    res.status(400).json({ error: "Missing wasmBase64 or wasmPath" });
+    return;
+  }
+
+  if (wasmBase64 && wasmPath) {
+    res.status(400).json({ error: "Provide either wasmBase64 or wasmPath, not both" });
     return;
   }
 
   try {
-    // Convert to buffer
-    const buffer = Buffer.from(wasmBase64, "base64");
+    let bufferOrPath: Buffer | string;
+    let fileSize: number;
+    let fileName: string;
+
+    // Path-based loading (preferred for performance)
+    if (wasmPath) {
+      if (typeof wasmPath !== "string") {
+        res.status(400).json({ error: "wasmPath must be a string" });
+        return;
+      }
+
+      // Validate path for security
+      const validationResult = validatePath(wasmPath, {
+        requireWasmExtension: true,
+        checkExists: true,
+      });
+
+      if (!validationResult.valid) {
+        res.status(400).json({ error: validationResult.error });
+        return;
+      }
+
+      // Use normalized path
+      bufferOrPath = validationResult.normalizedPath!;
+      fileName = path.basename(bufferOrPath);
+
+      // Get file size for event emission
+      const stats = await fs.stat(bufferOrPath);
+      fileSize = stats.size;
+    }
+    // Buffer-based loading (fallback for web UI)
+    else if (wasmBase64) {
+      if (typeof wasmBase64 !== "string") {
+        res.status(400).json({ error: "wasmBase64 must be a string" });
+        return;
+      }
+
+      // Convert to buffer
+      bufferOrPath = Buffer.from(wasmBase64, "base64");
+      fileSize = bufferOrPath.length;
+      fileName = "binary.wasm";
+    } else {
+      // This shouldn't happen due to validation above, but TypeScript needs it
+      res.status(400).json({ error: "Missing wasmBase64 or wasmPath" });
+      return;
+    }
 
     // Auto-detect WASM type
-    const wasmType = await detectWasmType(buffer);
+    const wasmType = await detectWasmType(bufferOrPath);
 
     // Cleanup previous runner
     if (currentRunner) {
@@ -55,12 +106,12 @@ app.post("/api/load", async (req: Request, res: Response) => {
     currentRunner = runnerFactory.createRunner(wasmType, dotenvEnabled);
     currentRunner.setStateManager(stateManager);
 
-    // Load WASM
-    await currentRunner.load(buffer, { dotenvEnabled });
+    // Load WASM (accepts either Buffer or string path)
+    await currentRunner.load(bufferOrPath, { dotenvEnabled });
 
     // Emit WASM loaded event
     const source = (req.headers["x-source"] as any) || "ui";
-    stateManager.emitWasmLoaded("binary.wasm", buffer.length, source);
+    stateManager.emitWasmLoaded(fileName, fileSize, source);
 
     res.json({ ok: true, wasmType });
   } catch (error) {

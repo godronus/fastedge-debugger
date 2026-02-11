@@ -45,7 +45,7 @@ export class HttpWasmRunner implements IWasmRunner {
   /**
    * Load WASM binary and spawn fastedge-run process
    */
-  async load(buffer: Buffer, config?: RunnerConfig): Promise<void> {
+  async load(bufferOrPath: Buffer | string, config?: RunnerConfig): Promise<void> {
     // Update config if provided
     if (config?.dotenvEnabled !== undefined) {
       this.dotenvEnabled = config.dotenvEnabled;
@@ -57,8 +57,18 @@ export class HttpWasmRunner implements IWasmRunner {
     // Find fastedge-run CLI
     this.cliPath = await findFastEdgeRunCli();
 
-    // Write WASM to temp file
-    this.tempWasmPath = await writeTempWasmFile(buffer);
+    // Determine WASM path
+    let wasmPath: string;
+
+    if (typeof bufferOrPath === "string") {
+      // Path provided directly - use it without creating temp file
+      wasmPath = bufferOrPath;
+      this.tempWasmPath = null; // Don't cleanup this file (user-provided)
+    } else {
+      // Buffer provided - write to temp file (existing behavior)
+      wasmPath = await writeTempWasmFile(bufferOrPath);
+      this.tempWasmPath = wasmPath; // Cleanup this temp file later
+    }
 
     // Allocate port (synchronous to avoid race conditions)
     this.port = this.portManager.allocate();
@@ -69,7 +79,7 @@ export class HttpWasmRunner implements IWasmRunner {
       "-p",
       this.port.toString(),
       "-w",
-      this.tempWasmPath,
+      wasmPath,
       "--wasi-http",
       "true",
     ];

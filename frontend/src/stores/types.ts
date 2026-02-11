@@ -38,6 +38,10 @@ export interface WasmState {
   wasmType: 'proxy-wasm' | 'http-wasm' | null;
   loading: boolean;
   error: string | null;
+  // Loading metadata
+  loadingMode: 'path' | 'buffer' | null;
+  loadTime: number | null; // Load time in milliseconds
+  fileSize: number | null; // File size in bytes
 }
 
 export interface WasmActions {

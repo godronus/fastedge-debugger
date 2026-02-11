@@ -21,6 +21,9 @@ function App() {
     error,
     loadWasm,
     reloadWasm,
+    loadingMode,
+    loadTime,
+    fileSize,
 
     // Proxy-WASM state (for WebSocket event handling)
     setUrl,
@@ -222,6 +225,10 @@ function App() {
         loading={loading}
         onLoadConfig={wasmType === 'proxy-wasm' ? handleLoadConfig : undefined}
         onSaveConfig={wasmType === 'proxy-wasm' ? handleSaveConfig : undefined}
+        loadingMode={loadingMode}
+        loadTime={loadTime}
+        fileSize={fileSize}
+        fileName={wasmPath}
       />
 
       {/* Show loading spinner while detecting WASM type */}

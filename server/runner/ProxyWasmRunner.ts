@@ -133,13 +133,24 @@ export class ProxyWasmRunner implements IWasmRunner {
     }
   }
 
-  async load(buffer: Buffer, config?: RunnerConfig): Promise<void> {
+  async load(bufferOrPath: Buffer | string, config?: RunnerConfig): Promise<void> {
     // Update config if provided
     if (config?.dotenvEnabled !== undefined) {
       this.dotenvEnabled = config.dotenvEnabled;
     }
 
     this.resetState();
+
+    // Get buffer from path if needed
+    let buffer: Buffer;
+    if (typeof bufferOrPath === "string") {
+      // Path provided - read file into buffer
+      const { readFile } = await import("fs/promises");
+      buffer = await readFile(bufferOrPath);
+    } else {
+      // Buffer provided directly
+      buffer = bufferOrPath;
+    }
 
     // Compile once and store the module (expensive operation)
     this.module = await WebAssembly.compile(new Uint8Array(buffer));

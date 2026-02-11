@@ -18,10 +18,19 @@ export type WasmType = "http-wasm" | "proxy-wasm";
 /**
  * Detect the type of a WASM binary
  *
- * @param buffer - The WASM binary buffer
+ * @param bufferOrPath - The WASM binary buffer or file path
  * @returns The detected WASM type
  */
-export async function detectWasmType(buffer: Buffer): Promise<WasmType> {
+export async function detectWasmType(bufferOrPath: Buffer | string): Promise<WasmType> {
+  // Get buffer from path if needed
+  let buffer: Buffer;
+  if (typeof bufferOrPath === "string") {
+    const { readFile } = await import("fs/promises");
+    buffer = await readFile(bufferOrPath);
+  } else {
+    buffer = bufferOrPath;
+  }
+
   try {
     // Attempt to compile the WASM module
     // Component Model binaries will fail here (version mismatch)

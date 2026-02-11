@@ -13,6 +13,9 @@ const DEFAULT_WASM_STATE: WasmState = {
   wasmType: null,
   loading: false,
   error: null,
+  loadingMode: null,
+  loadTime: null,
+  fileSize: null,
 };
 
 // ============================================================================
@@ -34,7 +37,8 @@ export const createWasmSlice: StateCreator<
 
   /**
    * Load a WASM file from disk
-   * Reads the file as ArrayBuffer, uploads it to the server, and automatically detects type
+   * Reads the file, uploads it to the server using optimal loading strategy, and automatically detects type
+   * Uses path-based loading (faster) when available, falls back to buffer-based loading
    */
   loadWasm: async (file: File, dotenvEnabled: boolean) => {
     // Set loading state
@@ -48,11 +52,15 @@ export const createWasmSlice: StateCreator<
     );
 
     try {
-      // Read file as ArrayBuffer
-      const buffer = await file.arrayBuffer();
+      // Upload to server using hybrid loading (path or buffer)
+      const { path, wasmType, loadingMode, loadTime, fileSize } = await uploadWasm(file, dotenvEnabled);
 
-      // Upload to server and get path + detected type
-      const { path, wasmType } = await uploadWasm(file, dotenvEnabled);
+      // Read buffer only if we used buffer-based loading
+      // (for caching/reload capability)
+      let buffer: ArrayBuffer | null = null;
+      if (loadingMode === 'buffer') {
+        buffer = await file.arrayBuffer();
+      }
 
       // Update state with loaded WASM
       set(
@@ -61,6 +69,9 @@ export const createWasmSlice: StateCreator<
           state.wasmBuffer = buffer;
           state.wasmFile = file; // Store file for reload capability
           state.wasmType = wasmType; // Store detected type
+          state.loadingMode = loadingMode; // Track which mode was used
+          state.loadTime = loadTime; // Track load performance
+          state.fileSize = fileSize; // Track file size
           state.loading = false;
           state.error = null;
         },
@@ -117,6 +128,9 @@ export const createWasmSlice: StateCreator<
         state.wasmType = null;
         state.loading = false;
         state.error = null;
+        state.loadingMode = null;
+        state.loadTime = null;
+        state.fileSize = null;
       },
       false,
       'wasm/clearWasm'
