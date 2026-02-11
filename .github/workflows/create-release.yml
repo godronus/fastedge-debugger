@@ -87,18 +87,18 @@ jobs:
 
       - name: Merge CLI binaries into fastedge-cli directory
         run: |
-          mkdir -p fastedge-cli
-          # Copy all binaries from artifacts to fastedge-cli/
-          find cli-artifacts -type f -name 'fastedge-run*' -exec cp {} fastedge-cli/ \;
+          mkdir -p fastedge-run
+          # Copy all binaries from artifacts to fastedge-run/
+          find cli-artifacts -type f -name 'fastedge-run*' -exec cp {} fastedge-run/ \;
           # Copy METADATA.json from any artifact (they're all the same)
-          find cli-artifacts -type f -name 'METADATA.json' -exec cp {} fastedge-cli/ \; -quit
+          find cli-artifacts -type f -name 'METADATA.json' -exec cp {} fastedge-run/ \; -quit
 
           # Verify all platform binaries exist
           echo "Verifying CLI binaries..."
-          ls -lh fastedge-cli/
-          test -f fastedge-cli/fastedge-run-linux-x64 || { echo "Missing Linux binary"; exit 1; }
-          test -f fastedge-cli/fastedge-run-darwin-arm64 || { echo "Missing macOS binary"; exit 1; }
-          test -f fastedge-cli/fastedge-run.exe || { echo "Missing Windows binary"; exit 1; }
+          ls -lh fastedge-run/
+          test -f fastedge-run/fastedge-run-linux-x64 || { echo "Missing Linux binary"; exit 1; }
+          test -f fastedge-run/fastedge-run-darwin-arm64 || { echo "Missing macOS binary"; exit 1; }
+          test -f fastedge-run/fastedge-run.exe || { echo "Missing Windows binary"; exit 1; }
           echo "✅ All platform binaries present"
 
       - name: Build Debugger code

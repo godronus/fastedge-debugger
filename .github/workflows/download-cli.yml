@@ -86,14 +86,14 @@ jobs:
       - name: Rename and copy fastedge-run
         run: |
           if [[ ${{ matrix.os }} == 'windows-latest' ]]; then
-            cp fastedge-run-$VERSION-${{ matrix.file_name }}/fastedge-run.exe ./fastedge-cli/fastedge-run.exe
+            cp fastedge-run-$VERSION-${{ matrix.file_name }}/fastedge-run.exe ./fastedge-run/fastedge-run.exe
           else
-            cp fastedge-run-$VERSION-${{ matrix.file_name }}/fastedge-run ./fastedge-cli/fastedge-run-${{ matrix.target }}
+            cp fastedge-run-$VERSION-${{ matrix.file_name }}/fastedge-run ./fastedge-run/fastedge-run-${{ matrix.target }}
           fi
 
       - name: Create a RELEASE.json file
         run: |
-          echo "{\"fastedge_run_version\": \"$VERSION\"}" > fastedge-cli/METADATA.json
+          echo "{\"fastedge_run_version\": \"$VERSION\"}" > fastedge-run/METADATA.json
 
       - name: Upload fastedge-run Artifact
         uses: actions/upload-artifact@v4
@@ -101,4 +101,4 @@ jobs:
           name: fastedge-run-${{ matrix.os }}-artifact
           retention-days: 1
           path: |
-            fastedge-cli/
+            fastedge-run/
