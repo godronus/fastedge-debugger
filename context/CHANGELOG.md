@@ -1,5 +1,92 @@
 # Proxy-WASM Runner - Changelog
 
+## February 10, 2026 - Debugger API Enhancement for Agent Integration
+
+### Overview
+Added health check endpoint and comprehensive API documentation to enable AI agents and CI/CD pipelines to programmatically control the debugger.
+
+### 🎯 What Was Completed
+
+#### 1. Health Check Endpoint
+**File Modified**: `server/server.ts`
+- Added `GET /health` endpoint
+- Returns: `{"status": "ok"}`
+- Purpose: Verify debugger server availability before testing
+
+**Implementation**:
+```typescript
+app.get("/health", (req: Request, res: Response) => {
+  res.json({ status: "ok" });
+});
+```
+
+#### 2. Comprehensive API Documentation
+**File Created**: `docs/API.md` (550+ lines)
+
+**Documentation Includes**:
+- All REST endpoints with examples
+  - `GET /health` - Health check
+  - `POST /api/load` - Load WASM module
+  - `POST /api/execute` - Execute request
+  - `GET /api/config` - Get configuration
+  - `POST /api/config` - Update configuration
+- WebSocket API for log streaming
+- Common workflows (testing scripts, CI/CD)
+- Error handling patterns
+- Best practices
+
+**Example Usage**:
+```bash
+# Health check
+curl http://localhost:5179/health
+
+# Load WASM
+WASM_BASE64=$(base64 -w 0 ./dist/app.wasm)
+curl -X POST http://localhost:5179/api/load \
+  -d "{\"wasmBase64\": \"$WASM_BASE64\"}"
+
+# Execute test
+curl -X POST http://localhost:5179/api/execute \
+  -d '{"url": "http://localhost/", "method": "GET"}'
+```
+
+#### 3. Skills Integration
+**Note**: Skills already documented REST API usage (from Phase 1)
+- Skill: `fastedge-debugging` includes comprehensive API examples
+- Located in generated projects: `.claude/skills/fastedge-debugging/`
+
+### Impact
+- **Agent-Ready**: AI agents can fully control debugger via REST API
+- **CI/CD Ready**: Automated testing in pipelines
+- **Health Monitoring**: Easy availability verification
+- **Comprehensive Docs**: Clear API reference for developers
+
+**Code Changes**:
+- Lines added: ~600 (1 endpoint + docs)
+- Files created: 1 (API.md)
+- Files modified: 1 (server.ts)
+
+### Testing
+```bash
+# Test health check
+curl http://localhost:5179/health
+# Expected: {"status": "ok"}
+
+# Test with agent workflow
+npm run build
+curl -f http://localhost:5179/health || exit 1
+# Load WASM, execute tests, verify responses
+```
+
+**Part of**: FastEdge Ecosystem Refactoring - Phase 3: Debugger API Enhancement
+
+### Notes
+- Health check requires no authentication
+- All API endpoints documented with curl examples
+- WebSocket available at ws://localhost:5178/ws for real-time logs
+
+---
+
 ## February 10, 2026 - Full-Flow Integration Testing with Downstream Services
 
 ### Overview

@@ -21,9 +21,10 @@ function getBundledCliPath(): string {
   // __dirname is available in CommonJS (see server/tsconfig.json)
   const currentDir = __dirname;
 
-  // Navigate from dist/utils to project root, then to fastedge-cli/
-  // dist/utils -> dist -> project-root -> fastedge-cli
-  const cliBinDir = join(currentDir, "..", "..", "fastedge-cli");
+  // Navigate to fastedge-cli/
+  // When bundled: dist/server.js -> dist/fastedge-cli/
+  // When not bundled: dist/utils/*.js -> dist/../fastedge-cli/
+  const cliBinDir = join(currentDir, "..", "fastedge-cli");
 
   switch (os.platform()) {
     case "win32":

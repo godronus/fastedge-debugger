@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "build": "pnpm run build:backend && pnpm run build:frontend",
-    "build:backend": "tsc -p server/tsconfig.json",
+    "build:backend": "node esbuild/bundle-server.js",
     "build:frontend": "cd frontend && pnpm exec vite build",
+    "check-types": "tsc -p server/tsconfig.json --noEmit",
     "build:cdn-test-apps": "pnpm -r --filter './test-applications/cdn-apps/*' build",
     "build:http-test-apps": "pnpm -r --filter './test-applications/http-apps/*' build",
     "start": "node dist/server.js",
@@ -53,6 +54,7 @@
     "@vitest/ui": "^4.0.18",
     "assemblyscript": "^0.28.9",
     "cross-env": "^10.1.0",
+    "esbuild": "^0.27.3",
     "happy-dom": "^20.5.0",
     "jsdom": "^28.0.0",
     "npm-run-all2": "^8.0.4",

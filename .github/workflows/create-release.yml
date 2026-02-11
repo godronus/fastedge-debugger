@@ -1,0 +1,122 @@
+name: Create a versioned release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.*"
+
+  workflow_dispatch: # trigger manually
+    inputs:
+      cli_version:
+        description: "FastEdge cli version"
+        required: true
+        default: "latest"
+      tag_version:
+        description: "Release tag e.g. v1.0.1"
+        required: true
+        default: ""
+
+jobs:
+  check_tags:
+    # runs-on: [self-hosted, ubuntu-22-04, regular]
+    runs-on: ubuntu-latest
+    outputs:
+      has_release_tag: ${{ steps.determine-tag.outputs.has_tag }}
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v6
+
+      - name: Create release tag
+        id: determine-tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag_version }}" ]; then
+            TAG_VERSION="${{ github.event.inputs.tag_version }}"
+            if [[ ! "$TAG_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?$ ]]; then
+              echo "Invalid tag format: $TAG_VERSION"
+              exit 1
+            fi
+            echo "Creating new release tag: $TAG_VERSION"
+            git tag -a "$TAG_VERSION" -m "Release $TAG_VERSION"
+            git push origin "$TAG_VERSION"
+            echo "has_tag=true" >> $GITHUB_OUTPUT
+          else
+            TAG_VERSION=${GITHUB_REF#refs/tags/}
+            if [[ ! "$TAG_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?$ ]]; then
+              echo "Invalid tag format: $TAG_VERSION"
+              exit 1
+            fi
+            echo "has_tag=true" >> $GITHUB_OUTPUT
+          fi
+
+  # fossa:
+  #   uses: ./.github/workflows/fossa.yaml
+  #   needs: [check_tags]
+  #   secrets:
+  #     FOSSA_PUB_API_KEY: ${{ secrets.FOSSA_PUB_API_KEY }}
+
+  download_fastedge_cli:
+    uses: ./.github/workflows/download-cli.yml
+    needs: [check_tags]
+    if: ${{ needs.check_tags.outputs.has_release_tag == 'true' }}
+    with:
+      cli_version: ${{ inputs.cli_version }}
+
+  build_debugger:
+    # needs: ["fossa", "check_tags", "download_fastedge_cli"]
+    needs: ["check_tags", "download_fastedge_cli"]
+    if: ${{ needs.check_tags.outputs.has_release_tag == 'true' }}
+    # runs-on: [self-hosted, ubuntu-22-04, regular]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node Environment
+        uses: ./.github/setup-node
+
+      - name: Download all CLI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fastedge-run-*-artifact
+          path: cli-artifacts
+          merge-multiple: false
+
+      - name: Merge CLI binaries into fastedge-cli directory
+        run: |
+          mkdir -p fastedge-cli
+          # Copy all binaries from artifacts to fastedge-cli/
+          find cli-artifacts -type f -name 'fastedge-run*' -exec cp {} fastedge-cli/ \;
+          # Copy METADATA.json from any artifact (they're all the same)
+          find cli-artifacts -type f -name 'METADATA.json' -exec cp {} fastedge-cli/ \; -quit
+
+          # Verify all platform binaries exist
+          echo "Verifying CLI binaries..."
+          ls -lh fastedge-cli/
+          test -f fastedge-cli/fastedge-run-linux-x64 || { echo "Missing Linux binary"; exit 1; }
+          test -f fastedge-cli/fastedge-run-darwin-arm64 || { echo "Missing macOS binary"; exit 1; }
+          test -f fastedge-cli/fastedge-run.exe || { echo "Missing Windows binary"; exit 1; }
+          echo "✅ All platform binaries present"
+
+      - name: Build Debugger code
+        run: |
+          pnpm run build
+
+      - name: Zip Debugger distribution
+        run: |
+          mkdir -p release
+          zip -r release/fastedge-debugger.zip dist fastedge-cli
+
+      - name: Create SHA256 checksum
+        run: |
+          shasum -a 256 release/fastedge-debugger.zip > release/fastedge-debugger.zip.sha256
+          echo "ASSET=release/fastedge-debugger.zip" >> $GITHUB_ENV
+          echo "ASSET_SUM=release/fastedge-debugger.zip.sha256" >> $GITHUB_ENV
+
+      - name: Upload release archive
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag_version }} # Explicitly provide the tag version
+          files: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET_SUM }}

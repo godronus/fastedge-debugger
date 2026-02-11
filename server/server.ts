@@ -22,6 +22,11 @@ let currentRunner: IWasmRunner | null = null;
 app.use(express.json({ limit: "20mb" }));
 app.use(express.static(path.join(__dirname, "frontend")));
 
+// Health check endpoint
+app.get("/health", (req: Request, res: Response) => {
+  res.json({ status: "ok" });
+});
+
 app.post("/api/load", async (req: Request, res: Response) => {
   const {
     wasmBase64,
