@@ -16,6 +16,9 @@ on:
         required: true
         default: ""
 
+permissions:
+  contents: write  # Required to create releases and push tags
+
 jobs:
   check_tags:
     # runs-on: [self-hosted, ubuntu-22-04, regular]
@@ -120,7 +123,7 @@ jobs:
       - name: Upload release archive
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag_version }} # Explicitly provide the tag version
+          tag_name: ${{ inputs.tag_version || github.ref_name }}
           files: |
             ${{ env.ASSET }}
             ${{ env.ASSET_SUM }}
