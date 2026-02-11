@@ -9,16 +9,16 @@
  * Location: esbuild/bundle-server.js
  */
 
-const esbuild = require('esbuild');
-const path = require('path');
-const fs = require('fs');
+const esbuild = require("esbuild");
+const path = require("path");
+const fs = require("fs");
 
 async function bundle() {
-  console.log('📦 Building server (TypeScript → Bundled JS)...');
+  console.log("📦 Building server (TypeScript → Bundled JS)...");
 
   // Paths relative to project root (one level up from esbuild/)
-  const projectRoot = path.join(__dirname, '..');
-  const distDir = path.join(projectRoot, 'dist');
+  const projectRoot = path.join(__dirname, "..");
+  const distDir = path.join(projectRoot, "dist");
 
   if (!fs.existsSync(distDir)) {
     fs.mkdirSync(distDir, { recursive: true });
@@ -27,28 +27,28 @@ async function bundle() {
   try {
     // Build directly from TypeScript source
     await esbuild.build({
-      entryPoints: [path.join(projectRoot, 'server/server.ts')],
+      entryPoints: [path.join(projectRoot, "server/server.ts")],
       bundle: true,
-      platform: 'node',
-      target: 'node20',
-      outfile: path.join(distDir, 'server.js'),
+      platform: "node",
+      target: "node20",
+      outfile: path.join(distDir, "server.js"),
       external: [
-        'fsevents', // Optional native dependency (Mac only)
+        "fsevents", // Optional native dependency (Mac only)
       ],
       minify: true,
       sourcemap: false,
-      logLevel: 'info',
+      logLevel: "info",
     });
 
-    console.log('✅ Server built successfully: dist/server.js');
-    console.log('   TypeScript compiled + all dependencies bundled');
+    console.log("✅ Server built successfully: dist/server.js");
+    console.log("   TypeScript compiled + all dependencies bundled");
 
-    // Copy fastedge-cli directory to dist (required for HTTP WASM runner)
-    const cliSourceDir = path.join(projectRoot, 'fastedge-cli');
-    const cliDestDir = path.join(distDir, 'fastedge-cli');
+    // Copy fastedge-run directory to dist/fastedge-cli/ (required for HTTP WASM runner)
+    const cliSourceDir = path.join(projectRoot, "fastedge-run");
+    const cliDestDir = path.join(distDir, "fastedge-cli");
 
     if (fs.existsSync(cliSourceDir)) {
-      console.log('📦 Copying fastedge-cli/ to dist/...');
+      console.log("📦 Copying fastedge-run/ to dist/fastedge-cli/...");
 
       // Remove old if exists
       if (fs.existsSync(cliDestDir)) {
@@ -57,13 +57,14 @@ async function bundle() {
 
       // Copy directory
       fs.cpSync(cliSourceDir, cliDestDir, { recursive: true });
-      console.log('✅ fastedge-cli/ copied');
+      console.log("✅ fastedge-run/ copied to dist/fastedge-cli/");
     } else {
-      console.log('⚠️  Warning: fastedge-cli/ not found - HTTP WASM won\'t work');
+      console.log(
+        "⚠️  Warning: fastedge-run/ not found - HTTP WASM won't work",
+      );
     }
-
   } catch (error) {
-    console.error('❌ Bundling failed:', error);
+    console.error("❌ Bundling failed:", error);
     process.exit(1);
   }
 }

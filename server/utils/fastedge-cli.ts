@@ -14,17 +14,13 @@ import os from "os";
 
 /**
  * Get the bundled CLI path for the current platform
- * Matches FastEdge-vscode's approach
+ *
+ * With esbuild bundling, the server is always at dist/server.js
+ * and the CLI binaries are at dist/fastedge-cli/
  */
 function getBundledCliPath(): string {
-  // Get the directory of this file (dist/utils when compiled)
-  // __dirname is available in CommonJS (see server/tsconfig.json)
-  const currentDir = __dirname;
-
-  // Navigate to fastedge-cli/
-  // When bundled: dist/server.js -> dist/fastedge-cli/
-  // When not bundled: dist/utils/*.js -> dist/../fastedge-cli/
-  const cliBinDir = join(currentDir, "..", "fastedge-cli");
+  // __dirname points to dist/ (location of the bundled server.js)
+  const cliBinDir = join(__dirname, "fastedge-cli");
 
   switch (os.platform()) {
     case "win32":

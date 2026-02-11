@@ -17,7 +17,7 @@ on:
         default: ""
 
 permissions:
-  contents: write  # Required to create releases and push tags
+  contents: write # Required to create releases and push tags
 
 jobs:
   check_tags:
@@ -112,7 +112,7 @@ jobs:
       - name: Zip Debugger distribution
         run: |
           mkdir -p release
-          zip -r release/fastedge-debugger.zip dist fastedge-cli
+          zip -r release/fastedge-debugger.zip dist
 
       - name: Create SHA256 checksum
         run: |
