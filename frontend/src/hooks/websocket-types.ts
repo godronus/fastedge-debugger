@@ -100,6 +100,13 @@ export interface HttpWasmRequestCompletedEvent extends BaseEvent {
   };
 }
 
+export interface ReloadWorkspaceWasmEvent extends BaseEvent {
+  type: "reload_workspace_wasm";
+  data: {
+    path: string;
+  };
+}
+
 export type ServerEvent =
   | WasmLoadedEvent
   | RequestStartedEvent
@@ -108,4 +115,5 @@ export type ServerEvent =
   | RequestFailedEvent
   | PropertiesUpdatedEvent
   | ConnectionStatusEvent
-  | HttpWasmRequestCompletedEvent;
+  | HttpWasmRequestCompletedEvent
+  | ReloadWorkspaceWasmEvent;

@@ -128,6 +128,17 @@ export interface ConnectionStatusEvent extends BaseEvent {
 }
 
 /**
+ * Reload workspace WASM (VSCode only)
+ * Triggered by VSCode extension after F5 rebuild
+ */
+export interface ReloadWorkspaceWasmEvent extends BaseEvent {
+  type: "reload_workspace_wasm";
+  data: {
+    path: string;
+  };
+}
+
+/**
  * Union of all possible events
  */
 export type ServerEvent =
@@ -138,7 +149,8 @@ export type ServerEvent =
   | RequestFailedEvent
   | PropertiesUpdatedEvent
   | HttpWasmRequestCompletedEvent
-  | ConnectionStatusEvent;
+  | ConnectionStatusEvent
+  | ReloadWorkspaceWasmEvent;
 
 /**
  * Helper to create events with automatic timestamp

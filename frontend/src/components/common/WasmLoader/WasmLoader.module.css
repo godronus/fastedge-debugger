@@ -43,126 +43,6 @@
   color: #ff6c37;
 }
 
-.typeSelector {
-  margin: 12px 0;
-  padding: 12px;
-  background-color: #252525;
-  border-radius: 4px;
-  border: 1px solid #3d3d3d;
-}
-
-.typeLabel {
-  font-size: 13px;
-  font-weight: 600;
-  color: #e0e0e0;
-  display: block;
-  margin-bottom: 8px;
-}
-
-.radioGroup {
-  display: flex;
-  gap: 16px;
-}
-
-.radioLabel {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  cursor: pointer;
-  padding: 8px 12px;
-  background-color: #1e1e1e;
-  border: 2px solid #3d3d3d;
-  border-radius: 4px;
-  transition: all 0.2s;
-  flex: 1;
-}
-
-.radioLabel:hover {
-  border-color: #ff6c37;
-  background-color: #2d2d2d;
-}
-
-.radioLabel input[type="radio"] {
-  margin-right: 8px;
-  cursor: pointer;
-}
-
-.radioLabel input[type="radio"]:checked + span {
-  color: #ff6c37;
-  font-weight: 600;
-}
-
-.radioLabel span:first-of-type {
-  font-size: 13px;
-  color: #e0e0e0;
-  font-weight: 500;
-}
-
-.description {
-  font-size: 11px;
-  color: #b0b0b0;
-  margin-left: 20px;
-}
-
-.wasmInfo {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: #252525;
-  border-radius: 4px;
-  border: 1px solid #3d3d3d;
-}
-
-.wasmInfoRow {
-  font-size: 12px;
-  color: #e0e0e0;
-  margin: 4px 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.wasmInfoRow strong {
-  color: #ff6c37;
-  font-weight: 600;
-  min-width: 60px;
-}
-
-.wasmInfoRow span {
-  color: #b0b0b0;
-}
-
-/* Path input section */
-.pathSection {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: #252525;
-  border-radius: 4px;
-  border: 1px solid #3d3d3d;
-}
-
-.fileSection {
-  margin-bottom: 8px;
-}
-
-.optionHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.optionLabel {
-  font-size: 13px;
-  font-weight: 600;
-  color: #e0e0e0;
-}
-
-.optionDesc {
-  font-size: 11px;
-  color: #b0b0b0;
-  font-style: italic;
-}
-
 .pathInputGroup {
   display: flex;
   gap: 8px;
@@ -215,4 +95,137 @@
 .pathButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.tabButtons {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: transparent;
+  color: #b0b0b0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  position: relative;
+  bottom: -1px;
+}
+
+.tab:hover:not(:disabled) {
+  color: #e0e0e0;
+  background: rgba(255, 108, 55, 0.1);
+}
+
+.tabActive {
+  color: #ff6c37 !important;
+  border-bottom-color: #ff6c37 !important;
+  font-weight: 600;
+}
+
+.tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tabIcon {
+  font-size: 14px;
+}
+
+.tabContent {
+  margin-top: 12px;
+}
+
+.pathPanel,
+.uploadPanel {
+  padding: 16px;
+  background: #252525;
+  border-radius: 4px;
+  border: 1px solid #3d3d3d;
+}
+
+.panelDescription {
+  font-size: 12px;
+  color: #b0b0b0;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.fileInput {
+  width: 100%;
+  padding: 8px;
+  background: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.fileInput::-webkit-file-upload-button {
+  background: #ff6c37;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 12px;
+}
+
+.fileInput::-webkit-file-upload-button:hover {
+  background: #ff7c47;
+}
+
+.fileInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Tab info display (far right in tabs bar) */
+.tabInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #b0b0b0;
+  padding: 0 12px 8px 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tabInfoIcon {
+  font-size: 13px;
+}
+
+.tabInfoText {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.tabInfoTime {
+  color: #b0b0b0;
+}
+
+.tabInfoSize {
+  color: #b0b0b0;
 }

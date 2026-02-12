@@ -1,6 +1,8 @@
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, useState, useEffect } from "react";
 import styles from "./WasmLoader.module.css";
 import { formatFileSize } from "../../../utils/filePath";
+
+type LoaderTab = 'path' | 'upload';
 
 interface WasmLoaderProps {
   onFileLoad: (file: File) => void;
@@ -13,6 +15,8 @@ interface WasmLoaderProps {
   loadTime?: number | null;
   fileSize?: number | null;
   fileName?: string | null;
+  // Default tab based on environment
+  defaultTab?: LoaderTab;
 }
 
 export function WasmLoader({
@@ -25,8 +29,15 @@ export function WasmLoader({
   loadTime,
   fileSize,
   fileName,
+  defaultTab = 'upload',
 }: WasmLoaderProps) {
   const [wasmPath, setWasmPath] = useState("");
+  const [activeTab, setActiveTab] = useState<LoaderTab>(defaultTab);
+
+  // Update active tab when defaultTab changes (environment detection completes)
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -41,7 +52,7 @@ export function WasmLoader({
     }
   };
 
-  const handlePathKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handlePathKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && wasmPath.trim() && onPathLoad) {
       handlePathLoad();
     }
@@ -84,70 +95,92 @@ export function WasmLoader({
         </div>
       </div>
 
-      {/* Option 1: Load from Path */}
+      {/* Tabs */}
       {onPathLoad && (
-        <div className={styles.pathSection}>
-          <div className={styles.optionHeader}>
-            <span className={styles.optionLabel}>Option 1: File Path</span>
-            <span className={styles.optionDesc}>(faster for local files)</span>
-          </div>
-          <div className={styles.pathInputGroup}>
-            <input
-              type="text"
-              className={styles.pathInput}
-              placeholder="/workspace/target/wasm32-wasi/release/app.wasm"
-              value={wasmPath}
-              onChange={(e) => setWasmPath(e.target.value)}
-              onKeyPress={handlePathKeyPress}
-              disabled={loading}
-            />
+        <div className={styles.tabs}>
+          <div className={styles.tabButtons}>
             <button
-              onClick={handlePathLoad}
-              disabled={loading || !wasmPath.trim()}
-              className={styles.pathButton}
+              className={`${styles.tab} ${activeTab === 'path' ? styles.tabActive : ''}`}
+              onClick={() => setActiveTab('path')}
+              disabled={loading}
             >
-              Load from Path
+              <span className={styles.tabIcon}>📁</span>
+              <span>File Path</span>
+            </button>
+            <button
+              className={`${styles.tab} ${activeTab === 'upload' ? styles.tabActive : ''}`}
+              onClick={() => setActiveTab('upload')}
+              disabled={loading}
+            >
+              <span className={styles.tabIcon}>📤</span>
+              <span>Upload File</span>
             </button>
           </div>
+
+          {/* Show loaded WASM info in tabs bar */}
+          {!loading && fileName && loadingMode && (
+            <div className={styles.tabInfo} title={getLoadingModeTitle()}>
+              <span className={styles.tabInfoIcon}>{getLoadingModeIcon()}</span>
+              <span className={styles.tabInfoText}>{getLoadingModeText()}</span>
+              {loadTime !== null && loadTime !== undefined && (
+                <span className={styles.tabInfoTime}>• {loadTime.toFixed(1)}ms</span>
+              )}
+              {fileSize && (
+                <span className={styles.tabInfoSize}>• ({formatFileSize(fileSize)})</span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Option 2: Upload File */}
-      <div className={styles.fileSection}>
-        <div className={styles.optionHeader}>
-          <span className={styles.optionLabel}>
-            {onPathLoad ? 'Option 2: Upload File' : 'Load WASM File'}
-          </span>
-          {onPathLoad && (
-            <span className={styles.optionDesc}>(works anywhere)</span>
-          )}
-        </div>
-        <input
-          type="file"
-          accept=".wasm"
-          onChange={handleFileChange}
-          disabled={loading}
-        />
+      {/* Tab Content */}
+      <div className={styles.tabContent}>
+        {/* Path Tab */}
+        {onPathLoad && activeTab === 'path' && (
+          <div className={styles.pathPanel}>
+            <div className={styles.panelDescription}>
+              Load WASM directly from filesystem path (faster, no upload needed)
+            </div>
+            <div className={styles.pathInputGroup}>
+              <input
+                type="text"
+                className={styles.pathInput}
+                placeholder="/workspace/target/wasm32-wasi/release/app.wasm"
+                value={wasmPath}
+                onChange={(e) => setWasmPath(e.target.value)}
+                onKeyDown={handlePathKeyDown}
+                disabled={loading}
+              />
+              <button
+                onClick={handlePathLoad}
+                disabled={loading || !wasmPath.trim()}
+                className={styles.pathButton}
+              >
+                Load from Path
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Tab */}
+        {activeTab === 'upload' && (
+          <div className={styles.uploadPanel}>
+            <div className={styles.panelDescription}>
+              Upload a WASM binary file from your computer
+            </div>
+            <input
+              type="file"
+              accept=".wasm"
+              onChange={handleFileChange}
+              disabled={loading}
+              className={styles.fileInput}
+            />
+          </div>
+        )}
       </div>
 
       {loading && (
         <span className={styles.loadingIndicator}> Loading...</span>
-      )}
-
-      {/* Show loaded WASM info */}
-      {!loading && fileName && loadingMode && (
-        <div className={styles.wasmInfo}>
-          <div className={styles.wasmInfoRow}>
-            <strong>Loaded:</strong> {fileName}
-            {fileSize && <span> ({formatFileSize(fileSize)})</span>}
-          </div>
-          <div className={styles.wasmInfoRow} title={getLoadingModeTitle()}>
-            <strong>Mode:</strong> {getLoadingModeIcon()} {getLoadingModeText()}
-            {loadTime !== null && loadTime !== undefined && (
-              <span> • {loadTime.toFixed(1)}ms</span>
-            )}
-          </div>
-        </div>
       )}
     </section>
   );

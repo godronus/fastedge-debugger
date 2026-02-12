@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "./stores";
 import { useWebSocket } from "./hooks/useWebSocket";
 import type { ServerEvent } from "./hooks/websocket-types";
@@ -7,10 +7,13 @@ import { ConnectionStatus } from "./components/common/ConnectionStatus";
 import { LoadingSpinner } from "./components/common/LoadingSpinner";
 import { HttpWasmView } from "./views/HttpWasmView";
 import { ProxyWasmView } from "./views/ProxyWasmView";
-import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI } from "./api";
+import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI, getEnvironment, getWorkspaceWasm, type EnvironmentInfo } from "./api";
 import "./App.css";
 
 function App() {
+  // Environment detection state
+  const [environment, setEnvironment] = useState<EnvironmentInfo | null>(null);
+
   // Get state and actions from stores
   const {
     // WASM state
@@ -63,6 +66,38 @@ function App() {
 
   // Track if this is the initial mount to avoid reloading WASM on mount
   const isInitialMount = useRef(true);
+
+  // Detect environment and auto-load workspace WASM on mount
+  useEffect(() => {
+    const initializeEnvironment = async () => {
+      try {
+        // 1. Detect environment
+        const envInfo = await getEnvironment();
+        setEnvironment(envInfo);
+        console.log(`[App] Detected environment: ${envInfo.environment}`);
+
+        // 2. If VSCode, check for workspace WASM and auto-load
+        if (envInfo.environment === 'vscode') {
+          const workspaceWasmPath = await getWorkspaceWasm();
+          if (workspaceWasmPath) {
+            console.log(`[App] Auto-loading workspace WASM: ${workspaceWasmPath}`);
+            await loadWasm(workspaceWasmPath, dotenvEnabled);
+          } else {
+            console.log("[App] No workspace WASM found at .fastedge/bin/debugger.wasm");
+          }
+        }
+      } catch (error) {
+        console.error("[App] Failed to initialize environment:", error);
+        // Default to node environment
+        setEnvironment({
+          environment: 'node',
+          supportsPathLoading: true,
+        });
+      }
+    };
+
+    initializeEnvironment();
+  }, []);
 
   // Reload WASM when dotenv toggle changes (only if WASM is already loaded)
   useEffect(() => {
@@ -170,6 +205,12 @@ function App() {
         mergeProperties(event.data.properties);
         break;
 
+      case "reload_workspace_wasm":
+        // Reload workspace WASM (VSCode only, triggered by F5 rebuild)
+        console.log(`[App] Reloading workspace WASM: ${event.data.path}`);
+        loadWasm(event.data.path, dotenvEnabled);
+        break;
+
       case "connection_status":
         // Connection status update - handled by useWebSocket
         break;
@@ -230,6 +271,7 @@ function App() {
         loadTime={loadTime}
         fileSize={fileSize}
         fileName={wasmPath}
+        defaultTab={environment?.environment === 'vscode' ? 'path' : 'upload'}
       />
 
       {/* Show loading spinner while detecting WASM type */}
