@@ -1,4 +1,3 @@
-import { useState } from "react";
 import styles from "./LogsViewer.module.css";
 
 interface LogEntry {
@@ -8,8 +7,7 @@ interface LogEntry {
 
 interface LogsViewerProps {
   logs: LogEntry[];
-  defaultLogLevel?: number;
-  showLevelFilter?: boolean;
+  logLevel: number;
 }
 
 const LOG_LEVEL_NAMES = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"];
@@ -25,10 +23,8 @@ const LOG_LEVEL_COLORS: Record<number, string> = {
 
 export function LogsViewer({
   logs,
-  defaultLogLevel = 0,
-  showLevelFilter = true
+  logLevel
 }: LogsViewerProps) {
-  const [logLevel, setLogLevel] = useState<number>(defaultLogLevel);
 
   /**
    * Filter logs by selected log level
@@ -46,11 +42,9 @@ export function LogsViewer({
   };
 
   const filteredLogs = filterLogs(logs, logLevel);
-  const totalLogs = logs.length;
-  const displayedLogs = filteredLogs.length;
 
   // Empty state
-  if (totalLogs === 0) {
+  if (logs.length === 0) {
     return (
       <div className={styles.emptyState}>
         <p>No logs captured</p>
@@ -60,29 +54,6 @@ export function LogsViewer({
 
   return (
     <div className={styles.logsViewer}>
-      {showLevelFilter && (
-        <div className={styles.filterBar}>
-          <label>Log Level:</label>
-          <select
-            value={logLevel}
-            onChange={(e) => setLogLevel(parseInt(e.target.value, 10))}
-            className={styles.levelSelect}
-          >
-            <option value="0">Trace (0)</option>
-            <option value="1">Debug (1)</option>
-            <option value="2">Info (2)</option>
-            <option value="3">Warn (3)</option>
-            <option value="4">Error (4)</option>
-            <option value="5">Critical (5)</option>
-          </select>
-          {displayedLogs < totalLogs && (
-            <span className={styles.filterInfo}>
-              Showing {displayedLogs} of {totalLogs} logs
-            </span>
-          )}
-        </div>
-      )}
-
       <pre className={styles.logsContainer}>
         {filteredLogs.length > 0 ? (
           filteredLogs.map((log, idx) => {

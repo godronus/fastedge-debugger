@@ -1,5 +1,78 @@
 # Proxy-WASM Runner - Changelog
 
+## February 12, 2026 (Late Evening) - Config Management UI & Spacing Refinements
+
+### Overview
+Refactored config management buttons into a dedicated component and optimized spacing throughout the application for a tighter, more cohesive UI.
+
+### 🎯 What Was Completed
+
+#### 1. Config Buttons Component Extraction
+**Created `/common/ConfigButtons` component:**
+- Extracted config load/save buttons from WasmLoader header
+- Positioned between WasmLoader and view components
+- Right-aligned buttons for better visual balance
+- Currently shows only for proxy-wasm (http-wasm config support planned)
+
+**Files Created:**
+- `frontend/src/components/common/ConfigButtons/ConfigButtons.tsx` - Component logic
+- `frontend/src/components/common/ConfigButtons/ConfigButtons.module.css` - Scoped styling
+- `frontend/src/components/common/ConfigButtons/index.ts` - Barrel export
+
+**Files Modified:**
+- `frontend/src/components/common/WasmLoader/WasmLoader.tsx` - Removed onLoadConfig/onSaveConfig props and buttons
+- `frontend/src/App.tsx` - Added ConfigButtons component usage
+- `frontend/src/App.css` - Cleaned up global styles
+
+#### 2. Spacing Optimizations
+Refined spacing throughout the application for a tighter, more cohesive feel:
+
+**View Containers:**
+- ProxyWasmView: Top padding reduced to 0.75rem (from 1.5rem)
+- HttpWasmView: Top padding reduced to 0.75rem (from 1.5rem)
+- Creates minimal gap between config buttons and request panel
+
+**Section Spacing:**
+- Global section margin-bottom: 10px (reduced from 20px)
+- Reduces gap between WasmLoader and config buttons
+
+**Config Buttons:**
+- Zero bottom padding (flush with views below)
+- Right-aligned for visual consistency
+
+### 📊 Component Structure
+
+**Before:**
+```
+WasmLoader (with config buttons in header)
+↓ 20px gap
+ProxyWasmView (1.5rem top padding)
+  └── RequestPanel
+```
+
+**After:**
+```
+WasmLoader
+↓ 10px gap
+ConfigButtons (right-aligned)
+↓ 0px gap (flush)
+ProxyWasmView (0.75rem top padding)
+  └── RequestPanel
+```
+
+### 📝 Benefits
+- **Cleaner architecture** - Config logic isolated in dedicated component
+- **Tighter spacing** - 50% reduction in vertical gaps for more content density
+- **Better visual flow** - Right-aligned buttons create natural reading path
+- **Easier to extend** - Can add http-wasm config support by updating ConfigButtons component
+
+### 🔮 Future Work
+- Extend config system to support http-wasm (different state structure)
+- Add config type detection and appropriate handling for both WASM types
+- Consider separate config files or unified format with type discriminator
+
+---
+
 ## February 12, 2026 (Evening) - UI Component Architecture Refactoring
 
 ### Overview

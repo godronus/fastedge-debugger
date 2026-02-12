@@ -98,8 +98,7 @@ export function HttpWasmView() {
             </div>
             <LogsViewer
               logs={httpLogs}
-              defaultLogLevel={logLevel}
-              showLevelFilter={false}
+              logLevel={logLevel}
             />
           </div>
         </CollapsiblePanel>
