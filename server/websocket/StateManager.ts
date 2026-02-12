@@ -17,6 +17,7 @@ import {
   RequestFailedEvent,
   PropertiesUpdatedEvent,
   HttpWasmRequestCompletedEvent,
+  ReloadWorkspaceWasmEvent,
 } from "./types.js";
 
 export class StateManager {
@@ -188,6 +189,23 @@ export class StateManager {
       "http_wasm_request_completed",
       source,
       { response, logs },
+    );
+
+    this.broadcast(event);
+  }
+
+  /**
+   * Emit reload workspace WASM event (VSCode only)
+   * Triggered by VSCode extension after F5 rebuild
+   */
+  public emitReloadWorkspaceWasm(
+    path: string,
+    source: EventSource = "system",
+  ): void {
+    const event = createEvent<ReloadWorkspaceWasmEvent>(
+      "reload_workspace_wasm",
+      source,
+      { path },
     );
 
     this.broadcast(event);

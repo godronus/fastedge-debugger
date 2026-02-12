@@ -28,6 +28,76 @@ app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok" });
 });
 
+// Environment detection endpoint
+app.get("/api/environment", (req: Request, res: Response) => {
+  const isVSCode = process.env.VSCODE_INTEGRATION === "true";
+  res.json({
+    environment: isVSCode ? "vscode" : "node",
+    supportsPathLoading: true, // Both environments support path loading
+  });
+});
+
+// Workspace WASM detection endpoint (VSCode only)
+app.get("/api/workspace-wasm", async (req: Request, res: Response) => {
+  const isVSCode = process.env.VSCODE_INTEGRATION === "true";
+  const workspacePath = process.env.WORKSPACE_PATH;
+
+  // Only available in VSCode with workspace
+  if (!isVSCode || !workspacePath) {
+    res.json({ path: null });
+    return;
+  }
+
+  try {
+    const wasmPath = path.join(workspacePath, ".fastedge", "bin", "debugger.wasm");
+
+    // Check if file exists
+    try {
+      await fs.stat(wasmPath);
+      res.json({ path: wasmPath });
+    } catch {
+      // File doesn't exist
+      res.json({ path: null });
+    }
+  } catch (error) {
+    console.error("[workspace-wasm] Error checking workspace WASM:", error);
+    res.json({ path: null });
+  }
+});
+
+// Trigger workspace WASM reload (VSCode only)
+// Called by VSCode extension after F5 rebuild
+app.post("/api/reload-workspace-wasm", async (req: Request, res: Response) => {
+  const isVSCode = process.env.VSCODE_INTEGRATION === "true";
+  const workspacePath = process.env.WORKSPACE_PATH;
+
+  // Only available in VSCode with workspace
+  if (!isVSCode || !workspacePath) {
+    res.status(400).json({ error: "Only available in VSCode environment" });
+    return;
+  }
+
+  try {
+    const wasmPath = path.join(workspacePath, ".fastedge", "bin", "debugger.wasm");
+
+    // Check if file exists
+    try {
+      await fs.stat(wasmPath);
+
+      // Emit WebSocket event to reload
+      stateManager.emitReloadWorkspaceWasm(wasmPath, "system");
+
+      res.json({ ok: true, path: wasmPath });
+    } catch {
+      // File doesn't exist
+      res.status(404).json({ error: "Workspace WASM file not found" });
+    }
+  } catch (error) {
+    console.error("[reload-workspace-wasm] Error:", error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 app.post("/api/load", async (req: Request, res: Response) => {
   const {
     wasmBase64,

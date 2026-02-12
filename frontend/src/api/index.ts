@@ -5,6 +5,64 @@ import { getFilePath, hasFilePath, formatFileSize } from "../utils/filePath";
 const API_BASE = "/api";
 
 /**
+ * Environment info from server
+ */
+export interface EnvironmentInfo {
+  environment: 'vscode' | 'node';
+  supportsPathLoading: boolean;
+}
+
+/**
+ * Get environment information from the server
+ * @returns Environment info indicating if running in VSCode or Node
+ */
+export async function getEnvironment(): Promise<EnvironmentInfo> {
+  const response = await fetch(`${API_BASE}/environment`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    // Default to node environment if endpoint fails
+    console.warn("Failed to fetch environment info, defaulting to node");
+    return {
+      environment: 'node',
+      supportsPathLoading: true,
+    };
+  }
+
+  const result = await response.json();
+  return result;
+}
+
+/**
+ * Get workspace WASM path (VSCode only)
+ * @returns Path to workspace WASM file if it exists, null otherwise
+ */
+export async function getWorkspaceWasm(): Promise<string | null> {
+  try {
+    const response = await fetch(`${API_BASE}/workspace-wasm`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const result = await response.json();
+    return result.path;
+  } catch (error) {
+    console.error("Failed to fetch workspace WASM path:", error);
+    return null;
+  }
+}
+
+/**
  * Loading mode used for WASM upload
  */
 export type LoadingMode = "path" | "buffer";

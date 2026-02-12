@@ -21,11 +21,13 @@ Build a Postman-like test runner for debugging WASM binaries that run on FastEdg
 - Server-side configuration and state management
 
 **Common Features:**
-- Load WASM binaries with explicit type selection
+- Load WASM binaries with hybrid loading (path-based or buffer-based)
+- Tab-based loader UI with environment-aware defaults
 - Real-time WebSocket synchronization across clients
 - Debug output and comprehensive logging
 - Configuration save/load (Proxy-WASM)
 - Test binaries locally before deploying to production
+- **VSCode Integration**: Auto-loads workspace WASM and supports F5 rebuild auto-reload
 
 ---
 

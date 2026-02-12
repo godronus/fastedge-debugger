@@ -1,5 +1,139 @@
 # Proxy-WASM Runner - Changelog
 
+## February 12, 2026 - Workspace WASM Auto-Loading & Tab-Based UI
+
+### Overview
+Implemented automatic workspace WASM detection and loading for VSCode integration, with tab-based UI for switching between path and upload modes. The debugger now seamlessly auto-loads `.fastedge/bin/debugger.wasm` on startup and supports F5 rebuild auto-reload.
+
+### 🎯 What Was Completed
+
+#### 1. Environment Detection System
+**Files Modified:**
+- `server/server.ts` - Added `/api/environment` and `/api/workspace-wasm` endpoints
+- `frontend/src/api/index.ts` - Added `getEnvironment()` and `getWorkspaceWasm()` API functions
+- `frontend/src/App.tsx` - Environment detection and auto-load on mount
+
+**Key Features:**
+- Server detects VSCode vs Node environment via `VSCODE_INTEGRATION` env var
+- Frontend pings server on startup to determine environment
+- Workspace path passed from VSCode extension via `WORKSPACE_PATH` env var
+- Auto-detects `.fastedge/bin/debugger.wasm` in VSCode environment
+
+#### 2. Tab-Based Loader UI
+**Files Modified:**
+- `frontend/src/components/common/WasmLoader/WasmLoader.tsx` - Complete tab UI refactor
+- `frontend/src/components/common/WasmLoader/WasmLoader.module.css` - Tab styling
+
+**User Experience:**
+- Tab 1: 📁 **File Path** - Direct path loading (fast, for local files)
+- Tab 2: 📤 **Upload File** - Buffer-based upload (universal)
+- Environment-aware default tab (VSCode → Path, Node → Upload)
+- Both tabs always accessible for flexibility
+- Compact load info in tab bar: `💾 Buffer-based • 388.0ms • (11.0 MB)`
+- Replaced large info panel with inline display to save vertical space
+
+**Improvements:**
+- Fixed deprecated `onKeyPress` → `onKeyDown` (React 18+)
+- Removed 134 lines of unused CSS (old layouts, radio buttons, etc.)
+- Clean, modern tab interface with hover effects
+
+#### 3. WebSocket Reload System
+**Files Modified:**
+- `server/websocket/types.ts` - Added `ReloadWorkspaceWasmEvent` type
+- `server/websocket/StateManager.ts` - Added `emitReloadWorkspaceWasm()` method
+- `server/server.ts` - Added `/api/reload-workspace-wasm` endpoint
+- `frontend/src/hooks/websocket-types.ts` - Added reload event type
+- `frontend/src/App.tsx` - Handle `reload_workspace_wasm` event
+
+**Key Features:**
+- VSCode extension can trigger WASM reload via WebSocket
+- After F5 rebuild, extension calls `debuggerServerManager.reloadWorkspaceWasm()`
+- Server broadcasts reload event to all connected clients
+- Frontend automatically reloads WASM and switches to File Path tab
+- Zero-click workflow: F5 → Auto-reload → Ready to test
+
+#### 4. VSCode Extension Integration
+**Files Modified:**
+- `FastEdge-vscode/src/debugger/DebuggerServerManager.ts` - Added workspace path parameter and `reloadWorkspaceWasm()` method
+- `FastEdge-vscode/src/extension.ts` - Pass workspace path on initialization
+
+**Integration Points:**
+- Extension passes workspace root path to server
+- Server uses path to locate `.fastedge/bin/debugger.wasm`
+- Extension can trigger reload: `await debuggerServerManager.reloadWorkspaceWasm()`
+- Ready for F5 build completion hook integration
+
+### 🧪 Testing
+
+**Auto-Load on Startup (VSCode):**
+```
+1. Press F5 to build WASM
+2. Open debugger
+3. ✅ WASM auto-loads from .fastedge/bin/debugger.wasm
+4. ✅ File Path tab is active
+5. ✅ Load info shows in tab bar
+```
+
+**F5 Rebuild Workflow:**
+```
+1. Load WASM in debugger
+2. Modify code and press F5
+3. Extension calls reloadWorkspaceWasm()
+4. ✅ Debugger auto-reloads updated WASM
+5. ✅ File Path tab becomes active
+6. ✅ Ready to test immediately
+```
+
+**Tab Switching:**
+```
+1. Switch between File Path and Upload tabs
+2. ✅ Content panels change correctly
+3. ✅ Load info remains visible in tab bar
+4. ✅ Active tab highlighted with orange underline
+```
+
+### 📝 Documentation
+
+**New Files:**
+- `context/features/WORKSPACE_WASM_AUTOLOAD.md` - Complete feature documentation
+  - Architecture and flow diagrams
+  - API endpoint reference
+  - VSCode extension integration guide
+  - Testing procedures
+  - Known issues and future enhancements
+
+**Key Sections:**
+- Environment detection flow
+- Frontend startup sequence
+- F5 rebuild integration
+- Tab-based UI implementation
+- File locations and paths
+
+### 🔑 Key Benefits
+
+1. **Zero-Click Development**: No manual file selection in VSCode
+2. **Fast Iteration**: F5 → Auto-reload → Test (seamless workflow)
+3. **Smart Defaults**: Right tab active based on environment
+4. **Space Efficient**: Compact load info saves vertical screen space
+5. **Universal Fallback**: Upload tab always available
+6. **Production Parity**: Uses fast path-based loading in VSCode
+
+### 📍 File Locations
+
+**Expected Workspace WASM:**
+```
+<workspace>/.fastedge/bin/debugger.wasm
+```
+
+**Modified Files:**
+- Server: 1 file (server.ts)
+- WebSocket: 2 files (types.ts, StateManager.ts)
+- Frontend API: 1 file (api/index.ts)
+- Frontend UI: 3 files (App.tsx, WasmLoader.tsx, WasmLoader.module.css, websocket-types.ts)
+- VSCode Extension: 2 files (DebuggerServerManager.ts, extension.ts)
+
+---
+
 ## February 11-12, 2026 - Hybrid WASM Loading System
 
 ### Overview
