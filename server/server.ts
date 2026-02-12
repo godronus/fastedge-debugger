@@ -54,7 +54,8 @@ app.get("/api/workspace-wasm", async (req: Request, res: Response) => {
     // Check if file exists
     try {
       await fs.stat(wasmPath);
-      res.json({ path: wasmPath });
+      // Return path with <workspace> placeholder for cleaner display
+      res.json({ path: "<workspace>/.fastedge/bin/debugger.wasm" });
     } catch {
       // File doesn't exist
       res.json({ path: null });
@@ -84,10 +85,10 @@ app.post("/api/reload-workspace-wasm", async (req: Request, res: Response) => {
     try {
       await fs.stat(wasmPath);
 
-      // Emit WebSocket event to reload
-      stateManager.emitReloadWorkspaceWasm(wasmPath, "system");
+      // Emit WebSocket event with <workspace> placeholder
+      stateManager.emitReloadWorkspaceWasm("<workspace>/.fastedge/bin/debugger.wasm", "system");
 
-      res.json({ ok: true, path: wasmPath });
+      res.json({ ok: true, path: "<workspace>/.fastedge/bin/debugger.wasm" });
     } catch {
       // File doesn't exist
       res.status(404).json({ error: "Workspace WASM file not found" });
@@ -128,8 +129,23 @@ app.post("/api/load", async (req: Request, res: Response) => {
         return;
       }
 
+      let resolvedPath = wasmPath;
+
+      // Expand <workspace> placeholder (VSCode integration)
+      if (wasmPath.startsWith("<workspace>")) {
+        const workspacePath = process.env.WORKSPACE_PATH;
+        if (!workspacePath) {
+          res.status(400).json({
+            error: "<workspace> placeholder only available in VSCode environment"
+          });
+          return;
+        }
+        // Replace <workspace> with actual workspace path
+        resolvedPath = wasmPath.replace("<workspace>", workspacePath);
+      }
+
       // Validate path for security
-      const validationResult = validatePath(wasmPath, {
+      const validationResult = validatePath(resolvedPath, {
         requireWasmExtension: true,
         checkExists: true,
       });

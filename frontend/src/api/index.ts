@@ -234,11 +234,8 @@ export async function uploadWasmFromPath(
 
   console.log(`✅ Path-based loading succeeded in ${loadTime.toFixed(1)}ms`);
 
-  // Extract filename from path for display
-  const fileName = wasmPath.split(/[\\/]/).pop() || wasmPath;
-
   return {
-    path: fileName,
+    path: wasmPath, // Return full path (including <workspace> placeholder if present)
     wasmType: result.wasmType,
     loadingMode: "path",
     loadTime,

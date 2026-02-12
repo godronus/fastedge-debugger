@@ -17,6 +17,8 @@ interface WasmLoaderProps {
   fileName?: string | null;
   // Default tab based on environment
   defaultTab?: LoaderTab;
+  // Current WASM path from global store (for syncing input field)
+  wasmPath?: string | null;
 }
 
 export function WasmLoader({
@@ -30,6 +32,7 @@ export function WasmLoader({
   fileSize,
   fileName,
   defaultTab = 'upload',
+  wasmPath: globalWasmPath,
 }: WasmLoaderProps) {
   const [wasmPath, setWasmPath] = useState("");
   const [activeTab, setActiveTab] = useState<LoaderTab>(defaultTab);
@@ -38,6 +41,13 @@ export function WasmLoader({
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
+
+  // Sync local input field with global store's wasmPath
+  useEffect(() => {
+    if (globalWasmPath && globalWasmPath !== wasmPath) {
+      setWasmPath(globalWasmPath);
+    }
+  }, [globalWasmPath]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -145,7 +155,7 @@ export function WasmLoader({
               <input
                 type="text"
                 className={styles.pathInput}
-                placeholder="/workspace/target/wasm32-wasi/release/app.wasm"
+                placeholder="<workspace>/.fastedge/bin/debugger.wasm"
                 value={wasmPath}
                 onChange={(e) => setWasmPath(e.target.value)}
                 onKeyDown={handlePathKeyDown}
