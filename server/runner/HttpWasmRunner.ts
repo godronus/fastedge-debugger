@@ -104,9 +104,12 @@ export class HttpWasmRunner implements IWasmRunner {
     // Setup error handlers
     this.setupErrorHandlers();
 
-    // Wait for server to be ready (20 seconds in test environments, 5 seconds otherwise)
-    // Increased timeout for slower-starting binaries (e.g., those with downstream fetches)
-    const timeout = process.env.NODE_ENV === 'test' || process.env.VITEST ? 20000 : 5000;
+    // Wait for server to be ready
+    // Timeout accounts for:
+    // - Large WASM files that take time to compile (10MB+ can take 3-5s)
+    // - WASMs that make downstream HTTP requests on first request (up to 5s)
+    // - Test environments where startup can be slower
+    const timeout = process.env.NODE_ENV === 'test' || process.env.VITEST ? 20000 : 10000;
     await this.waitForServerReady(this.port, timeout);
   }
 
@@ -294,19 +297,34 @@ export class HttpWasmRunner implements IWasmRunner {
 
     while (Date.now() - startTime < timeoutMs) {
       try {
+        // Allow up to 5 seconds per request for WASMs that make downstream calls
         const response = await fetch(`http://localhost:${port}/`, {
-          signal: AbortSignal.timeout(1000),
+          signal: AbortSignal.timeout(5000),
         });
         // Any response means the server is up
         return;
       } catch (error) {
+        // Check if process crashed
+        if (this.process && this.process.exitCode !== null) {
+          throw new Error(
+            `FastEdge-run process exited with code ${this.process.exitCode} before server started`
+          );
+        }
         // Server not ready yet, wait and retry
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
 
+    // Collect diagnostics for timeout error
+    const processInfo = this.process
+      ? `Process state: exitCode=${this.process.exitCode}, killed=${this.process.killed}, pid=${this.process.pid}`
+      : 'Process is null';
+    const recentLogs = this.logs.slice(-5).map(l => `[${l.level}] ${l.message}`).join('\n');
+
     throw new Error(
-      `FastEdge-run server did not start within ${timeoutMs}ms on port ${port}`
+      `FastEdge-run server did not start within ${timeoutMs}ms on port ${port}\n` +
+      `${processInfo}\n` +
+      `Recent logs:\n${recentLogs || '(no logs)'}`
     );
   }
 

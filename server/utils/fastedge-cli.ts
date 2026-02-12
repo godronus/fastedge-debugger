@@ -13,25 +13,39 @@ import { join } from "path";
 import os from "os";
 
 /**
- * Get the bundled CLI path for the current platform
- *
- * With esbuild bundling, the server is always at dist/server.js
- * and the CLI binaries are at dist/fastedge-cli/
+ * Get the CLI binary filename for the current platform
  */
-function getBundledCliPath(): string {
-  // __dirname points to dist/ (location of the bundled server.js)
-  const cliBinDir = join(__dirname, "fastedge-cli");
-
+function getCliBinaryName(): string {
   switch (os.platform()) {
     case "win32":
-      return join(cliBinDir, "fastedge-run.exe");
+      return "fastedge-run.exe";
     case "darwin":
-      return join(cliBinDir, "fastedge-run-darwin-arm64");
+      return "fastedge-run-darwin-arm64";
     case "linux":
-      return join(cliBinDir, "fastedge-run-linux-x64");
+      return "fastedge-run-linux-x64";
     default:
       throw new Error(`Unsupported platform: ${os.platform()}`);
   }
+}
+
+/**
+ * Get possible bundled CLI paths
+ * Checks both production (dist/fastedge-cli/) and source (fastedge-run/) locations
+ */
+function getBundledCliPaths(): string[] {
+  const binaryName = getCliBinaryName();
+
+  return [
+    // Production: bundled server at dist/server.js
+    join(__dirname, "fastedge-cli", binaryName),
+
+    // Development/Tests: running from source
+    // __dirname might be server/utils/, so go up to project root
+    join(__dirname, "..", "..", "fastedge-run", binaryName),
+
+    // Alternative: if __dirname is already at project root
+    join(__dirname, "fastedge-run", binaryName),
+  ];
 }
 
 /**
@@ -52,14 +66,11 @@ export async function findFastEdgeRunCli(): Promise<string> {
     }
   }
 
-  // 2. Check for bundled binary
-  try {
-    const bundledPath = getBundledCliPath();
+  // 2. Check for bundled binary (multiple possible locations)
+  for (const bundledPath of getBundledCliPaths()) {
     if (existsSync(bundledPath)) {
       return bundledPath;
     }
-  } catch (error) {
-    // Platform not supported or path doesn't exist, continue to next option
   }
 
   // 3. Check PATH using 'which' (Unix) or 'where' (Windows)

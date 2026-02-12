@@ -35,8 +35,8 @@ async function bundle() {
       external: [
         "fsevents", // Optional native dependency (Mac only)
       ],
-      minify: true,
-      sourcemap: false,
+      minify: true, // Minify for production
+      sourcemap: false, // No source maps in production
       logLevel: "info",
     });
 

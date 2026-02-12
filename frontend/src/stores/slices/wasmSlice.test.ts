@@ -25,6 +25,18 @@ describe('WasmSlice', () => {
     } as unknown as File;
   };
 
+  // Helper function to create mock upload result
+  const createMockUploadResult = (
+    path: string,
+    loadingMode: 'path' | 'buffer' = 'buffer'
+  ) => ({
+    path,
+    wasmType: 'proxy-wasm' as const,
+    loadingMode,
+    loadTime: 100,
+    fileSize: 1024,
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Clear the store state
@@ -56,7 +68,13 @@ describe('WasmSlice', () => {
       const mockPath = 'test.wasm';
       const mockFile = createMockFile('wasm content', 'test.wasm', mockArrayBuffer);
 
-      mockUploadWasm.mockResolvedValue(mockPath);
+      mockUploadWasm.mockResolvedValue({
+        path: mockPath,
+        wasmType: 'proxy-wasm',
+        loadingMode: 'buffer',
+        loadTime: 100,
+        fileSize: mockFile.size,
+      });
 
       const { result } = renderHook(() => useAppStore());
 
@@ -81,7 +99,7 @@ describe('WasmSlice', () => {
       const mockPath = 'test.wasm';
       const mockFile = createMockFile('wasm content', 'test.wasm', mockArrayBuffer);
 
-      mockUploadWasm.mockResolvedValue(mockPath);
+      mockUploadWasm.mockResolvedValue(createMockUploadResult(mockPath));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -146,7 +164,7 @@ describe('WasmSlice', () => {
       });
 
       // Second load succeeds
-      mockUploadWasm.mockResolvedValueOnce('test.wasm');
+      mockUploadWasm.mockResolvedValueOnce(createMockUploadResult('test.wasm'));
 
       await act(async () => {
         await result.current.loadWasm(mockFile, true);
@@ -225,8 +243,12 @@ describe('WasmSlice', () => {
       const mockFile = {
         name: 'test.wasm',
         type: 'application/wasm',
+        size: 1024,
         arrayBuffer: vi.fn().mockRejectedValue(new Error(errorMessage)),
       } as unknown as File;
+
+      // Mock uploadWasm to succeed with buffer loading mode
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm', 'buffer'));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -238,8 +260,9 @@ describe('WasmSlice', () => {
         expect(result.current.loading).toBe(false);
       });
 
+      // uploadWasm succeeds, but arrayBuffer() fails, so error is caught
       expect(result.current.error).toBe(errorMessage);
-      expect(mockUploadWasm).not.toHaveBeenCalled();
+      expect(mockUploadWasm).toHaveBeenCalledWith(mockFile, true);
     });
 
     it('should set loading to false even when upload fails', async () => {
@@ -265,7 +288,7 @@ describe('WasmSlice', () => {
       const mockArrayBuffer = new ArrayBuffer(8);
       const mockFile = createMockFile('wasm content', 'test.wasm', mockArrayBuffer);
 
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -284,7 +307,7 @@ describe('WasmSlice', () => {
       const mockArrayBuffer = new ArrayBuffer(8);
       const mockFile = createMockFile('wasm content', 'test.wasm', mockArrayBuffer);
 
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -301,7 +324,7 @@ describe('WasmSlice', () => {
 
       // Reset mock to verify reloadWasm call
       mockUploadWasm.mockClear();
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       // Now reload with dotenv enabled
       await act(async () => {
@@ -321,7 +344,7 @@ describe('WasmSlice', () => {
       const mockArrayBuffer = new ArrayBuffer(8);
       const mockFile = createMockFile('wasm content', 'test.wasm', mockArrayBuffer);
 
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -335,7 +358,7 @@ describe('WasmSlice', () => {
       });
 
       mockUploadWasm.mockClear();
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       // Now reload with dotenv disabled
       await act(async () => {
@@ -377,7 +400,7 @@ describe('WasmSlice', () => {
       const errorMessage = 'Reload failed';
       const mockFile = createMockFile('wasm content', 'test.wasm', mockArrayBuffer);
 
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -409,7 +432,7 @@ describe('WasmSlice', () => {
       const mockArrayBuffer = new ArrayBuffer(8);
       const mockFile = createMockFile('wasm content', 'test.wasm', mockArrayBuffer);
 
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -426,7 +449,7 @@ describe('WasmSlice', () => {
 
       // Reload
       mockUploadWasm.mockClear();
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       await act(async () => {
         await result.current.reloadWasm(true);
@@ -447,7 +470,7 @@ describe('WasmSlice', () => {
       const mockArrayBuffer = new ArrayBuffer(8);
       const mockFile = createMockFile('wasm content', 'test.wasm', mockArrayBuffer);
 
-      mockUploadWasm.mockResolvedValue('test.wasm');
+      mockUploadWasm.mockResolvedValue(createMockUploadResult('test.wasm'));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -538,7 +561,7 @@ describe('WasmSlice', () => {
       const mockFile1 = createMockFile('wasm content 1', 'test1.wasm', mockArrayBuffer1);
       const mockFile2 = createMockFile('wasm content 2', 'test2.wasm', mockArrayBuffer2);
 
-      mockUploadWasm.mockResolvedValueOnce('test1.wasm');
+      mockUploadWasm.mockResolvedValueOnce(createMockUploadResult('test1.wasm'));
 
       const { result } = renderHook(() => useAppStore());
 
@@ -552,7 +575,7 @@ describe('WasmSlice', () => {
       });
 
       // Load second file, should replace first
-      mockUploadWasm.mockResolvedValueOnce('test2.wasm');
+      mockUploadWasm.mockResolvedValueOnce(createMockUploadResult('test2.wasm'));
 
       await act(async () => {
         await result.current.loadWasm(mockFile2, true);
@@ -607,7 +630,7 @@ describe('WasmSlice', () => {
       });
 
       // Second attempt succeeds
-      mockUploadWasm.mockResolvedValueOnce('test.wasm');
+      mockUploadWasm.mockResolvedValueOnce(createMockUploadResult('test.wasm'));
 
       await act(async () => {
         await result.current.loadWasm(mockFile, true);

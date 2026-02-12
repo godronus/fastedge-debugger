@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppStore, WasmSlice, WasmState } from '../types';
-import { uploadWasm } from '../../api';
+import { uploadWasm, uploadWasmFromPath } from '../../api';
 
 // ============================================================================
 // DEFAULT STATE
@@ -36,11 +36,11 @@ export const createWasmSlice: StateCreator<
   // ============================================================================
 
   /**
-   * Load a WASM file from disk
-   * Reads the file, uploads it to the server using optimal loading strategy, and automatically detects type
-   * Uses path-based loading (faster) when available, falls back to buffer-based loading
+   * Load a WASM file from disk or path
+   * Accepts either a File object or a string path
+   * Uses optimal loading strategy and automatically detects type
    */
-  loadWasm: async (file: File, dotenvEnabled: boolean) => {
+  loadWasm: async (fileOrPath: File | string, dotenvEnabled: boolean) => {
     // Set loading state
     set(
       (state) => {
@@ -52,13 +52,24 @@ export const createWasmSlice: StateCreator<
     );
 
     try {
-      // Upload to server using hybrid loading (path or buffer)
-      const { path, wasmType, loadingMode, loadTime, fileSize } = await uploadWasm(file, dotenvEnabled);
+      let result;
+      let file: File | null = null;
 
-      // Read buffer only if we used buffer-based loading
+      // Handle string path (direct path loading)
+      if (typeof fileOrPath === 'string') {
+        result = await uploadWasmFromPath(fileOrPath, dotenvEnabled);
+      } else {
+        // Handle File object (hybrid loading)
+        file = fileOrPath;
+        result = await uploadWasm(file, dotenvEnabled);
+      }
+
+      const { path, wasmType, loadingMode, loadTime, fileSize } = result;
+
+      // Read buffer only if we used buffer-based loading with a File object
       // (for caching/reload capability)
       let buffer: ArrayBuffer | null = null;
-      if (loadingMode === 'buffer') {
+      if (file && loadingMode === 'buffer') {
         buffer = await file.arrayBuffer();
       }
 
@@ -67,7 +78,7 @@ export const createWasmSlice: StateCreator<
         (state) => {
           state.wasmPath = path;
           state.wasmBuffer = buffer;
-          state.wasmFile = file; // Store file for reload capability
+          state.wasmFile = file; // Store file for reload capability (null if path-based)
           state.wasmType = wasmType; // Store detected type
           state.loadingMode = loadingMode; // Track which mode was used
           state.loadTime = loadTime; // Track load performance

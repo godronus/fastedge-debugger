@@ -222,6 +222,7 @@ function App() {
 
       <WasmLoader
         onFileLoad={(file) => loadWasm(file, dotenvEnabled)}
+        onPathLoad={(path) => loadWasm(path, dotenvEnabled)}
         loading={loading}
         onLoadConfig={wasmType === 'proxy-wasm' ? handleLoadConfig : undefined}
         onSaveConfig={wasmType === 'proxy-wasm' ? handleSaveConfig : undefined}

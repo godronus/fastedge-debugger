@@ -1,9 +1,10 @@
-import { ChangeEvent } from "react";
+import { ChangeEvent, useState } from "react";
 import styles from "./WasmLoader.module.css";
 import { formatFileSize } from "../../../utils/filePath";
 
 interface WasmLoaderProps {
   onFileLoad: (file: File) => void;
+  onPathLoad?: (path: string) => void;
   loading: boolean;
   onLoadConfig?: () => void;
   onSaveConfig?: () => void;
@@ -16,6 +17,7 @@ interface WasmLoaderProps {
 
 export function WasmLoader({
   onFileLoad,
+  onPathLoad,
   loading,
   onLoadConfig,
   onSaveConfig,
@@ -24,10 +26,24 @@ export function WasmLoader({
   fileSize,
   fileName,
 }: WasmLoaderProps) {
+  const [wasmPath, setWasmPath] = useState("");
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       onFileLoad(file);
+    }
+  };
+
+  const handlePathLoad = () => {
+    if (wasmPath.trim() && onPathLoad) {
+      onPathLoad(wasmPath.trim());
+    }
+  };
+
+  const handlePathKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && wasmPath.trim() && onPathLoad) {
+      handlePathLoad();
     }
   };
 
@@ -68,12 +84,51 @@ export function WasmLoader({
         </div>
       </div>
 
-      <input
-        type="file"
-        accept=".wasm"
-        onChange={handleFileChange}
-        disabled={loading}
-      />
+      {/* Option 1: Load from Path */}
+      {onPathLoad && (
+        <div className={styles.pathSection}>
+          <div className={styles.optionHeader}>
+            <span className={styles.optionLabel}>Option 1: File Path</span>
+            <span className={styles.optionDesc}>(faster for local files)</span>
+          </div>
+          <div className={styles.pathInputGroup}>
+            <input
+              type="text"
+              className={styles.pathInput}
+              placeholder="/workspace/target/wasm32-wasi/release/app.wasm"
+              value={wasmPath}
+              onChange={(e) => setWasmPath(e.target.value)}
+              onKeyPress={handlePathKeyPress}
+              disabled={loading}
+            />
+            <button
+              onClick={handlePathLoad}
+              disabled={loading || !wasmPath.trim()}
+              className={styles.pathButton}
+            >
+              Load from Path
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Option 2: Upload File */}
+      <div className={styles.fileSection}>
+        <div className={styles.optionHeader}>
+          <span className={styles.optionLabel}>
+            {onPathLoad ? 'Option 2: Upload File' : 'Load WASM File'}
+          </span>
+          {onPathLoad && (
+            <span className={styles.optionDesc}>(works anywhere)</span>
+          )}
+        </div>
+        <input
+          type="file"
+          accept=".wasm"
+          onChange={handleFileChange}
+          disabled={loading}
+        />
+      </div>
 
       {loading && (
         <span className={styles.loadingIndicator}> Loading...</span>

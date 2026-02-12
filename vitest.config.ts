@@ -6,6 +6,11 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['server/**/*.test.ts'],
+    exclude: [
+      '**/node_modules/**',
+      '**/.git/**',
+      'server/__tests__/integration/**', // Integration tests have separate configs
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

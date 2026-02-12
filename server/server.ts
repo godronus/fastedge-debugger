@@ -115,6 +115,11 @@ app.post("/api/load", async (req: Request, res: Response) => {
 
     res.json({ ok: true, wasmType });
   } catch (error) {
+    // Cleanup runner if load failed
+    if (currentRunner) {
+      await currentRunner.cleanup();
+      currentRunner = null;
+    }
     res.status(500).json({ ok: false, error: String(error) });
   }
 });

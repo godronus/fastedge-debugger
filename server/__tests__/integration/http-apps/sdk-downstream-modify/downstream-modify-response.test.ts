@@ -12,33 +12,40 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { join } from 'path';
 import type { IWasmRunner, HttpResponse } from '../../../../runner/IWasmRunner';
-import { loadHttpAppWasm, WASM_TEST_BINARIES } from '../../utils/wasm-loader';
+import { WASM_TEST_BINARIES } from '../../utils/wasm-loader';
 import {
   createHttpWasmRunner,
   isSuccessResponse,
   hasContentType,
 } from '../../utils/http-wasm-helpers';
 
-// TODO: This test suite consistently fails to start FastEdge-run in test environment
-// Manual testing of the binary works fine, suggesting an environment-specific issue
-// Needs investigation: possibly network-related (external API fetch), resource limits, or timing
-describe.skip('HTTP WASM Runner - Downstream Fetch & Modify', () => {
+// Fixed: Timeout issues resolved by increasing per-request timeout to 5s (for downstream fetches)
+// Now using path-based loading for faster test execution
+describe('HTTP WASM Runner - Downstream Fetch & Modify', () => {
   let runner: IWasmRunner;
-  let wasmBinary: Uint8Array;
+  let wasmPath: string;
 
-  // Load once before all tests for performance
+  // Load once before all tests - path-based loading for performance
   beforeAll(async () => {
     // Small delay to allow ports to be fully released from previous test file
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     runner = createHttpWasmRunner();
-    wasmBinary = await loadHttpAppWasm(
-      'sdk-examples',
-      WASM_TEST_BINARIES.httpApps.sdkExamples.sdkDownstreamModifyResponse
+
+    // Get file path from wasm output directory
+    wasmPath = join(
+      process.cwd(),
+      'wasm',
+      'http-apps',
+      'basic-examples',
+      'downstream-fetch.wasm'
     );
-    await runner.load(Buffer.from(wasmBinary));
-  }, 40000); // 40s timeout (2s delay + load time)
+
+    // Load from path (faster and no temp file needed!)
+    await runner.load(wasmPath);
+  }, 30000); // 30s timeout (2s delay + load time, reduced from 40s)
 
   // Cleanup once after all tests
   afterAll(async () => {

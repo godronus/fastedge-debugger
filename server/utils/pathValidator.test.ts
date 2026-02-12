@@ -100,7 +100,8 @@ describe("Path Validator", () => {
       const result = validatePath(tempDir);
 
       expect(result.valid).toBe(false);
-      expect(result.error).toContain("not a file");
+      // Directory is rejected due to missing .wasm extension (checked first)
+      expect(result.error).toContain("File must have .wasm extension");
     });
   });
 

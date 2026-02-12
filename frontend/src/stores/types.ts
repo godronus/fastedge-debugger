@@ -45,7 +45,7 @@ export interface WasmState {
 }
 
 export interface WasmActions {
-  loadWasm: (file: File, dotenvEnabled: boolean) => Promise<void>;
+  loadWasm: (fileOrPath: File | string, dotenvEnabled: boolean) => Promise<void>;
   reloadWasm: (dotenvEnabled: boolean) => Promise<void>;
   clearWasm: () => void;
   setLoading: (loading: boolean) => void;

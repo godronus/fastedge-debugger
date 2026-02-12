@@ -130,3 +130,89 @@
 .wasmInfoRow span {
   color: #b0b0b0;
 }
+
+/* Path input section */
+.pathSection {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #252525;
+  border-radius: 4px;
+  border: 1px solid #3d3d3d;
+}
+
+.fileSection {
+  margin-bottom: 8px;
+}
+
+.optionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.optionLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.optionDesc {
+  font-size: 11px;
+  color: #b0b0b0;
+  font-style: italic;
+}
+
+.pathInputGroup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pathInput {
+  flex: 1;
+  padding: 8px 12px;
+  background: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.pathInput:focus {
+  outline: none;
+  border-color: #ff6c37;
+  background: #2d2d2d;
+}
+
+.pathInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pathInput::placeholder {
+  color: #666;
+}
+
+.pathButton {
+  padding: 8px 16px;
+  background: #ff6c37;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.pathButton:hover:not(:disabled) {
+  background: #ff7c47;
+}
+
+.pathButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

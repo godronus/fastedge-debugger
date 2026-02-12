@@ -135,6 +135,59 @@ export async function uploadWasm(
   };
 }
 
+/**
+ * Uploads a WASM file by path directly (no File object needed).
+ *
+ * This is ideal for:
+ * - Local development in browser mode
+ * - CI/CD testing workflows
+ * - Agent/API usage
+ * - When you know the exact file path
+ *
+ * Always uses path-based loading (fastest mode).
+ *
+ * @param wasmPath - Absolute or relative path to WASM file
+ * @param dotenvEnabled - Whether to enable .env file loading
+ * @returns Upload result with metadata
+ */
+export async function uploadWasmFromPath(
+  wasmPath: string,
+  dotenvEnabled: boolean = true,
+): Promise<UploadWasmResult> {
+  const startTime = performance.now();
+
+  console.log(`📁 Loading WASM from path: ${wasmPath}`);
+
+  const response = await fetch(`${API_BASE}/load`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ wasmPath, dotenvEnabled }),
+  });
+
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.error || "Failed to load WASM from path");
+  }
+
+  const loadTime = performance.now() - startTime;
+  const result = await response.json();
+
+  console.log(`✅ Path-based loading succeeded in ${loadTime.toFixed(1)}ms`);
+
+  // Extract filename from path for display
+  const fileName = wasmPath.split(/[\\/]/).pop() || wasmPath;
+
+  return {
+    path: fileName,
+    wasmType: result.wasmType,
+    loadingMode: "path",
+    loadTime,
+    fileSize: 0, // Unknown from path-only loading
+  };
+}
+
 export async function callHook(
   hook: string,
   params: HookCall,
