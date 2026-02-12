@@ -1,5 +1,8 @@
 .panel {
-  /* Panel container styles can be added here if needed */
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #252525;
 }
 
 .header {
@@ -32,15 +35,20 @@
 }
 
 .arrow {
-  font-size: 12px;
-  color: #b0b0b0;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid #b0b0b0;
+  border-bottom: 2px solid #b0b0b0;
+  transform: rotate(45deg);
   transition: transform 0.2s;
+  flex-shrink: 0;
 }
 
 .arrow.expanded {
-  transform: rotate(180deg);
+  transform: rotate(-135deg);
 }
 
 .content {
-  /* Content container styles can be added here if needed */
+  padding: 1rem 1.25rem;
+  background: #252525;
 }

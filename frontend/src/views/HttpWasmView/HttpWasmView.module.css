@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: 1.5rem;
   height: 100%;
-  padding: 1.5rem 2rem;
+  padding: 0.75rem 1rem 1.5rem 1rem;
 }
 
 .panels {
@@ -30,4 +30,40 @@
 
 .panels::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: #b0b0b0;
+  font-style: italic;
+  padding: 0.5rem 0;
+  text-align: left;
+}
+
+/* Logging Section */
+.loggingContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.loggingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 0.75rem 0;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.logTab {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-bottom: 2px solid #ff6c37;
+  color: #ff6c37;
+}
+
+.tabLabel {
+  font-size: 0.9rem;
+  font-weight: 500;
 }

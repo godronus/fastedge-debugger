@@ -1,6 +1,7 @@
-import { useState, ChangeEvent } from "react";
+import { useState } from "react";
 import { HookCall, HookResult, LogEntry } from "../../types";
 import { CollapsiblePanel } from "../../common/CollapsiblePanel";
+import { LogLevelSelector } from "../../common/LogLevelSelector";
 import { JsonDisplay } from "../../common/JsonDisplay";
 import styles from "./HookStagesPanel.module.css";
 
@@ -28,10 +29,6 @@ export function HookStagesPanel({
 }: HookStagesPanelProps) {
   const [activeHook, setActiveHook] = useState<string>("onRequestHeaders");
   const [activeSubView, setActiveSubView] = useState<SubView>("logs");
-
-  const handleLogLevelChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    onLogLevelChange(parseInt(e.target.value, 10));
-  };
 
   /**
    * Check if the content-type indicates JSON
@@ -392,17 +389,10 @@ export function HookStagesPanel({
             ))}
           </div>
 
-          <div className={styles.logLevelSelector}>
-            <label>Log Level:</label>
-            <select value={logLevel} onChange={handleLogLevelChange}>
-              <option value="0">Trace (0)</option>
-              <option value="1">Debug (1)</option>
-              <option value="2">Info (2)</option>
-              <option value="3">Warn (3)</option>
-              <option value="4">Error (4)</option>
-              <option value="5">Critical (5)</option>
-            </select>
-          </div>
+          <LogLevelSelector
+            logLevel={logLevel}
+            onLogLevelChange={onLogLevelChange}
+          />
         </div>
 
         <div className={styles.subViewTabs}>

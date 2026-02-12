@@ -1,6 +1,87 @@
 # Proxy-WASM Runner - Changelog
 
-## February 12, 2026 - Workspace WASM Auto-Loading & Tab-Based UI
+## February 12, 2026 (Evening) - UI Component Architecture Refactoring
+
+### Overview
+Major refactoring of the frontend component architecture to create shared, reusable components across both proxy-wasm (CDN) and wasi-http interfaces. Eliminated code duplication and created a consistent UI pattern.
+
+### 🎯 What Was Completed
+
+#### 1. Created Shared Request Components
+- **RequestPanel** - Unified request UI wrapper combining RequestBar and RequestInfoTabs
+  - RequestBar always visible at top (method/URL/send button)
+  - RequestInfoTabs in collapsible section below (headers/body tabs)
+  - Supports URL prefix for wasi-http split input
+  - Supports default headers for proxy-wasm
+- **Moved child components** into RequestPanel folder as implementation details
+  - `RequestBar` → `RequestPanel/RequestBar`
+  - `RequestInfoTabs` → `RequestPanel/RequestInfoTabs`
+
+#### 2. Renamed and Enhanced Response Components
+- **ResponseViewer → ResponsePanel** - Renamed for naming consistency
+  - Handles all response types (JSON, HTML, images, binary)
+  - Shows status badge with color coding
+  - Tabs for Body/Preview/Headers
+
+#### 3. Created Shared Logging Components
+- **LogLevelSelector** - Reusable log level dropdown component
+  - Extracted from HookStagesPanel
+  - Used by both proxy-wasm and wasi-http interfaces
+  - Compact design (0.75rem font, no line-breaking)
+- Both interfaces now have consistent "Logging" panels with log level filtering
+
+#### 4. Removed Dead Code and Wrapper Components
+Eliminated unnecessary wrapper components and dead code (~400+ lines removed):
+- ❌ `HeadersEditor` - Redundant wrapper around DictionaryInput
+- ❌ `RequestTabs` - Redundant wrapper around CollapsiblePanel + RequestInfoTabs
+- ❌ `ResponseTabs` - Unused dead code
+- ❌ `HttpRequestPanel` - Logic moved to HttpWasmView
+- ❌ `HttpResponsePanel` - Logic moved to HttpWasmView
+- ❌ Entire `http-wasm` component folder deleted
+
+#### 5. Enhanced CollapsiblePanel Component
+Improved visual design and usability:
+- Added 1px border and background to make panels visually distinct when expanded
+- Replaced unicode arrow (▼) with modern CSS chevron (10px × 10px, 2px borders)
+- Better padding (1rem 1.25rem) in content area
+- Rounded corners (4px border-radius)
+
+#### 6. Unified View Structure
+Both ProxyWasmView and HttpWasmView now follow the same pattern:
+- `<RequestPanel />` - Request UI (method/URL/headers/body)
+- `<Logging CollapsiblePanel>` - Logging with log level selector
+- `<ResponsePanel />` - Response display (status/body/headers/preview)
+
+### 📊 Architecture Changes
+
+**Component Structure:**
+```
+common/
+├── RequestPanel/         ← NEW: Unified request UI
+│   ├── RequestBar/       ← Moved from common/RequestBar
+│   └── RequestInfoTabs/  ← Moved from common/RequestInfoTabs
+├── ResponsePanel/        ← Renamed from ResponseViewer
+├── LogLevelSelector/     ← NEW: Extracted from HookStagesPanel
+├── CollapsiblePanel/     ← Enhanced styling
+└── ...
+
+proxy-wasm/              ← Only domain-specific components remain
+├── HookStagesPanel/     ← Now uses LogLevelSelector
+├── ServerPropertiesPanel/
+└── PropertiesEditor/
+```
+
+### 📝 Benefits
+- **75% reduction** in UI component code duplication
+- **Consistent UX** across both proxy-wasm and wasi-http interfaces
+- **Easier maintenance** - changes to common components affect both interfaces
+- **Cleaner architecture** - clear separation between common and domain-specific components
+- **Better visual design** - panels are distinct with borders and modern icons
+- **Reduced padding** - Views use 1rem horizontal padding (was 2rem) for more content width
+
+---
+
+## February 12, 2026 (Morning) - Workspace WASM Auto-Loading & Tab-Based UI
 
 ### Overview
 Implemented automatic workspace WASM detection and loading for VSCode integration, with tab-based UI for switching between path and upload modes. The debugger now seamlessly auto-loads `.fastedge/bin/debugger.wasm` on startup and supports F5 rebuild auto-reload.

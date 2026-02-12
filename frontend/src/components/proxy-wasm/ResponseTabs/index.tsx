@@ -1,1 +1,0 @@
-export { ResponseTabs } from "./ResponseTabs";

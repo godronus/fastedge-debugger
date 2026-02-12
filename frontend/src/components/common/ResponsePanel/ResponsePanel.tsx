@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { CollapsiblePanel } from "../CollapsiblePanel";
 import { JsonDisplay } from "../JsonDisplay";
-import styles from "./ResponseViewer.module.css";
+import styles from "./ResponsePanel.module.css";
 
-interface ResponseViewerProps {
+interface ResponsePanelProps {
   response: {
     status: number;
     statusText: string;
@@ -16,7 +16,7 @@ interface ResponseViewerProps {
 
 type Tab = "body" | "preview" | "headers";
 
-export function ResponseViewer({ response }: ResponseViewerProps) {
+export function ResponsePanel({ response }: ResponsePanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("body");
 
   // Auto-switch to appropriate tab based on content type
@@ -50,7 +50,7 @@ export function ResponseViewer({ response }: ResponseViewerProps) {
 
   if (!response) {
     return (
-      <div className={styles.responseViewer}>
+      <div className={styles.responsePanel}>
         <CollapsiblePanel title="Response" defaultExpanded={true}>
           <div className={styles.responseEmpty}>
             Click "Send" to execute the request and view the response.
@@ -271,7 +271,7 @@ export function ResponseViewer({ response }: ResponseViewerProps) {
   };
 
   return (
-    <div className={styles.responseViewer}>
+    <div className={styles.responsePanel}>
       <CollapsiblePanel
         title="Response"
         defaultExpanded={true}

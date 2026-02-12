@@ -1,8 +1,7 @@
-import { RequestBar } from "../../components/common/RequestBar";
-import { RequestTabs } from "../../components/proxy-wasm/RequestTabs";
+import { RequestPanel } from "../../components/common/RequestPanel";
 import { ServerPropertiesPanel } from "../../components/proxy-wasm/ServerPropertiesPanel";
 import { HookStagesPanel } from "../../components/proxy-wasm/HookStagesPanel";
-import { ResponseViewer } from "../../components/common/ResponseViewer";
+import { ResponsePanel } from "../../components/common/ResponsePanel";
 import { useAppStore } from "../../stores";
 import { applyDefaultContentType } from "../../utils/contentType";
 import styles from "./ProxyWasmView.module.css";
@@ -109,16 +108,13 @@ export function ProxyWasmView() {
 
   return (
     <div className={styles.proxyWasmView}>
-      <RequestBar
+      <RequestPanel
         method={method}
         url={url}
         wasmLoaded={wasmPath !== null}
         onMethodChange={setMethod}
         onUrlChange={setUrl}
         onSend={handleSend}
-      />
-
-      <RequestTabs
         headers={requestHeaders}
         body={requestBody}
         onHeadersChange={setRequestHeaders}
@@ -162,6 +158,10 @@ export function ProxyWasmView() {
             placeholder: "Bearer <token>",
           },
         }}
+        headersLabel="Request Headers"
+        bodyLabel="Request Body"
+        headerKeyPlaceholder="Header name"
+        headerValuePlaceholder="Header value"
       />
 
       <ServerPropertiesPanel
@@ -178,7 +178,7 @@ export function ProxyWasmView() {
         onLogLevelChange={setLogLevel}
       />
 
-      <ResponseViewer response={finalResponse} />
+      <ResponsePanel response={finalResponse} />
     </div>
   );
 }

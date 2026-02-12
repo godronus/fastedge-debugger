@@ -8,8 +8,6 @@ interface WasmLoaderProps {
   onFileLoad: (file: File) => void;
   onPathLoad?: (path: string) => void;
   loading: boolean;
-  onLoadConfig?: () => void;
-  onSaveConfig?: () => void;
   // Loading metadata (optional)
   loadingMode?: 'path' | 'buffer' | null;
   loadTime?: number | null;
@@ -25,8 +23,6 @@ export function WasmLoader({
   onFileLoad,
   onPathLoad,
   loading,
-  onLoadConfig,
-  onSaveConfig,
   loadingMode,
   loadTime,
   fileSize,
@@ -91,18 +87,6 @@ export function WasmLoader({
     <section className={styles.wasmLoader}>
       <div className={styles.header}>
         <h2>Load WASM Binary</h2>
-        <div className={styles.actions}>
-          {onLoadConfig && (
-            <button onClick={onLoadConfig} className={styles.secondaryButton}>
-              📥 Load Config
-            </button>
-          )}
-          {onSaveConfig && (
-            <button onClick={onSaveConfig} className={styles.secondaryButton}>
-              💾 Save Config
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Tabs */}

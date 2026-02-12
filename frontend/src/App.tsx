@@ -5,6 +5,7 @@ import type { ServerEvent } from "./hooks/websocket-types";
 import { WasmLoader } from "./components/common/WasmLoader";
 import { ConnectionStatus } from "./components/common/ConnectionStatus";
 import { LoadingSpinner } from "./components/common/LoadingSpinner";
+import { ConfigButtons } from "./components/common/ConfigButtons";
 import { HttpWasmView } from "./views/HttpWasmView";
 import { ProxyWasmView } from "./views/ProxyWasmView";
 import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI, getEnvironment, getWorkspaceWasm, type EnvironmentInfo } from "./api";
@@ -266,14 +267,21 @@ function App() {
         onPathLoad={(path) => loadWasm(path, dotenvEnabled)}
         loading={loading}
         wasmPath={wasmPath}
-        onLoadConfig={wasmType === 'proxy-wasm' ? handleLoadConfig : undefined}
-        onSaveConfig={wasmType === 'proxy-wasm' ? handleSaveConfig : undefined}
         loadingMode={loadingMode}
         loadTime={loadTime}
         fileSize={fileSize}
         fileName={wasmPath}
         defaultTab={environment?.environment === 'vscode' ? 'path' : 'upload'}
       />
+
+      {/* Config Management - Show when WASM is loaded */}
+      {wasmPath && (
+        <ConfigButtons
+          onLoadConfig={handleLoadConfig}
+          onSaveConfig={handleSaveConfig}
+          wasmType={wasmType}
+        />
+      )}
 
       {/* Show loading spinner while detecting WASM type */}
       {loading && <LoadingSpinner message="Loading and detecting WASM type..." />}

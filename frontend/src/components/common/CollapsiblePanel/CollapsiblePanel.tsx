@@ -24,7 +24,7 @@ export function CollapsiblePanel({
         <h3 className={styles.title}>{title}</h3>
         <div className={styles.headerRight}>
           {headerExtra}
-          <span className={arrowClass}>▼</span>
+          <div className={arrowClass}></div>
         </div>
       </div>
 
