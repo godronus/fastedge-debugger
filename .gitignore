@@ -22,8 +22,5 @@ yarn-error.log
 # Internal Rust code
 rust_host/
 
-# Built wasm binaries for test applications
-wasm/
-
 # Using pnpm
 package-lock.json
