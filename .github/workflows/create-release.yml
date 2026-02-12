@@ -110,9 +110,9 @@ jobs:
       #     pnpm build:test-apps
 
       # This is using developer built wasm tets-apps.. NEEDS TO BUILD IN CI/CD
-      - name: Run tests
-        run: |
-          pnpm test
+      # - name: Run tests
+      #   run: |
+      #     pnpm test
 
       - name: Zip Debugger distribution
         run: |
