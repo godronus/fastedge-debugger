@@ -401,6 +401,41 @@ export async function saveConfig(config: TestConfig): Promise<void> {
   }
 }
 
+export async function showSaveDialog(
+  suggestedName: string
+): Promise<{ canceled?: boolean; filePath?: string; fallbackRequired?: boolean }> {
+  const response = await fetch(`${API_BASE}/config/show-save-dialog`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ suggestedName }),
+  });
+
+  const result = await response.json();
+  return result;
+}
+
+export async function saveConfigAs(
+  config: TestConfig,
+  filePath: string
+): Promise<{ savedPath: string }> {
+  const response = await fetch(`${API_BASE}/config/save-as`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ config, filePath }),
+  });
+
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.error || "Failed to save config");
+  }
+
+  return response.json();
+}
+
 export async function executeHttpWasm(
   url: string,
   method: string = 'GET',

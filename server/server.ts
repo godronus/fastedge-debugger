@@ -8,6 +8,15 @@ import { WebSocketManager, StateManager } from "./websocket/index.js";
 import { detectWasmType } from "./utils/wasmTypeDetector.js";
 import { validatePath } from "./utils/pathValidator.js";
 
+// Try to import electron dialog if available
+let electronDialog: any = null;
+try {
+  // This will work if running in Electron context
+  electronDialog = require("electron")?.dialog;
+} catch {
+  // Not in Electron, dialog features won't be available
+}
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -405,6 +414,84 @@ app.post("/api/config", async (req: Request, res: Response) => {
     }
 
     res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: String(error) });
+  }
+});
+
+// Show save dialog (Electron only)
+app.post("/api/config/show-save-dialog", async (req: Request, res: Response) => {
+  try {
+    const { suggestedName } = req.body ?? {};
+
+    if (!electronDialog) {
+      res.status(501).json({
+        ok: false,
+        error: "Dialog API not available (not running in Electron)",
+        fallbackRequired: true
+      });
+      return;
+    }
+
+    // Show Electron save dialog
+    const result = await electronDialog.showSaveDialog({
+      title: "Save Config File",
+      defaultPath: suggestedName || "test-config.json",
+      filters: [
+        { name: "JSON Files", extensions: ["json"] },
+        { name: "All Files", extensions: ["*"] }
+      ],
+      properties: ["createDirectory", "showOverwriteConfirmation"]
+    });
+
+    if (result.canceled || !result.filePath) {
+      res.json({ ok: true, canceled: true });
+      return;
+    }
+
+    res.json({ ok: true, filePath: result.filePath });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: String(error) });
+  }
+});
+
+// Save config to a specific file path
+app.post("/api/config/save-as", async (req: Request, res: Response) => {
+  try {
+    const { config, filePath } = req.body ?? {};
+    if (!config) {
+      res.status(400).json({ error: "Missing config" });
+      return;
+    }
+    if (!filePath) {
+      res.status(400).json({ error: "Missing filePath" });
+      return;
+    }
+
+    // Resolve path relative to project root (where server runs)
+    const projectRoot = path.join(__dirname, "..");
+    let targetPath: string;
+
+    // Check if path is absolute or relative
+    if (path.isAbsolute(filePath)) {
+      targetPath = filePath;
+    } else {
+      targetPath = path.join(projectRoot, filePath);
+    }
+
+    // Ensure .json extension
+    if (!targetPath.endsWith(".json")) {
+      targetPath += ".json";
+    }
+
+    // Create directory if it doesn't exist
+    const dir = path.dirname(targetPath);
+    await fs.mkdir(dir, { recursive: true });
+
+    // Write the file
+    await fs.writeFile(targetPath, JSON.stringify(config, null, 2), "utf-8");
+
+    res.json({ ok: true, savedPath: targetPath });
   } catch (error) {
     res.status(500).json({ ok: false, error: String(error) });
   }

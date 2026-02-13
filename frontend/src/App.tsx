@@ -8,12 +8,17 @@ import { LoadingSpinner } from "./components/common/LoadingSpinner";
 import { ConfigButtons } from "./components/common/ConfigButtons";
 import { HttpWasmView } from "./views/HttpWasmView";
 import { ProxyWasmView } from "./views/ProxyWasmView";
-import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI, getEnvironment, getWorkspaceWasm, type EnvironmentInfo } from "./api";
+import { ConfigEditorModal } from "./components/ConfigEditorModal";
+import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI, getEnvironment, getWorkspaceWasm, type EnvironmentInfo, type TestConfig } from "./api";
 import "./App.css";
 
 function App() {
   // Environment detection state
   const [environment, setEnvironment] = useState<EnvironmentInfo | null>(null);
+
+  // Config editor modal state
+  const [showConfigEditor, setShowConfigEditor] = useState(false);
+  const [configEditorInitial, setConfigEditorInitial] = useState<TestConfig | null>(null);
 
   // Get state and actions from stores
   const {
@@ -219,34 +224,47 @@ function App() {
   }
 
   /**
-   * Load configuration from test-config.json
+   * Load configuration from a file
    */
-  const handleLoadConfig = async () => {
-    try {
-      const config = await loadConfigAPI();
+  const handleLoadConfig = () => {
+    // Create file input element
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
 
-      // Load config into store
-      loadFromConfig(config);
+    input.onchange = async (e) => {
+      try {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
 
-      alert("✅ Configuration loaded successfully!");
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      alert(`❌ Failed to load config: ${msg}`);
-    }
+        const text = await file.text();
+        const config = JSON.parse(text) as TestConfig;
+
+        // Validate basic structure
+        if (!config.request || !config.properties || config.logLevel === undefined) {
+          throw new Error("Invalid config file structure");
+        }
+
+        // Load config into store
+        loadFromConfig(config);
+
+        alert(`✅ Configuration loaded from ${file.name}!`);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        alert(`❌ Failed to load config: ${msg}`);
+      }
+    };
+
+    input.click();
   };
 
   /**
-   * Save current configuration to test-config.json
+   * Open config editor modal for saving
    */
-  const handleSaveConfig = async () => {
-    try {
-      const config = exportConfig();
-      await saveConfigAPI(config);
-      alert("✅ Configuration saved to test-config.json!");
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      alert(`❌ Failed to save config: ${msg}`);
-    }
+  const handleSaveConfig = () => {
+    const config = exportConfig();
+    setConfigEditorInitial(config);
+    setShowConfigEditor(true);
   };
 
   return (
@@ -295,6 +313,14 @@ function App() {
 
       {!loading && wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
       {!loading && wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
+
+      {/* Config Editor Modal */}
+      {showConfigEditor && configEditorInitial && (
+        <ConfigEditorModal
+          initialConfig={configEditorInitial}
+          onClose={() => setShowConfigEditor(false)}
+        />
+      )}
     </div>
   );
 }

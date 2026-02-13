@@ -1,0 +1,98 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  font-size: 13px;
+  color: #b0b0b0;
+  font-weight: 500;
+}
+
+.errorBadge {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: #5d2f2f;
+  color: #ff6b6b;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.successBadge {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: #2f5d2f;
+  color: #6bff6b;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.error {
+  background: #3d1f1f;
+  color: #ff6b6b;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #5d2f2f;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.error strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #ff8888;
+}
+
+.editor {
+  flex: 1;
+  min-height: 400px;
+  max-height: 600px;
+  padding: 16px;
+  background: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  line-height: 1.6;
+  resize: vertical;
+  tab-size: 2;
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.editor:focus {
+  outline: none;
+  border-color: #ff6c37;
+  box-shadow: 0 0 0 2px rgba(255, 108, 55, 0.2);
+}
+
+.footer {
+  padding-top: 12px;
+  border-top: 1px solid #3d3d3d;
+}
+
+.hint {
+  font-size: 12px;
+  color: #808080;
+  font-style: italic;
+}

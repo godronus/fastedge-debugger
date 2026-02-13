@@ -1,5 +1,146 @@
 # Proxy-WASM Runner - Changelog
 
+## February 13, 2026 - Config Editor Modal with Smart Save Strategies
+
+### Overview
+Implemented modal-based config editor with JSON editing and intelligent save strategies that adapt to browser capabilities. Supports native OS dialogs in Chrome/Edge, with fallbacks for Firefox/Safari and future VS Code integration.
+
+### 🎯 What Was Completed
+
+#### 1. Config Editor Modal
+**Created ConfigEditorModal component with two-tab design:**
+- **JSON Editor Tab** (Implemented) - Real-time JSON validation, syntax error highlighting, format button
+- **Form Editor Tab** (Coming Soon) - Will reuse existing UI components for visual editing
+
+**Features:**
+- Real-time JSON validation with inline error messages
+- Pretty-print formatting
+- ESC key and backdrop click to close
+- Validates required fields and data types
+
+**Files Created:**
+- `frontend/src/components/ConfigEditorModal/ConfigEditorModal.tsx` - Main modal component
+- `frontend/src/components/ConfigEditorModal/ConfigEditorModal.module.css` - Modal styling
+- `frontend/src/components/ConfigEditorModal/JsonEditorTab.tsx` - JSON editor with validation
+- `frontend/src/components/ConfigEditorModal/JsonEditorTab.module.css` - Editor styling
+- `frontend/src/components/ConfigEditorModal/index.tsx` - Barrel export
+
+#### 2. Smart 3-Tier Save Strategy
+
+**Tier 1: File System Access API (Chrome/Edge)**
+- Uses native `window.showSaveFilePicker()` API
+- Shows OS-level "Save As" dialog with full folder navigation
+- Supported in Chrome 86+, Edge 86+, Opera 72+
+- **Best user experience** - familiar native dialogs
+
+**Tier 2: Backend Electron Dialog (VS Code Integration)**
+- Backend endpoint: `POST /api/config/show-save-dialog`
+- Attempts to use Electron's dialog API
+- Ready for VS Code extension integration (extension can intercept and use `vscode.window.showSaveDialog()`)
+- Falls back if not available
+
+**Tier 3: Prompt Fallback (Firefox/Safari)**
+- Text prompt for file path entry
+- Supports relative and absolute paths
+- Backend creates directories as needed
+- Ensures `.json` extension
+
+#### 3. Backend File Operations
+
+**New Endpoints:**
+
+`POST /api/config/show-save-dialog`
+- Shows Electron save dialog (if available)
+- Returns selected file path or cancellation status
+- Falls back gracefully if dialog API unavailable
+
+`POST /api/config/save-as`
+- Saves config to specified file path
+- Handles relative/absolute paths
+- Creates directories recursively
+- Auto-adds `.json` extension
+
+**Files Modified:**
+- `server/server.ts` - Added dialog and save-as endpoints, Electron dialog integration
+
+#### 4. Frontend Integration
+
+**Updated Components:**
+- `App.tsx` - Modal state management, updated save/load handlers
+- `api/index.ts` - Added `showSaveDialog()` and `saveConfigAs()` API functions
+
+**Load Flow:**
+- Uses native `<input type="file">` picker
+- Works in all browsers
+- Validates config structure before loading
+
+#### 5. File Naming Logic
+
+Intelligent filename suggestions based on WASM:
+- WASM loaded: `{wasm-name}-config.json`
+- No WASM: `test-config.json`
+- Example: `my-filter.wasm` → suggests `my-filter-config.json`
+
+### 🌐 Browser Compatibility
+
+| Browser | Save Method | Dialog Type |
+|---------|-------------|-------------|
+| Chrome 86+ | File System Access API | ✅ Native OS dialog |
+| Edge 86+ | File System Access API | ✅ Native OS dialog |
+| Firefox | Prompt fallback | ⚠️ Text prompt |
+| Safari | Prompt fallback | ⚠️ Text prompt |
+| VS Code webview | Backend dialog (future) | 🔄 Requires extension integration |
+
+### 📋 Known Limitations
+
+1. **Firefox/Safari**: No native "Save As" dialog - falls back to text prompt
+   - Limitation: File System Access API not supported by these browsers
+   - Workaround: Use Chrome/Edge for testing, or accept prompt UX
+   - Future: Could implement custom file browser UI
+
+2. **VS Code Integration**: Backend Electron dialog doesn't work in standard Node.js server
+   - Solution: VS Code extension must intercept dialog calls
+   - Extension should use `vscode.window.showSaveDialog()`
+   - Backend endpoints are ready for this integration
+
+3. **Form Editor Tab**: Not yet implemented
+   - Currently shows "Coming Soon" message
+   - Will reuse existing components (PropertiesEditor, RequestPanel, LogLevelSelector)
+   - Requires extracting logic into hooks for controlled component versions
+
+### 🧪 Testing
+
+**Recommended Setup:**
+- **Local Development**: Chrome or Edge for native dialog testing
+- **Firefox Testing**: Prompt fallback works but less user-friendly
+- **VS Code Extension**: Requires extension integration (documented in CONFIG_EDITOR.md)
+
+### 📝 Documentation
+
+Created comprehensive feature documentation:
+- `context/features/CONFIG_EDITOR.md` - Complete implementation guide
+  - Component architecture
+  - Save strategy details
+  - Browser compatibility matrix
+  - API documentation
+  - VS Code integration guide
+  - Future enhancements roadmap
+
+### 🔄 Integration with Existing Features
+
+- Uses existing `exportConfig()` and `loadFromConfig()` from Zustand store
+- WebSocket integration: Emits properties update events when config saved
+- Environment detection: Respects existing `getEnvironment()` API
+
+### 🚀 Next Steps
+
+1. **Form Editor Tab**: Implement visual form using existing components
+2. **VS Code Extension Integration**: Add message passing for native dialogs
+3. **Remove Debug Logs**: Clean up console.log statements for production
+4. **Custom File Browser**: Consider for universal cross-browser solution (optional)
+
+---
+
 ## February 12, 2026 (Late Evening) - Config Management UI & Spacing Refinements
 
 ### Overview
