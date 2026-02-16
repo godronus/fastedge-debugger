@@ -1,0 +1,28 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://cdn-origin-4732724.fastedge.cdn.gc.onl/",
+    "headers": {
+      "content-type": "application/json",
+      "host": "cdn-origin-4732724.fastedge.cdn.gc.onl"
+    },
+    "body": "{\"message\": \"Hello\"}"
+  },
+  "response": {
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"response\": \"OK\"}"
+  },
+  "properties": {
+    "request.url": "https://cdn-origin-4732724.fastedge.cdn.gc.onl/",
+    "request.host": "cdn-origin-4732724.fastedge.cdn.gc.onl",
+    "request.path": "/",
+    "request.query": "",
+    "request.scheme": "https",
+    "request.extension": "",
+    "request.method": "POST"
+  },
+  "logLevel": 3,
+  "dotenvEnabled": true
+}

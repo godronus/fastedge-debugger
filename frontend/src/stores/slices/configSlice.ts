@@ -84,7 +84,7 @@ export const createConfigSlice: StateCreator<
 
   exportConfig: () => {
     const state = get();
-    return {
+    const config: TestConfig = {
       request: {
         method: state.method,
         url: state.url,
@@ -98,7 +98,17 @@ export const createConfigSlice: StateCreator<
       properties: { ...state.properties },
       logLevel: state.logLevel,
       dotenvEnabled: state.dotenvEnabled,
-    } as TestConfig;
+    };
+
+    // Include wasm path if loaded
+    if (state.wasmPath) {
+      config.wasm = {
+        path: state.wasmPath,
+        description: 'Current loaded WASM binary',
+      };
+    }
+
+    return config;
   },
 
   resetConfig: () =>

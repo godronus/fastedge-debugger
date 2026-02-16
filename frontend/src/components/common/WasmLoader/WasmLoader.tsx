@@ -1,4 +1,4 @@
-import { ChangeEvent, useState, useEffect } from "react";
+import { ChangeEvent, useState, useEffect, useRef } from "react";
 import styles from "./WasmLoader.module.css";
 import { formatFileSize } from "../../../utils/filePath";
 
@@ -32,18 +32,34 @@ export function WasmLoader({
 }: WasmLoaderProps) {
   const [wasmPath, setWasmPath] = useState("");
   const [activeTab, setActiveTab] = useState<LoaderTab>(defaultTab);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update active tab when defaultTab changes (environment detection completes)
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
 
-  // Sync local input field with global store's wasmPath
+  // Update active tab based on loading mode (shows which method was actually used)
   useEffect(() => {
-    if (globalWasmPath && globalWasmPath !== wasmPath) {
-      setWasmPath(globalWasmPath);
+    if (loadingMode === 'buffer') {
+      // Buffer mode = file upload or drag & drop
+      setActiveTab('upload');
+    } else if (loadingMode === 'path') {
+      // Path mode = file path loading
+      setActiveTab('path');
     }
-  }, [globalWasmPath]);
+  }, [loadingMode]);
+
+  // Sync local input field with global store's wasmPath
+  // Only sync when using path mode (not buffer mode)
+  useEffect(() => {
+    if (loadingMode === 'path' && globalWasmPath && globalWasmPath !== wasmPath) {
+      setWasmPath(globalWasmPath);
+    } else if (loadingMode === 'buffer') {
+      // Clear path input when using buffer mode
+      setWasmPath('');
+    }
+  }, [globalWasmPath, loadingMode]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,13 +178,41 @@ export function WasmLoader({
             <div className={styles.panelDescription}>
               Upload a WASM binary file from your computer
             </div>
-            <input
-              type="file"
-              accept=".wasm"
-              onChange={handleFileChange}
-              disabled={loading}
-              className={styles.fileInput}
-            />
+            <div className={styles.fileInputWrapper}>
+              {/* Custom "Choose File" button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+                className={styles.chooseFileButton}
+              >
+                Choose File
+              </button>
+
+              {/* Hidden native file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".wasm"
+                onChange={handleFileChange}
+                disabled={loading}
+                className={styles.hiddenFileInput}
+              />
+
+              {/* Inline file display - shown when file is loaded */}
+              {!loading && loadingMode === 'buffer' && fileName ? (
+                <div className={styles.selectedFile}>
+                  <span className={styles.selectedFileIcon}>✓</span>
+                  <span className={styles.selectedFileName}>{fileName}</span>
+                  {fileSize && (
+                    <span className={styles.selectedFileSize}>
+                      ({formatFileSize(fileSize)})
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className={styles.noFileChosen}>No file chosen</span>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://cdn-origin-4732724.fastedge.cdn.gc.onl/",
+    "headers": {},
+    "body": "{\"message\": \"Hello\"}"
+  },
+  "response": {
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"response\": \"OK\"}"
+  },
+  "properties": {},
+  "logLevel": 3,
+  "dotenvEnabled": true
+}

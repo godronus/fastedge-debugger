@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://cdn-origin-4732724.fastedge.cdn.gc.onl/",
+    "headers": {},
+    "body": "{\"message\": \"Hello\"}"
+  },
+  "response": {
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\"response\": \"OK\"}"
+  },
+  "properties": {},
+  "logLevel": 3,
+  "dotenvEnabled": true,
+  "wasm": {
+    "path": "/home/gdoco/dev/gcore/backend/apps/test_fns_mono/wasm/http_sdk_basic.wasm",
+    "description": "Current loaded WASM binary"
+  }
+}

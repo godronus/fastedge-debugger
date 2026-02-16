@@ -235,7 +235,7 @@ export async function uploadWasmFromPath(
   console.log(`✅ Path-based loading succeeded in ${loadTime.toFixed(1)}ms`);
 
   return {
-    path: wasmPath, // Return full path (including <workspace> placeholder if present)
+    path: result.resolvedPath || wasmPath, // Use resolved absolute path from backend, fallback to original
     wasmType: result.wasmType,
     loadingMode: "path",
     loadTime,

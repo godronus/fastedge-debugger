@@ -169,18 +169,19 @@
   line-height: 1.5;
 }
 
-.fileInput {
-  width: 100%;
+/* Custom file input wrapper - horizontal layout */
+.fileInputWrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 8px;
   background: #1e1e1e;
   border: 1px solid #3d3d3d;
   border-radius: 4px;
-  color: #e0e0e0;
-  font-size: 13px;
-  cursor: pointer;
 }
 
-.fileInput::-webkit-file-upload-button {
+/* Custom "Choose File" button */
+.chooseFileButton {
   background: #ff6c37;
   color: #ffffff;
   border: none;
@@ -189,16 +190,54 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  margin-right: 12px;
+  white-space: nowrap;
+  transition: background 0.2s;
 }
 
-.fileInput::-webkit-file-upload-button:hover {
+.chooseFileButton:hover:not(:disabled) {
   background: #ff7c47;
 }
 
-.fileInput:disabled {
+.chooseFileButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Hidden native file input */
+.hiddenFileInput {
+  display: none;
+}
+
+/* "No file chosen" text */
+.noFileChosen {
+  color: #888;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Selected file display (inline, next to button) */
+.selectedFile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.selectedFileIcon {
+  color: #4caf50;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.selectedFileName {
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.selectedFileSize {
+  color: #b0b0b0;
+  font-size: 12px;
 }
 
 /* Tab info display (far right in tabs bar) */

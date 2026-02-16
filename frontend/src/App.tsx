@@ -6,19 +6,15 @@ import { WasmLoader } from "./components/common/WasmLoader";
 import { ConnectionStatus } from "./components/common/ConnectionStatus";
 import { LoadingSpinner } from "./components/common/LoadingSpinner";
 import { ConfigButtons } from "./components/common/ConfigButtons";
+import { DragDropZone } from "./components/common/DragDropZone";
 import { HttpWasmView } from "./views/HttpWasmView";
 import { ProxyWasmView } from "./views/ProxyWasmView";
-import { ConfigEditorModal } from "./components/ConfigEditorModal";
-import { loadConfig as loadConfigAPI, saveConfig as saveConfigAPI, getEnvironment, getWorkspaceWasm, type EnvironmentInfo, type TestConfig } from "./api";
+import { getEnvironment, getWorkspaceWasm, type EnvironmentInfo } from "./api";
 import "./App.css";
 
 function App() {
   // Environment detection state
   const [environment, setEnvironment] = useState<EnvironmentInfo | null>(null);
-
-  // Config editor modal state
-  const [showConfigEditor, setShowConfigEditor] = useState(false);
-  const [configEditorInitial, setConfigEditorInitial] = useState<TestConfig | null>(null);
 
   // Get state and actions from stores
   const {
@@ -51,7 +47,6 @@ function App() {
     // Config state
     dotenvEnabled,
     loadFromConfig,
-    exportConfig,
 
     // UI state
     wsStatus,
@@ -224,104 +219,100 @@ function App() {
   }
 
   /**
-   * Load configuration from a file
+   * Handle WASM file drop
+   * Accepts either File object (buffer mode) or string path (path mode)
    */
-  const handleLoadConfig = () => {
-    // Create file input element
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-
-    input.onchange = async (e) => {
-      try {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (!file) return;
-
-        const text = await file.text();
-        const config = JSON.parse(text) as TestConfig;
-
-        // Validate basic structure
-        if (!config.request || !config.properties || config.logLevel === undefined) {
-          throw new Error("Invalid config file structure");
-        }
-
-        // Load config into store
-        loadFromConfig(config);
-
-        alert(`✅ Configuration loaded from ${file.name}!`);
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : "Unknown error";
-        alert(`❌ Failed to load config: ${msg}`);
-      }
-    };
-
-    input.click();
+  const handleWasmDrop = async (fileOrPath: File | string) => {
+    try {
+      await loadWasm(fileOrPath, dotenvEnabled);
+      const fileName = typeof fileOrPath === 'string'
+        ? fileOrPath.split('/').pop() || fileOrPath
+        : fileOrPath.name;
+      console.log(`✅ WASM loaded via drag & drop: ${fileName}`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`❌ Failed to load WASM: ${msg}`);
+    }
   };
 
   /**
-   * Open config editor modal for saving
+   * Handle config file drop
+   * Loads config and auto-loads WASM if path is present
    */
-  const handleSaveConfig = () => {
-    const config = exportConfig();
-    setConfigEditorInitial(config);
-    setShowConfigEditor(true);
+  const handleConfigDrop = async (file: File) => {
+    try {
+      const text = await file.text();
+      const config = JSON.parse(text);
+
+      // Validate config structure
+      if (!config.request || !config.properties || config.logLevel === undefined) {
+        throw new Error('Invalid config file structure');
+      }
+
+      // Load config state
+      loadFromConfig(config);
+
+      // Auto-load WASM if path is specified
+      if (config.wasm?.path) {
+        try {
+          await loadWasm(config.wasm.path, dotenvEnabled);
+          alert(`✅ Configuration loaded from ${file.name}\n🚀 WASM auto-loaded: ${config.wasm.path}`);
+        } catch (wasmError) {
+          const wasmMsg = wasmError instanceof Error ? wasmError.message : 'Unknown error';
+          alert(`✅ Configuration loaded from ${file.name}\n⚠️ WASM path not found. Please load WASM manually.`);
+        }
+      } else {
+        alert(`✅ Configuration loaded from ${file.name}!`);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`❌ Failed to load config: ${msg}`);
+    }
   };
 
   return (
-    <div className="container">
-      <header>
-        <h1>
-          {wasmType === 'http-wasm' ? 'HTTP WASM Debugger' :
-           wasmType === 'proxy-wasm' ? 'Proxy-WASM Test Runner' :
-           'FastEdge WASM Debugger'}
-        </h1>
-        <ConnectionStatus status={wsStatus} />
-      </header>
+    <DragDropZone onWasmDrop={handleWasmDrop} onConfigDrop={handleConfigDrop}>
+      <div className="container">
+        <header>
+          <h1>
+            {wasmType === 'http-wasm' ? 'HTTP WASM Debugger' :
+             wasmType === 'proxy-wasm' ? 'Proxy-WASM Test Runner' :
+             'FastEdge WASM Debugger'}
+          </h1>
+          <ConnectionStatus status={wsStatus} />
+        </header>
 
-      {error && <div className="error">{error}</div>}
+        {error && <div className="error">{error}</div>}
 
-      <WasmLoader
-        onFileLoad={(file) => loadWasm(file, dotenvEnabled)}
-        onPathLoad={(path) => loadWasm(path, dotenvEnabled)}
-        loading={loading}
-        wasmPath={wasmPath}
-        loadingMode={loadingMode}
-        loadTime={loadTime}
-        fileSize={fileSize}
-        fileName={wasmPath}
-        defaultTab={environment?.environment === 'vscode' ? 'path' : 'upload'}
-      />
-
-      {/* Config Management - Show when WASM is loaded */}
-      {wasmPath && (
-        <ConfigButtons
-          onLoadConfig={handleLoadConfig}
-          onSaveConfig={handleSaveConfig}
-          wasmType={wasmType}
+        <WasmLoader
+          onFileLoad={(file) => loadWasm(file, dotenvEnabled)}
+          onPathLoad={(path) => loadWasm(path, dotenvEnabled)}
+          loading={loading}
+          wasmPath={wasmPath}
+          loadingMode={loadingMode}
+          loadTime={loadTime}
+          fileSize={fileSize}
+          fileName={wasmPath}
+          defaultTab="path"
         />
-      )}
 
-      {/* Show loading spinner while detecting WASM type */}
-      {loading && <LoadingSpinner message="Loading and detecting WASM type..." />}
+        {/* Config Management - Always visible */}
+        <ConfigButtons />
 
-      {/* Show appropriate view based on WASM type */}
-      {!loading && !wasmPath && (
-        <div className="empty-state">
-          <p>👆 Load a WASM binary to get started</p>
-        </div>
-      )}
+        {/* Show loading spinner while detecting WASM type */}
+        {loading && <LoadingSpinner message="Loading and detecting WASM type..." />}
 
-      {!loading && wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
-      {!loading && wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
+        {/* Show appropriate view based on WASM type */}
+        {!loading && !wasmPath && (
+          <div className="empty-state">
+            <p>👆 Load a WASM binary to get started</p>
+          </div>
+        )}
 
-      {/* Config Editor Modal */}
-      {showConfigEditor && configEditorInitial && (
-        <ConfigEditorModal
-          initialConfig={configEditorInitial}
-          onClose={() => setShowConfigEditor(false)}
-        />
-      )}
-    </div>
+        {!loading && wasmPath && wasmType === 'http-wasm' && <HttpWasmView />}
+        {!loading && wasmPath && wasmType === 'proxy-wasm' && <ProxyWasmView />}
+      </div>
+    </DragDropZone>
   );
 }
 

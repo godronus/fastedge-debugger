@@ -208,7 +208,9 @@ app.post("/api/load", async (req: Request, res: Response) => {
     const source = (req.headers["x-source"] as any) || "ui";
     stateManager.emitWasmLoaded(fileName, fileSize, source);
 
-    res.json({ ok: true, wasmType });
+    // Return resolved absolute path (only for path-based loading)
+    const resolvedPath = typeof bufferOrPath === 'string' ? bufferOrPath : undefined;
+    res.json({ ok: true, wasmType, resolvedPath });
   } catch (error) {
     // Cleanup runner if load failed
     if (currentRunner) {
